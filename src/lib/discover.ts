@@ -209,6 +209,62 @@ export async function getRecentShows(onProgress?: (text: string) => void): Promi
   return groups;
 }
 
+// Promise condivise per il preload in background: una volta avviate, le viste
+// possono "attaccarsi" alla stessa promise senza rifare il fetch.
+let _popularPromise: Promise<DiscoverGroups> | null = null;
+let _recentPromise: Promise<DiscoverGroups> | null = null;
+
+/**
+ * Avvia il caricamento in background dei dati Discover (popolari + recenti).
+ * Da chiamare all'avvio dell'app, idealmente dopo un piccolo delay per non
+ * competere con il render iniziale. Silenzioso: nessuna UI di caricamento.
+ * Usa le promise condivise: se già in corso, non riparte.
+ */
+export function preloadDiscover(): void {
+  // Popolari
+  if (!_popularPromise) {
+    _popularPromise = getPopularShows().catch((e) => {
+      console.warn('[discover] preload popular failed:', e);
+      _popularPromise = null; // consenti retry al prossimo avvio/tab
+      throw e;
+    });
+  }
+  // Recenti (sequenziale per non sovraccaricare TVMaze con troppi fetch paralleli)
+  if (!_recentPromise) {
+    _recentPromise = _popularPromise
+      .catch(() => null) // non bloccare recenti se popolari fallisce
+      .then(() => getRecentShows())
+      .catch((e) => {
+        console.warn('[discover] preload recent failed:', e);
+        _recentPromise = null;
+        throw e;
+      });
+  }
+}
+
+/**
+ * Restituisce la promise (già avviata dal preload o nuova) per il tab richiesto.
+ * La vista Discover usa questa invece di chiamare getPopularShows/getRecentShows
+ * direttamente, così se il preload è già in corso ci si attacca a quello.
+ */
+export function getDiscoverPromise(tab: 'popular' | 'recent'): Promise<DiscoverGroups> {
+  if (tab === 'popular') {
+    if (!_popularPromise) _popularPromise = getPopularShows();
+    return _popularPromise;
+  }
+  if (!_recentPromise) _recentPromise = getRecentShows();
+  return _recentPromise;
+}
+
+/**
+ * Resetta le promise condivise (usato quando l'utente invalida la cache
+ * tramite "Aggiorna lista").
+ */
+export function resetDiscoverPreload(tab?: 'popular' | 'recent'): void {
+  if (!tab || tab === 'popular') _popularPromise = null;
+  if (!tab || tab === 'recent') _recentPromise = null;
+}
+
 export function invalidateDiscoverCache(tab: 'popular' | 'recent'): void {
   try {
     if (tab === 'popular') localStorage.removeItem(DISCOVER_CACHE_KEY);

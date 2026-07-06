@@ -2,7 +2,7 @@
 
 import type { TvmazeShow } from '../types';
 import { getState, setDiscoverTab } from '../lib/store';
-import { getPopularShows, getRecentShows, invalidateDiscoverCache, findShowInDiscoverGroups, type DiscoverGroups } from '../lib/discover';
+import { invalidateDiscoverCache, resetDiscoverPreload, getDiscoverPromise, findShowInDiscoverGroups, type DiscoverGroups } from '../lib/discover';
 import { addShowToList } from '../lib/shows';
 import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
@@ -91,14 +91,11 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     }
     if (_popularLoading) return;
     _popularLoading = true;
+    // Se il preload è già a buon punto, mostriamo subito il caricamento solo se serve
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
-      _popularCache = await getPopularShows((text) => {
-        const el2 = document.getElementById('discoverContent');
-        if (el2 && el2.querySelector('.loading')) {
-          el2.innerHTML = '<div class="loading"><div class="spinner"></div>' + escapeHtml(text) + '</div>';
-        }
-      });
+      // Si attacca alla promise condivisa (avviata dal preload all'avvio dell'app)
+      _popularCache = await getDiscoverPromise('popular');
       el.innerHTML = renderDiscoverContent(_popularCache);
       bindCarousels(el);
     } catch (e) {
@@ -116,12 +113,7 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     _recentLoading = true;
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
-      _recentCache = await getRecentShows((text) => {
-        const el2 = document.getElementById('discoverContent');
-        if (el2 && el2.querySelector('.loading')) {
-          el2.innerHTML = '<div class="loading"><div class="spinner"></div>' + escapeHtml(text) + '</div>';
-        }
-      });
+      _recentCache = await getDiscoverPromise('recent');
       el.innerHTML = renderDiscoverContent(_recentCache);
       bindCarousels(el);
     } catch (e) {
@@ -186,9 +178,11 @@ export function bindDiscoverEvents(main: HTMLElement): void {
       const state = getState();
       if (state._discoverTab === 'popular') {
         invalidateDiscoverCache('popular');
+        resetDiscoverPreload('popular');
         _popularCache = null;
       } else {
         invalidateDiscoverCache('recent');
+        resetDiscoverPreload('recent');
         _recentCache = null;
       }
       loadTab(state._discoverTab);
