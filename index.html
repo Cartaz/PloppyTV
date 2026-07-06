@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="PloppyTV - Il tuo tracker personale per serie TV">
+  <meta name="theme-color" content="#ff6b35">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PloppyTV">
+  <meta name="application-name" content="PloppyTV">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Preconnect per ridurre latenza prima del fetch API/poster -->
+  <link rel="preconnect" href="https://api.tvmaze.com" crossorigin>
+  <link rel="preconnect" href="https://static.tvmaze.com" crossorigin>
+  <link rel="dns-prefetch" href="https://api.tvmaze.com">
+  <link rel="dns-prefetch" href="https://static.tvmaze.com">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="mask-icon" href="icons/icon.svg" color="#ff6b35">
+  <link rel="shortcut icon" href="favicon.ico">
+
+  <title>PloppyTV - Tracker Serie TV</title>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="logo">
+        <div class="logo-icon">PT</div>
+        <span>PloppyTV</span>
+      </div>
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Cerca serie TV..." autocomplete="off" maxlength="100">
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="exportBtn" title="Esporta dati" aria-label="Esporta">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button class="icon-btn" id="importBtn" title="Importa dati" aria-label="Importa">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      </div>
+    </header>
+
+    <nav class="sidebar" id="sidebar">
+      <div class="nav-section">
+        <div class="nav-section-title">Menu</div>
+        <div class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="watching">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>In corso</span>
+          <span class="nav-badge" id="badge-watching">0</span>
+        </div>
+        <div class="nav-item" data-view="towatch">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span>Da vedere</span>
+          <span class="nav-badge" id="badge-towatch">0</span>
+        </div>
+        <div class="nav-item" data-view="completed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Completate</span>
+          <span class="nav-badge" id="badge-completed">0</span>
+        </div>
+        <div class="nav-item" data-view="discover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+          <span>Scopri</span>
+        </div>
+        <div class="nav-item" data-view="calendar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Calendario</span>
+        </div>
+        <div class="nav-item" data-view="stats">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Statistiche</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Info</div>
+        <div class="nav-item" id="aboutBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Informazioni</span>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main" id="mainContent"></main>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

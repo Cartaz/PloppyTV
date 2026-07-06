@@ -1,0 +1,69 @@
+name: Deploy PWA to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Permetti un solo deploy alla volta
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure base path
+        id: base
+        run: |
+          # Se il repo si chiama <user>.github.io, base = '/'
+          # Altrimenti base = '/<repo-name>/'
+          REPO="${GITHUB_REPOSITORY##*/}"
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          if [ "$REPO" = "$OWNER.github.io" ]; then
+            echo "base=/" >> $GITHUB_OUTPUT
+          else
+            echo "base=/$REPO/" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build
+        env:
+          VITE_BASE_PATH: ${{ steps.base.outputs.base }}
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

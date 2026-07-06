@@ -1,0 +1,238 @@
+// Discover: serie popolari + ultimi arrivi con cache 1h
+
+import type { TvmazeShow } from '../types';
+import { getShowsPage, ApiError } from './api';
+import {
+  DISCOVER_CACHE_KEY,
+  DISCOVER_RECENT_CACHE_KEY,
+  DISCOVER_CACHE_TTL,
+  DISCOVER_POPULAR_PAGES,
+  DISCOVER_RECENT_PAGES,
+  DISCOVER_TARGET_PER_GENRE,
+  DISCOVER_TARGET_OTHER,
+  DISCOVER_TOTAL_TARGET,
+  GENRE_CAROUSELS,
+} from './constants';
+import { parseISODateLocal } from './utils';
+
+export interface DiscoverGroups {
+  [genre: string]: TvmazeShow[];
+  _other: TvmazeShow[];
+}
+
+async function fetchAllCandidates(
+  pages: number[],
+  recentOnly: boolean,
+  onProgress?: (text: string) => void
+): Promise<TvmazeShow[]> {
+  const sixMonthsAgo = recentOnly
+    ? (() => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 6);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      })()
+    : null;
+
+  const total = pages.length;
+  let completed = 0;
+  let lastProgressText = '';
+  let progressRAF: number | null = null;
+  let progressDirty = false;
+
+  const scheduleProgress = (label: string) => {
+    progressDirty = true;
+    if (progressRAF) return;
+    progressRAF = requestAnimationFrame(() => {
+      progressRAF = null;
+      if (!progressDirty) return;
+      progressDirty = false;
+      const text = label + '... (' + completed + '/' + total + ' pagine)';
+      if (text === lastProgressText) return;
+      lastProgressText = text;
+      onProgress?.(text);
+    });
+  };
+
+  const label = recentOnly ? 'Caricamento ultimi arrivi' : 'Caricamento serie popolari';
+  scheduleProgress(label);
+
+  const fetchPromises = pages.map(
+    (page) =>
+      (async (): Promise<TvmazeShow[]> => {
+        try {
+          const pageShows = await getShowsPage(page);
+          return Array.isArray(pageShows) ? pageShows : [];
+        } catch (e) {
+          console.warn('Errore caricamento pagina ' + page + ':', e);
+          return [];
+        } finally {
+          completed++;
+          scheduleProgress(label);
+        }
+      })()
+  );
+
+  const pagesResults = await Promise.all(fetchPromises);
+
+  const all: TvmazeShow[] = [];
+  for (const pageShows of pagesResults) {
+    for (const show of pageShows) {
+      if (!show || !show.image || !show.name || !show.weight || show.weight <= 0) continue;
+      if (recentOnly) {
+        if (!show.premiered) continue;
+        const d = parseISODateLocal(show.premiered);
+        if (!d || d < sixMonthsAgo!) continue;
+      }
+      all.push(show);
+    }
+  }
+
+  all.sort((a, b) => {
+    const wDiff = (b.weight || 0) - (a.weight || 0);
+    if (wDiff !== 0) return wDiff;
+    const rA = a.rating?.average ?? 0;
+    const rB = b.rating?.average ?? 0;
+    return rB - rA;
+  });
+  return all;
+}
+
+function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
+  const groups: DiscoverGroups = {} as DiscoverGroups;
+  for (const g of GENRE_CAROUSELS) groups[g] = [];
+  groups._other = [];
+  const assignedIds = new Set<number>();
+
+  // FASE 1
+  for (const show of candidates) {
+    if (assignedIds.has(show.id)) continue;
+    const genres = Array.isArray(show.genres) ? show.genres : [];
+    let assigned: string | null = null;
+    for (const targetGenre of GENRE_CAROUSELS) {
+      if (genres.includes(targetGenre)) {
+        assigned = targetGenre;
+        break;
+      }
+    }
+    if (assigned) {
+      if (groups[assigned].length < DISCOVER_TARGET_PER_GENRE) {
+        groups[assigned].push(show);
+        assignedIds.add(show.id);
+      }
+    } else {
+      if (groups._other.length < DISCOVER_TARGET_OTHER) {
+        groups._other.push(show);
+        assignedIds.add(show.id);
+      }
+    }
+  }
+
+  // FASE 2: ridistribuzione deficit
+  let total = 0;
+  for (const g of GENRE_CAROUSELS) total += groups[g].length;
+  total += groups._other.length;
+  const deficit = DISCOVER_TOTAL_TARGET - total;
+
+  if (deficit > 0) {
+    let added = 0;
+    for (const show of candidates) {
+      if (added >= deficit) break;
+      if (assignedIds.has(show.id)) continue;
+      const genres = Array.isArray(show.genres) ? show.genres : [];
+      let assigned: string | null = null;
+      for (const targetGenre of GENRE_CAROUSELS) {
+        if (genres.includes(targetGenre)) {
+          assigned = targetGenre;
+          break;
+        }
+      }
+      if (assigned) {
+        groups[assigned].push(show);
+        assignedIds.add(show.id);
+        added++;
+      } else {
+        groups._other.push(show);
+        assignedIds.add(show.id);
+        added++;
+      }
+    }
+  }
+
+  return groups;
+}
+
+async function fetchShowsByGenre(
+  pages: number[],
+  recentOnly: boolean,
+  onProgress?: (text: string) => void
+): Promise<DiscoverGroups> {
+  const candidates = await fetchAllCandidates(pages, recentOnly, onProgress);
+  return assignShowsToGroups(candidates);
+}
+
+function readCache(key: string): DiscoverGroups | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { cachedAt: number; groups: DiscoverGroups };
+    if (cached && cached.cachedAt && Date.now() - cached.cachedAt < DISCOVER_CACHE_TTL && cached.groups) {
+      return cached.groups;
+    }
+  } catch {
+    // cache invalida
+  }
+  return null;
+}
+
+function writeCache(key: string, groups: DiscoverGroups): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ groups, cachedAt: Date.now() }));
+  } catch {
+    // storage pieno
+  }
+}
+
+export async function getPopularShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+  const cached = readCache(DISCOVER_CACHE_KEY);
+  if (cached) return cached;
+  const groups = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false, onProgress);
+  writeCache(DISCOVER_CACHE_KEY, groups);
+  return groups;
+}
+
+export async function getRecentShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+  const cached = readCache(DISCOVER_RECENT_CACHE_KEY);
+  if (cached) return cached;
+  const groups = await fetchShowsByGenre(DISCOVER_RECENT_PAGES, true, onProgress);
+  writeCache(DISCOVER_RECENT_CACHE_KEY, groups);
+  return groups;
+}
+
+export function invalidateDiscoverCache(tab: 'popular' | 'recent'): void {
+  try {
+    if (tab === 'popular') localStorage.removeItem(DISCOVER_CACHE_KEY);
+    else localStorage.removeItem(DISCOVER_RECENT_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// Helper: cerca uno show nella cache discover (popolari + recenti)
+export function findShowInDiscoverGroups(
+  showId: number,
+  groupsArr: Array<DiscoverGroups | null>
+): TvmazeShow | null {
+  for (const groups of groupsArr) {
+    if (!groups) continue;
+    for (const key of Object.keys(groups)) {
+      const arr = groups[key as keyof DiscoverGroups];
+      if (!Array.isArray(arr)) continue;
+      const found = arr.find((s) => s && s.id === showId);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+export { ApiError };

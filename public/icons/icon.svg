@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b35"/>
+      <stop offset="100%" stop-color="#ff4500"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="115" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.2"/>
+  <g filter="url(#shadow)">
+    <text x="256" y="320" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+          font-size="220" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle"
+          letter-spacing="-8">PT</text>
+  </g>
+  <circle cx="120" cy="120" r="14" fill="#ffffff" opacity="0.7"/>
+  <circle cx="392" cy="392" r="10" fill="#ffffff" opacity="0.5"/>
+</svg>
