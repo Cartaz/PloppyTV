@@ -324,13 +324,16 @@ a:hover { color: var(--accent-hover); }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 5px;
   background: rgba(0,0,0,0.5);
 }
 .show-card-progress-bar {
   height: 100%;
   background: var(--accent);
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.show-card-progress-bar.completed {
+  background: var(--success);
 }
 .show-card-badge {
   position: absolute;
@@ -361,24 +364,25 @@ a:hover { color: var(--accent-hover); }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
 }
 .stat-card {
   background: var(--bg-card);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 14px;
   border: 1px solid var(--border);
 }
 .stat-value {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--accent);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  line-height: 1.1;
 }
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -458,6 +462,35 @@ a:hover { color: var(--accent-hover); }
   text-align: center;
   font-size: 13px;
   padding: 16px;
+}
+/* Barra progresso dettaglio serie */
+.detail-progress-block { margin-bottom: 16px; }
+.detail-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.detail-progress-track {
+  height: 14px;
+  background: var(--bg-card);
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.detail-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease, background 0.3s ease;
+  border-radius: 7px;
+}
+.detail-progress-block.completed .detail-progress-fill {
+  background: var(--success);
+}
+.detail-progress-block.completed .detail-progress-meta span:last-child {
+  color: var(--success);
+  font-weight: 700;
 }
 .detail-info { flex: 1; min-width: 250px; }
 .detail-name { font-size: 32px; font-weight: 800; margin-bottom: 8px; overflow-wrap: anywhere; word-break: break-word; }
@@ -996,7 +1029,9 @@ a:hover { color: var(--accent-hover); }
   .page-title { font-size: 22px; margin-bottom: 16px; }
   .detail-name { font-size: 24px; }
   .section-title { font-size: 18px; }
-  .stat-value { font-size: 26px; }
+  .stat-value { font-size: 22px; }
+  .stats-grid { gap: 10px; }
+  .stat-card { padding: 12px; }
   .modal-overlay { padding: 12px; }
   .modal { padding: 18px; max-height: 88vh; }
   .modal-title { font-size: 18px; }
@@ -1009,6 +1044,14 @@ a:hover { color: var(--accent-hover); }
   .logo span { display: none; }
   .search-wrap { margin: 0 8px; max-width: none; }
   .header-actions { gap: 4px; }
+  /* Schede statistiche compatte su mobile piccolo (es. iPhone 13 mini) */
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+    gap: 8px;
+  }
+  .stat-card { padding: 10px; }
+  .stat-value { font-size: 19px; }
+  .stat-label { font-size: 10px; letter-spacing: 0.3px; }
 }
 @media (max-width: 360px) {
   .header-actions .icon-btn[title="Esporta dati"],

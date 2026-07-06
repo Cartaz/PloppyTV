@@ -8,6 +8,7 @@ import { imgTag } from '../components/img';
 function showCardHtml(show: Show): string {
   const watched = getWatchedCount(show);
   const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
+  const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   return (
     '<div class="show-card" data-action="openShow" data-show-id="' + show.id + '">' +
     (show.image
@@ -15,7 +16,7 @@ function showCardHtml(show: Show): string {
       : '<div class="show-card-placeholder">' + escapeHtml(show.name) + '</div>') +
     '<div class="show-card-info"><div class="show-card-name">' + escapeHtml(show.name) + '</div>' +
     '<div class="show-card-meta">' + watched + '/' + show.totalEpisodes + ' ep</div></div>' +
-    '<div class="show-card-progress"><div class="show-card-progress-bar" style="width:' + progress + '%"></div></div>' +
+    '<div class="show-card-progress"><div class="show-card-progress-bar' + (isCompleted ? ' completed' : '') + '" style="width:' + progress + '%"></div></div>' +
     '</div>'
   );
 }

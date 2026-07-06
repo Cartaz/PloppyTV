@@ -27,6 +27,7 @@ export function renderShowDetail(main: HTMLElement): void {
 
   const watched = getWatchedCount(show);
   const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
+  const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
   const statusClass = statusLower.includes('running') || statusLower.includes('in corso') ? 'status-running' : 'status-ended';
 
@@ -36,10 +37,15 @@ export function renderShowDetail(main: HTMLElement): void {
     'Torna indietro</button>';
 
   html += '<div class="detail-header">';
+  // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
+  // show.image è già la versione medium (vedi getPosterUrl); bigImg è la original.
   const bigImg = show.image ? show.image.replace('medium', 'original') : null;
-  if (bigImg) {
-    // Poster principale: eager loading + fallback inline (più robusto)
-    html += '<img class="detail-poster" src="' + escapeAttr(bigImg) + '" alt="' + escapeAttr(show.name) + '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
+  if (bigImg && show.image && bigImg !== show.image) {
+    // Catena: original -> medium -> placeholder
+    html += '<img class="detail-poster" src="' + escapeAttr(bigImg) + '" alt="' + escapeAttr(show.name) + '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' + escapeAttr(show.image) + '">';
+  } else if (show.image) {
+    // Solo medium disponibile
+    html += '<img class="detail-poster" src="' + escapeAttr(show.image) + '" alt="' + escapeAttr(show.name) + '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
   } else {
     html += '<div class="detail-poster-placeholder">Immagine non disponibile</div>';
   }
@@ -54,12 +60,12 @@ export function renderShowDetail(main: HTMLElement): void {
     '<span>' + show.totalEpisodes + ' episodi</span>' +
     '</div>' +
     '<div class="detail-genres">' + show.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') + '</div>' +
-    '<div style="margin-bottom:16px;">' +
-    '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary);margin-bottom:6px;">' +
+    '<div class="detail-progress-block' + (isCompleted ? ' completed' : '') + '">' +
+    '<div class="detail-progress-meta">' +
     '<span>' + watched + ' / ' + show.totalEpisodes + ' episodi visti</span>' +
     '<span>' + Math.round(progress) + '%</span></div>' +
-    '<div style="height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden;">' +
-    '<div style="height:100%;width:' + progress + '%;background:var(--accent);transition:width 0.3s;"></div></div></div>';
+    '<div class="detail-progress-track">' +
+    '<div class="detail-progress-fill" style="width:' + progress + '%"></div></div></div>';
 
   if (show.summary) {
     html += '<div class="detail-summary">' + show.summary.split('\n').map((p) => '<p>' + escapeHtml(p) + '</p>').join('') + '</div>';

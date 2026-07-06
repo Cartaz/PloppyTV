@@ -10,6 +10,17 @@ export function initImageFallback(): void {
     if (!(target instanceof HTMLImageElement)) return;
     if (!target.dataset.fallback) return;
     if (target.dataset.fallbackApplied) return;
+
+    // 1) Se c'è un data-fallback-src (catena immagini), prova prima quello.
+    //    Marca applied solo quando passiamo al placeholder definitivo, per
+    //    permettere all'immagine di fallback di caricare normalmente.
+    const fallbackSrc = target.dataset.fallbackSrc;
+    if (fallbackSrc && target.src !== fallbackSrc) {
+      target.src = fallbackSrc;
+      return;
+    }
+
+    // 2) Tutti i tentativi falliti: sostituisci con placeholder testuale
     target.dataset.fallbackApplied = '1';
 
     const fallbackName = target.dataset.fallback || 'N/D';
