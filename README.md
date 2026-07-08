@@ -107,6 +107,7 @@ ploppytv/
 │   ├── favicon.ico
 │   └── icons/                 # icone PWA (192, 512, maskable, ...)
 ├── scripts/
+<<<<<<< HEAD
 │   └── test-entry.ts          # Re-export delle funzioni interne per stress-test manuali
 ├── tests/                     # Suite Vitest
 │   ├── helpers.ts             # Factory per Show/Episode
@@ -114,6 +115,9 @@ ploppytv/
 │   ├── watched.test.ts        # Test su getWatchedCount, findNextEpisode
 │   ├── normalize.test.ts      # Test su normalizeShow, buildShowFromTvmaze, reconcileAllLists
 │   └── store.test.ts          # Test su reconcileList, updateShowListStatus, manualList
+=======
+│   └── test-entry.ts          # Re-export delle funzioni interne per test/stress-test manuali
+>>>>>>> 42d8811d9c3c2dff71384a0f377e0a3b00541213
 └── src/
     ├── main.ts                # Entry point: init moduli + register SW
     ├── types.ts               # Tipi condivisi UI ↔ worker
@@ -237,6 +241,27 @@ L'ultimo giro di sviluppo si è concentrato sulla robustezza dell'app in scenari
 | **Routing con hash**            | Gli shortcut PWA (`#dashboard`, `#discover`, `#calendar`) e i deep link a una serie (`#show/<id>`) ora vengono interpretati anche dopo il caricamento iniziale e supportano avanti/indietro del browser                     |
 | **Ricerca TVMaze**              | Corretta una race condition per cui i risultati di una ricerca precedente potevano sovrascrivere quelli di una più recente                                                                                                  |
 | **Normalizzazione dati**        | Sanitizzazione più rigorosa dei dati importati/da API (percentuali di progresso e conteggi episodi ora sempre in un range valido, niente più `NaN`/negativi)                                                                |
+
+## Affidabilità: fix da stress test
+
+L'ultimo giro di sviluppo si è concentrato sulla robustezza dell'app in scenari reali (più tab aperte, worker che risponde in ritardo, SW che aggiorna in background, uso da tastiera/screen reader). In sintesi:
+
+| Area | Problema risolto |
+| --- | --- |
+| **Storage multi-tab** | Scritture concorrenti tra tab diverse ora usano un controllo ottimistico (CAS su `savedAt`): se un'altra tab ha già salvato, la scrittura corrente viene rifiutata invece di sovrascrivere silenziosamente i dati |
+| **Modali nidificate** | `modal.ts` ora gestisce uno **stack** di modali: aprire una modale da dentro un'altra non chiude più anche quella padre; aggiunti focus trap, `role="dialog"`, `aria-modal` e gestione ESC |
+| **Web Worker (stats/calendar)** | Le richieste al worker portano un `id` di correlazione: risposte in ritardo da richieste precedenti non vengono più confuse con quella corrente; aggiunto `worker.onerror` per catturare errori di caricamento dello script |
+| **Aggiornamento PWA** | Un nuovo Service Worker "in attesa" ora mostra un toast che permette di applicare subito l'update, invece di restare bloccato finché l'utente non chiude manualmente tutte le tab |
+| **Routing con hash** | Gli shortcut PWA (`#dashboard`, `#discover`, `#calendar`) e i deep link a una serie (`#show/<id>`) ora vengono interpretati anche dopo il caricamento iniziale e supportano avanti/indietro del browser |
+| **Ricerca TVMaze** | Corretta una race condition per cui i risultati di una ricerca precedente potevano sovrascrivere quelli di una più recente |
+| **Normalizzazione dati** | Sanitizzazione più rigorosa dei dati importati/da API (percentuali di progresso e conteggi episodi ora sempre in un range valido, niente più `NaN`/negativi) |
+
+## Novità recenti
+
+- **Preload di "Scopri"** — al termine dell'avvio l'app carica in background (con un piccolo delay per non competere col primo render) le serie popolari e recenti da TVMaze, così quando l'utente apre la tab "Scopri" i dati sono già pronti o quasi
+- **Statistiche più compatte** — le card della vista Stats sono state ridimensionate per mostrare più informazioni senza scroll eccessivo
+- **Barra di completamento al 100%** — le barre di progresso (dashboard e dettaglio serie) diventano verdi quando una serie è completata, invece di restare del colore accento standard
+- **Fallback immagini a catena** — il poster nel dettaglio serie prova prima la versione ad alta risoluzione, poi quella media, poi il placeholder testuale, invece di saltare direttamente al placeholder al primo errore
 
 ## Migrare dati dalla versione originale
 
