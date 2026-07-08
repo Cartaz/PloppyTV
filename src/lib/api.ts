@@ -41,7 +41,9 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
       // Cleanup del listener esterno alla prima risoluzione
       const cleanup = () => signal.removeEventListener('abort', onExternalAbort);
       // Lo agganciamo a microtask+macro per coprire sia fast-resolve che throw
-      Promise.resolve(controller.signal.aborted ? null : undefined).then(cleanup).catch(cleanup);
+      Promise.resolve(controller.signal.aborted ? null : undefined)
+        .then(cleanup)
+        .catch(cleanup);
       setTimeout(cleanup, API_TIMEOUT_MS + 50);
     }
   }
@@ -49,11 +51,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
   try {
     const res = await fetch(API_BASE + path, { signal: controller.signal });
     if (!res.ok) {
-      throw new ApiError(
-        'API error ' + res.status,
-        res.status === 429 ? 'RateLimitError' : 'ApiError',
-        res.status
-      );
+      throw new ApiError('API error ' + res.status, res.status === 429 ? 'RateLimitError' : 'ApiError', res.status);
     }
     // Body vuoto o non-JSON: gestione esplicita per evitare SyntaxError
     // non tipizzato che il caller non saprebbe gestire.

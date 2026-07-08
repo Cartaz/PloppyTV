@@ -53,7 +53,10 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     }
     updateBadges();
     showToast('Serie aggiunta: ' + show.name, 'success');
-    if (['dashboard', 'watching', 'towatch', 'completed'].includes(getState().currentView) && !getState().currentShowId) {
+    if (
+      ['dashboard', 'watching', 'towatch', 'completed'].includes(getState().currentView) &&
+      !getState().currentShowId
+    ) {
       emitChange();
     }
     return show;
@@ -97,7 +100,7 @@ export function removeShow(showId: number, showName: string): void {
           emitChange();
         },
       },
-    ]
+    ],
   );
 }
 

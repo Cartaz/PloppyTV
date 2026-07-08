@@ -24,7 +24,7 @@ function renderCalendarContent(
   week: CalendarEpisode[],
   afterWeek: CalendarEpisode[],
   weekStart: string,
-  weekEnd: string
+  weekEnd: string,
 ): void {
   const state = getState();
   const today = new Date();
@@ -45,13 +45,20 @@ function renderCalendarContent(
   let html = '<h1 class="page-title">Calendario</h1>';
   html += '<p class="page-subtitle">Prossimi episodi delle tue serie in corso (basato su airdate TVMaze)</p>';
 
-  const weekLabel = start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' – ' + end.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  const weekLabel =
+    start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) +
+    ' – ' +
+    end.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
   html +=
     '<div class="calendar-nav"><div class="calendar-nav-controls">' +
     '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="-1" aria-label="Settimana precedente">‹</button>' +
-    '<span class="calendar-nav-label">' + weekLabel + '</span>' +
+    '<span class="calendar-nav-label">' +
+    weekLabel +
+    '</span>' +
     '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="1" aria-label="Settimana successiva">›</button></div>' +
-    (state.calendarWeekOffset !== 0 ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">Oggi</button>' : '') +
+    (state.calendarWeekOffset !== 0
+      ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">Oggi</button>'
+      : '') +
     '</div>';
 
   html += '<div class="calendar-grid">';
@@ -63,16 +70,31 @@ function renderCalendarContent(
     const isToday = isSameLocalDay(day, today);
     const dayEpisodes = byDay[i];
     html +=
-      '<div class="calendar-day ' + (isToday ? 'today' : '') + '">' +
-      '<div class="calendar-day-header">' + dayName + '</div>' +
-      '<div class="calendar-day-date">' + day.getDate() + '</div>' +
+      '<div class="calendar-day ' +
+      (isToday ? 'today' : '') +
+      '">' +
+      '<div class="calendar-day-header">' +
+      dayName +
+      '</div>' +
+      '<div class="calendar-day-date">' +
+      day.getDate() +
+      '</div>' +
       (dayEpisodes.length > 0
         ? dayEpisodes
             .map(
               (ep) =>
-                '<div class="calendar-episode" data-action="openShow" data-show-id="' + ep.showId + '">' +
-                '<div class="calendar-ep-name">' + escapeHtml(ep.showName) + '</div>' +
-                '<div class="calendar-ep-show">S' + ep.season + 'E' + ep.num + (ep.name ? ' · ' + escapeHtml(ep.name) : '') + '</div></div>'
+                '<div class="calendar-episode" data-action="openShow" data-show-id="' +
+                ep.showId +
+                '">' +
+                '<div class="calendar-ep-name">' +
+                escapeHtml(ep.showName) +
+                '</div>' +
+                '<div class="calendar-ep-show">S' +
+                ep.season +
+                'E' +
+                ep.num +
+                (ep.name ? ' · ' + escapeHtml(ep.name) : '') +
+                '</div></div>',
             )
             .join('')
         : '<div style="color:var(--text-muted);font-size:12px;">Nessun episodio</div>') +
@@ -81,23 +103,35 @@ function renderCalendarContent(
   html += '</div>';
 
   if (afterWeek.length > 0) {
-    html += '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
+    html +=
+      '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
     for (const ep of afterWeek.slice(0, 20)) {
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
         : escapeHtml(ep.showName) + ' · Stagione ' + ep.season + ', Episodio ' + ep.num;
       html +=
-        '<div class="episode-item" data-action="openShow" data-show-id="' + ep.showId + '" style="cursor:pointer;">' +
+        '<div class="episode-item" data-action="openShow" data-show-id="' +
+        ep.showId +
+        '" style="cursor:pointer;">' +
         '<div class="episode-checkbox"></div>' +
-        '<div class="episode-info"><div class="episode-name">' + epTitle + '</div>' +
-        '<div class="episode-meta">S' + ep.season + 'E' + ep.num + ' • ' + formatDate(ep.date) + '</div></div></div>';
+        '<div class="episode-info"><div class="episode-name">' +
+        epTitle +
+        '</div>' +
+        '<div class="episode-meta">S' +
+        ep.season +
+        'E' +
+        ep.num +
+        ' • ' +
+        formatDate(ep.date) +
+        '</div></div></div>';
     }
     html += '</div></div>';
   }
 
   html += '<div class="section" style="margin-top:32px;"><h2 class="section-title">Da vedere questa settimana</h2>';
   if (week.length === 0) {
-    html += '<div class="empty-state"><div class="empty-state-title">Tutto visto!</div><div class="empty-state-text">Nessun episodio in programmazione questa settimana.</div></div>';
+    html +=
+      '<div class="empty-state"><div class="empty-state-title">Tutto visto!</div><div class="empty-state-text">Nessun episodio in programmazione questa settimana.</div></div>';
   } else {
     html += '<div class="episode-list">';
     for (const ep of week) {
@@ -105,10 +139,24 @@ function renderCalendarContent(
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
         : escapeHtml(ep.showName) + ' · Stagione ' + ep.season + ', Episodio ' + ep.num;
       html +=
-        '<div class="episode-item" data-action="openShow" data-show-id="' + ep.showId + '" style="cursor:pointer;">' +
+        '<div class="episode-item" data-action="openShow" data-show-id="' +
+        ep.showId +
+        '" style="cursor:pointer;">' +
         '<div class="episode-checkbox"></div>' +
-        '<div class="episode-info"><div class="episode-name">' + epTitle + '</div>' +
-        '<div class="episode-meta">S' + ep.season + 'E' + ep.num + ' • ' + formatDate(ep.date) + ' • ' + ep.watchedCount + '/' + ep.totalEpisodes + ' episodi visti</div></div></div>';
+        '<div class="episode-info"><div class="episode-name">' +
+        epTitle +
+        '</div>' +
+        '<div class="episode-meta">S' +
+        ep.season +
+        'E' +
+        ep.num +
+        ' • ' +
+        formatDate(ep.date) +
+        ' • ' +
+        ep.watchedCount +
+        '/' +
+        ep.totalEpisodes +
+        ' episodi visti</div></div></div>';
     }
     html += '</div>';
   }

@@ -2,7 +2,13 @@
 
 import type { TvmazeShow } from '../types';
 import { getState, setDiscoverTab } from '../lib/store';
-import { invalidateDiscoverCache, resetDiscoverPreload, getDiscoverPromise, findShowInDiscoverGroups, type DiscoverGroups } from '../lib/discover';
+import {
+  invalidateDiscoverCache,
+  resetDiscoverPreload,
+  getDiscoverPromise,
+  findShowInDiscoverGroups,
+  type DiscoverGroups,
+} from '../lib/discover';
 import { addShowToList } from '../lib/shows';
 import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
@@ -26,20 +32,42 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
   const carouselId = 'carousel-' + genre.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
   let html = '<div class="genre-carousel">';
   html += '<div class="carousel-header">';
-  html += '<div><span class="carousel-title">' + escapeHtml(genre) + '</span><span class="carousel-count">' + shows.length + ' serie</span></div>';
+  html +=
+    '<div><span class="carousel-title">' +
+    escapeHtml(genre) +
+    '</span><span class="carousel-count">' +
+    shows.length +
+    ' serie</span></div>';
   html += '<div class="carousel-nav">';
-  html += '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' + carouselId + '" data-dir="-1" aria-label="Precedente">‹</button>';
-  html += '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' + carouselId + '" data-dir="1" aria-label="Successivo">›</button>';
+  html +=
+    '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
+    carouselId +
+    '" data-dir="-1" aria-label="Precedente">‹</button>';
+  html +=
+    '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
+    carouselId +
+    '" data-dir="1" aria-label="Successivo">›</button>';
   html += '</div></div>';
   html += '<div class="carousel-track" id="' + carouselId + '">';
   for (const show of shows) {
     const img = getPosterUrl(show);
-    const year = show.premiered ? (parseISODateLocal(show.premiered) ? parseISODateLocal(show.premiered)!.getFullYear() : '') : '';
+    const year = show.premiered
+      ? parseISODateLocal(show.premiered)
+        ? parseISODateLocal(show.premiered)!.getFullYear()
+        : ''
+      : '';
     const isAdded = getState().shows.find((s) => s.id === show.id);
     html += '<div class="carousel-card" data-action="previewDiscover" data-show-id="' + show.id + '">';
     if (isAdded) html += '<div class="carousel-card-badge">Aggiunta</div>';
     if (img) {
-      html += '<img class="carousel-card-poster" src="' + escapeAttr(img) + '" alt="' + escapeAttr(show.name) + '" loading="lazy" decoding="async" data-fallback="' + escapeAttr(show.name) + '" data-fallback-cls="carousel-card-placeholder">';
+      html +=
+        '<img class="carousel-card-poster" src="' +
+        escapeAttr(img) +
+        '" alt="' +
+        escapeAttr(show.name) +
+        '" loading="lazy" decoding="async" data-fallback="' +
+        escapeAttr(show.name) +
+        '" data-fallback-cls="carousel-card-placeholder">';
     } else {
       html += '<div class="carousel-card-placeholder">' + escapeHtml(show.name) + '</div>';
     }
@@ -85,8 +113,12 @@ function renderDiscoverError(err: { name?: string }): string {
   if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
   else if (err.name === 'TimeoutError') msg = 'Timeout caricamento.';
   else if (err.name === 'ParseError') msg = 'Risposta API non valida. Riprova.';
-  return '<div class="empty-state"><div class="empty-state-title">' + escapeHtml(msg) + '</div>' +
-    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>';
+  return (
+    '<div class="empty-state"><div class="empty-state-title">' +
+    escapeHtml(msg) +
+    '</div>' +
+    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>'
+  );
 }
 
 /**
@@ -156,18 +188,26 @@ export function renderDiscover(main: HTMLElement): void {
   html += '<p class="page-subtitle">Esplora le serie TV più popolari e i nuovi arrivi.</p>';
 
   html += '<div class="discover-tabs" role="tablist">';
-  html += '<button class="discover-tab ' + (state._discoverTab === 'popular' ? 'active' : '') + '" data-action="switchDiscoverTab" data-tab="popular" role="tab">Popolari</button>';
-  html += '<button class="discover-tab ' + (state._discoverTab === 'recent' ? 'active' : '') + '" data-action="switchDiscoverTab" data-tab="recent" role="tab">Ultimi arrivi</button>';
+  html +=
+    '<button class="discover-tab ' +
+    (state._discoverTab === 'popular' ? 'active' : '') +
+    '" data-action="switchDiscoverTab" data-tab="popular" role="tab">Popolari</button>';
+  html +=
+    '<button class="discover-tab ' +
+    (state._discoverTab === 'recent' ? 'active' : '') +
+    '" data-action="switchDiscoverTab" data-tab="recent" role="tab">Ultimi arrivi</button>';
   html += '</div>';
 
   if (state._storageDisabled) {
-    html += '<div class="empty-state"><div class="empty-state-title">Funzione non disponibile</div><div class="empty-state-text">La cache non è disponibile in modalità privata.</div></div>';
+    html +=
+      '<div class="empty-state"><div class="empty-state-title">Funzione non disponibile</div><div class="empty-state-text">La cache non è disponibile in modalità privata.</div></div>';
     main.innerHTML = html;
     return;
   }
 
   html += '<div id="discoverContent"><div class="loading"><div class="spinner"></div>Caricamento...</div></div>';
-  html += '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">Aggiorna lista</button></div>';
+  html +=
+    '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">Aggiorna lista</button></div>';
   main.innerHTML = html;
 
   loadTab(state._discoverTab);
@@ -245,7 +285,11 @@ function previewDiscover(showId: number): void {
     return;
   }
   const isAdded = getState().shows.find((s) => s.id === found.id);
-  const year = found.premiered ? (parseISODateLocal(found.premiered) ? parseISODateLocal(found.premiered)!.getFullYear() : 'N/D') : 'N/D';
+  const year = found.premiered
+    ? parseISODateLocal(found.premiered)
+      ? parseISODateLocal(found.premiered)!.getFullYear()
+      : 'N/D'
+    : 'N/D';
   const network = (found.network && found.network.name) || (found.webChannel && found.webChannel.name) || 'N/D';
   const rating = found.rating && found.rating.average ? found.rating.average + '/10' : 'N/D';
   const img = getPosterUrl(found);
@@ -253,20 +297,36 @@ function previewDiscover(showId: number): void {
 
   let body = '<div class="discover-preview-header">';
   if (img) {
-    body += '<img class="discover-preview-poster" src="' + escapeAttr(img) + '" alt="' + escapeAttr(found.name) + '" data-fallback="" >';
+    body +=
+      '<img class="discover-preview-poster" src="' +
+      escapeAttr(img) +
+      '" alt="' +
+      escapeAttr(found.name) +
+      '" data-fallback="" >';
   }
   body += '<div class="discover-preview-info">';
   body += '<div class="discover-preview-name">' + escapeHtml(found.name) + '</div>';
   body += '<div class="discover-preview-meta">' + year + ' • ' + escapeHtml(network) + ' • Rating ' + rating + '</div>';
   if (Array.isArray(found.genres) && found.genres.length > 0) {
-    body += '<div class="discover-preview-genres">' + found.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') + '</div>';
+    body +=
+      '<div class="discover-preview-genres">' +
+      found.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') +
+      '</div>';
   }
   body += '</div></div>';
   if (summary) {
-    body += '<div class="discover-preview-summary">' + escapeHtml(summary.slice(0, 600)) + (summary.length > 600 ? '...' : '') + '</div>';
+    body +=
+      '<div class="discover-preview-summary">' +
+      escapeHtml(summary.slice(0, 600)) +
+      (summary.length > 600 ? '...' : '') +
+      '</div>';
   }
   if (found.status) {
-    body += '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' + escapeHtml(found.status) + (found.runtime ? ' • ' + found.runtime + ' min/ep' : '') + '</div>';
+    body +=
+      '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' +
+      escapeHtml(found.status) +
+      (found.runtime ? ' • ' + found.runtime + ' min/ep' : '') +
+      '</div>';
   }
 
   const actions = isAdded

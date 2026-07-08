@@ -10,13 +10,25 @@ function showCardHtml(show: Show): string {
   const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   return (
-    '<div class="show-card" data-action="openShow" data-show-id="' + show.id + '">' +
+    '<div class="show-card" data-action="openShow" data-show-id="' +
+    show.id +
+    '">' +
     (show.image
       ? imgTag(show.image, show.name, 'show-card-poster')
       : '<div class="show-card-placeholder">' + escapeHtml(show.name) + '</div>') +
-    '<div class="show-card-info"><div class="show-card-name">' + escapeHtml(show.name) + '</div>' +
-    '<div class="show-card-meta">' + watched + '/' + show.totalEpisodes + ' ep</div></div>' +
-    '<div class="show-card-progress"><div class="show-card-progress-bar' + (isCompleted ? ' completed' : '') + '" style="width:' + progress + '%"></div></div>' +
+    '<div class="show-card-info"><div class="show-card-name">' +
+    escapeHtml(show.name) +
+    '</div>' +
+    '<div class="show-card-meta">' +
+    watched +
+    '/' +
+    show.totalEpisodes +
+    ' ep</div></div>' +
+    '<div class="show-card-progress"><div class="show-card-progress-bar' +
+    (isCompleted ? ' completed' : '') +
+    '" style="width:' +
+    progress +
+    '%"></div></div>' +
     '</div>'
   );
 }
@@ -44,23 +56,36 @@ export function renderDashboard(main: HTMLElement): void {
 
   html +=
     '<div class="stats-grid">' +
-    '<div class="stat-card"><div class="stat-value">' + totalShows + '</div><div class="stat-label">Serie tracciate</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + totalWatched + '</div><div class="stat-label">Episodi visti</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + watching.length + '</div><div class="stat-label">In corso</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + completed.length + '</div><div class="stat-label">Completate</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' +
+    totalShows +
+    '</div><div class="stat-label">Serie tracciate</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' +
+    totalWatched +
+    '</div><div class="stat-label">Episodi visti</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' +
+    watching.length +
+    '</div><div class="stat-label">In corso</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' +
+    completed.length +
+    '</div><div class="stat-label">Completate</div></div>' +
     '</div>';
 
   const continueWatching = watching.filter((s) => getWatchedCount(s) < s.totalEpisodes).slice(0, 8);
   if (continueWatching.length > 0) {
-    html += '<div class="section"><div class="section-header"><h2 class="section-title">Continua a guardare</h2></div><div class="continue-grid">';
+    html +=
+      '<div class="section"><div class="section-header"><h2 class="section-title">Continua a guardare</h2></div><div class="continue-grid">';
     for (const show of continueWatching) {
       const watched = getWatchedCount(show);
       const nextEp = findNextEpisode(show);
       html +=
-        '<div class="continue-card" data-action="openShow" data-show-id="' + show.id + '">' +
+        '<div class="continue-card" data-action="openShow" data-show-id="' +
+        show.id +
+        '">' +
         imgTag(show.image, show.name, 'continue-card-poster') +
         '<div class="continue-card-body"><div>' +
-        '<div class="continue-card-name">' + escapeHtml(show.name) + '</div>' +
+        '<div class="continue-card-name">' +
+        escapeHtml(show.name) +
+        '</div>' +
         (nextEp
           ? '<div class="continue-card-ep">Prossimo: Stagione ' + nextEp.season + ', Ep ' + nextEp.num + '</div>'
           : '<div class="continue-card-ep">' + watched + '/' + show.totalEpisodes + ' episodi</div>') +

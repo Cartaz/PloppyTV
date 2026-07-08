@@ -102,7 +102,10 @@ function computeStatsFallback(shows: Show[]): StatsResult {
   };
 }
 
-function computeCalendarFallback(shows: Show[], weekOffset: number): { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string } {
+function computeCalendarFallback(
+  shows: Show[],
+  weekOffset: number,
+): { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(today);
@@ -191,7 +194,7 @@ export function computeStatsAsync(shows: Show[]): Promise<StatsResult> {
 
 export function computeCalendarAsync(
   shows: Show[],
-  weekOffset: number
+  weekOffset: number,
 ): Promise<{ week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string }> {
   return new Promise((resolve) => {
     const worker = getWorker();

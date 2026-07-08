@@ -9,7 +9,19 @@ export function imgTag(src: string | null, alt: string, cls: string, extraStyle 
   }
   // Costruisci un fallback data-attribute per il delegato globale (vedi imageFallback.ts)
   return (
-    '<img class="' + cls + '" src="' + escapeAttr(src) + '" alt="' + escapeAttr(alt || '') + '" ' +
-    'loading="lazy" decoding="async" data-fallback="' + escapeAttr(alt || 'N/D') + '" data-fallback-cls="' + cls + '-placeholder" data-fallback-style="' + escapeAttr(extraStyle) + '">'
+    '<img class="' +
+    cls +
+    '" src="' +
+    escapeAttr(src) +
+    '" alt="' +
+    escapeAttr(alt || '') +
+    '" ' +
+    'loading="lazy" decoding="async" data-fallback="' +
+    escapeAttr(alt || 'N/D') +
+    '" data-fallback-cls="' +
+    cls +
+    '-placeholder" data-fallback-style="' +
+    escapeAttr(extraStyle) +
+    '">'
   );
 }

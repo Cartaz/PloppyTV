@@ -44,20 +44,22 @@ export function safeImageUrl(u: unknown): string | null {
 export function stripHtml(html: unknown): string {
   if (!html) return '';
   const str = String(html);
-  return str
-    // Rimuovi contenuto di script/style (compreso il testo interno)
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#x27;/g, "'")
-    .replace(/&apos;/g, "'")
-    .trim();
+  return (
+    str
+      // Rimuovi contenuto di script/style (compreso il testo interno)
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#x27;/g, "'")
+      .replace(/&apos;/g, "'")
+      .trim()
+  );
 }
 
 export function getPosterUrl(show: { image?: { medium?: string; original?: string } | null } | null): string | null {
@@ -100,9 +102,7 @@ export function localISODate(d: Date): string {
 }
 
 export function isSameLocalDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 const IT_MONTHS = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
@@ -163,11 +163,13 @@ interface HasSeasons {
  * Senza il sort per `num`, un array non ordinato restituirebbe l'episodio
  * sbagliato come "prossimo".
  */
-export function findNextEpisode<T extends HasSeasons>(show: T | null): { season: number; num: number; airdate: string | null; name: string | null } | null {
+export function findNextEpisode<T extends HasSeasons>(
+  show: T | null,
+): { season: number; num: number; airdate: string | null; name: string | null } | null {
   if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return null;
   try {
     const seasons = Object.keys(show.seasons)
-      .filter(k => !isNaN(parseInt(k, 10)) && parseInt(k, 10) > 0)
+      .filter((k) => !isNaN(parseInt(k, 10)) && parseInt(k, 10) > 0)
       .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     for (const s of seasons) {
       const eps = show.seasons![Number(s)];

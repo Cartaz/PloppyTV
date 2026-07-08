@@ -33,7 +33,11 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
     .map((r, idx) => {
       const show = r.show;
       const img = getPosterUrl(show);
-      const year = show.premiered ? (parseISODateLocal(show.premiered) ? parseISODateLocal(show.premiered)!.getFullYear() : 'N/D') : 'N/D';
+      const year = show.premiered
+        ? parseISODateLocal(show.premiered)
+          ? parseISODateLocal(show.premiered)!.getFullYear()
+          : 'N/D'
+        : 'N/D';
       const network = (show.network && show.network.name) || (show.webChannel && show.webChannel.name) || 'N/D';
       return (
         '<div class="search-result-item" data-idx="' +
@@ -43,12 +47,24 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
           ? '<img class="search-result-img" src="' + escapeAttr(img) + '" alt="" loading="lazy">'
           : '<div class="search-result-img" style="display:flex;align-items:center;justify-content:center;">N/D</div>') +
         '<div class="search-result-info">' +
-        '<div class="search-result-name">' + escapeHtml(show.name) + '</div>' +
-        '<div class="search-result-meta">' + year + ' • ' + escapeHtml(network) + '</div>' +
+        '<div class="search-result-name">' +
+        escapeHtml(show.name) +
+        '</div>' +
+        '<div class="search-result-meta">' +
+        year +
+        ' • ' +
+        escapeHtml(network) +
+        '</div>' +
         '<div class="search-result-actions">' +
-        '<button class="btn btn-primary btn-sm" data-idx="' + idx + '" data-list="watching">In corso</button>' +
-        '<button class="btn btn-secondary btn-sm" data-idx="' + idx + '" data-list="towatch">Da vedere</button>' +
-        '<button class="btn btn-secondary btn-sm" data-idx="' + idx + '" data-list="completed">Completata</button>' +
+        '<button class="btn btn-primary btn-sm" data-idx="' +
+        idx +
+        '" data-list="watching">In corso</button>' +
+        '<button class="btn btn-secondary btn-sm" data-idx="' +
+        idx +
+        '" data-list="towatch">Da vedere</button>' +
+        '<button class="btn btn-secondary btn-sm" data-idx="' +
+        idx +
+        '" data-list="completed">Completata</button>' +
         '</div></div></div>'
       );
     })
@@ -92,11 +108,14 @@ async function doSearch(query: string): Promise<void> {
   _searchResults.classList.add('active');
 
   try {
-    let results = await searchShows(query, signal);
+    const results = await searchShows(query, signal);
     if (mySeq !== searchSeq) return;
 
     if (!results || results.length === 0) {
-      const words = query.split(/\s+/).filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
+      const words = query
+        .split(/\s+/)
+        .filter((w) => w.length >= 3)
+        .sort((a, b) => b.length - a.length);
       if (words.length > 0 && words[0].toLowerCase() !== query.toLowerCase()) {
         const altQuery = words[0];
         try {
@@ -105,11 +124,11 @@ async function doSearch(query: string): Promise<void> {
           if (altResults && altResults.length > 0) {
             const qLower = query.toLowerCase();
             const filtered = altResults.filter(
-              (r) => r && r.show && r.show.name && r.show.name.toLowerCase().includes(qLower)
+              (r) => r && r.show && r.show.name && r.show.name.toLowerCase().includes(qLower),
             );
             const html = renderSearchResultsHTML(
               filtered.length > 0 ? filtered : altResults.slice(0, 10),
-              'Nessun risultato per "' + query + '". Risultati simili per "' + altQuery + '":'
+              'Nessun risultato per "' + query + '". Risultati simili per "' + altQuery + '":',
             );
             if (html) {
               _searchResults.innerHTML = html;
@@ -123,7 +142,9 @@ async function doSearch(query: string): Promise<void> {
         }
       }
       _searchResults.innerHTML =
-        '<div class="search-no-results">Nessuna serie trovata per "' + escapeHtml(query) + '". Prova con meno parole o la parola principale.</div>';
+        '<div class="search-no-results">Nessuna serie trovata per "' +
+        escapeHtml(query) +
+        '". Prova con meno parole o la parola principale.</div>';
       lastSearchResults = [];
       return;
     }
@@ -132,7 +153,8 @@ async function doSearch(query: string): Promise<void> {
     if (html) {
       _searchResults.innerHTML = html;
     } else {
-      _searchResults.innerHTML = '<div class="search-no-results">Nessuna serie trovata per "' + escapeHtml(query) + '".</div>';
+      _searchResults.innerHTML =
+        '<div class="search-no-results">Nessuna serie trovata per "' + escapeHtml(query) + '".</div>';
       lastSearchResults = [];
     }
   } catch (e: unknown) {

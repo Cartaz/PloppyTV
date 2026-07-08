@@ -62,8 +62,10 @@ export function initExportImport(): void {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
         showToast(
-          'File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido, non corrotto o in encoding UTF-16)',
-          'error'
+          'File JSON non valido: ' +
+            msg +
+            ' (controlla che sia un file JSON valido, non corrotto o in encoding UTF-16)',
+          'error',
         );
         input.value = '';
         return;
@@ -75,8 +77,10 @@ export function initExportImport(): void {
       }
       if (!Array.isArray(data.shows)) {
         showToast(
-          'Formato non valido: "shows" deve essere un array (era ' + (data.shows === null ? 'null' : typeof data.shows) + ')',
-          'error'
+          'Formato non valido: "shows" deve essere un array (era ' +
+            (data.shows === null ? 'null' : typeof data.shows) +
+            ')',
+          'error',
         );
         input.value = '';
         return;
@@ -101,7 +105,11 @@ export function initExportImport(): void {
       }
       const skipMsg =
         skipped > 0
-          ? ' (' + skipped + ' ignorate per dati non validi' + (duplicates > 0 ? ', ' + duplicates + ' duplicati saltati' : '') + ')'
+          ? ' (' +
+            skipped +
+            ' ignorate per dati non validi' +
+            (duplicates > 0 ? ', ' + duplicates + ' duplicati saltati' : '') +
+            ')'
           : duplicates > 0
             ? ' (' + duplicates + ' duplicati saltati)'
             : '';
@@ -178,15 +186,20 @@ export function initExportImport(): void {
                   closeAllModals();
                 },
               },
-            ]
+            ],
           );
         },
       };
 
       showModal(
         'Importa backup',
-        '<p>Trovate ' + dedupedShows.length + ' serie valide' + skipMsg + '.</p>' + '<p>Vuoi sostituire i dati attuali o unirli?</p>',
-        [{ label: 'Annulla' }, mergeAction, replaceAction]
+        '<p>Trovate ' +
+          dedupedShows.length +
+          ' serie valide' +
+          skipMsg +
+          '.</p>' +
+          '<p>Vuoi sostituire i dati attuali o unirli?</p>',
+        [{ label: 'Annulla' }, mergeAction, replaceAction],
       );
     };
     reader.readAsText(file, 'utf-8');

@@ -77,7 +77,10 @@ function computeStats(shows: Show[]): StatsResult {
   };
 }
 
-function computeCalendar(shows: Show[], weekOffset: number): { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string } {
+function computeCalendar(
+  shows: Show[],
+  weekOffset: number,
+): { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(today);

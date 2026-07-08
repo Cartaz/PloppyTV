@@ -1,0 +1,13 @@
+dist/
+node_modules/
+dev-dist/
+coverage/
+*.min.js
+*.min.css
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+public/icons/
+
+# Markdown: scritto a mano con wrapping manuale, non passare Prettier
+*.md

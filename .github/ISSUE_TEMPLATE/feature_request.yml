@@ -1,0 +1,80 @@
+name: Feature Request
+description: Proponi una nuova feature per PloppyTV
+title: '[feat] '
+labels: ['enhancement', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie per l'idea! Prima di compilare, leggi la [roadmap](../blob/main/README.md#roadmap)
+        e i [principi guida](../blob/main/PRIVACY.md): PloppyTV è local-first, senza backend,
+        senza account, senza tracking. Feature che richiedono un server non verranno accettate.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema che risolve
+      description: Qual è il dolore o la frustrazione che questa feature eliminerebbe? "Sarebbe figa" non è sufficiente.
+      placeholder: |
+        Quando ho 50+ serie in tracking, non riesco a trovare rapidamente quelle
+        che sto effettivamente guardando. Devo scorrere tutta la lista "In corso".
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Soluzione proposta
+      description: Come pensi che dovrebbe funzionare? Anche un abbozzo va bene.
+      placeholder: |
+        Aggiungere un campo di ricerca nella vista "In corso" che filtra in tempo
+        reale per nome della serie. Keyboard shortcut "/" per focus rapido.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative considerate
+      description: Hai pensato ad altre soluzioni? Perché non vanno bene?
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Categoria (consultivo — la assegna il maintainer)
+      options:
+        - Quality of life (scorciatoie, UX, dati più ricchi)
+        - Nuova vista / pagina
+        - Performance / affidabilità
+        - A11y / keyboard
+        - i18n / traduzioni
+        - Altro
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Compatibilità con i principi del progetto
+      description: Tutte le feature devono rispettare questi vincoli
+      options:
+        - label: Non richiede un backend / server
+          required: true
+        - label: Non richiede account / login
+          required: true
+        - label: Non aggiunge tracking / analytics
+          required: true
+        - label: I dati restano in localStorage (o cloud storage dell'utente, opt-in)
+          required: true
+
+  - type: textarea
+    id: privacy_impact
+    attributes:
+      label: Impatto su privacy / chiamate network
+      description: Aggiunge chiamate a servizi esterni (oltre a TVMaze)? Salva nuovi dati sensibili? Se sì, come mitighi?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contesto aggiuntivo
+      description: Screenshot di app simili (TV Time, Trakt, Refract), mockup, link a discussioni, ecc.

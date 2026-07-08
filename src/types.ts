@@ -111,16 +111,29 @@ export interface StatsResult {
   timeLabel: string;
   totalProgress: number;
   topGenres: Array<{ genre: string; episodes: number; shows: number }>;
-  topShows: Array<{ showId: number; showName: string; image: string | null; watched: number; totalEpisodes: number; pct: number }>;
+  topShows: Array<{
+    showId: number;
+    showName: string;
+    image: string | null;
+    watched: number;
+    totalEpisodes: number;
+    pct: number;
+  }>;
 }
 
 // Messaggi Worker — ogni richiesta porta un `id` (correlation) e la risposta
 // lo riporta, in modo che il client possa scartare risposte stale o tardive.
 export type WorkerRequest =
-  | { type: 'stats'; id: number; shows: Show[] }
-  | { type: 'calendar'; id: number; shows: Show[]; weekOffset: number };
+  { type: 'stats'; id: number; shows: Show[] } | { type: 'calendar'; id: number; shows: Show[]; weekOffset: number };
 
 export type WorkerResponse =
   | { type: 'stats'; id: number; result: StatsResult }
-  | { type: 'calendar'; id: number; result: CalendarEpisode[]; weekStart: string; weekEnd: string; afterWeek: CalendarEpisode[] }
+  | {
+      type: 'calendar';
+      id: number;
+      result: CalendarEpisode[];
+      weekStart: string;
+      weekEnd: string;
+      afterWeek: CalendarEpisode[];
+    }
   | { type: 'error'; id: number; message: string };

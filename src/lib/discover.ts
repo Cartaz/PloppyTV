@@ -32,7 +32,7 @@ export interface DiscoverGroups {
 async function fetchAllCandidates(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void
+  onProgress?: (text: string) => void,
 ): Promise<{ shows: TvmazeShow[]; failedPages: number[] }> {
   const sixMonthsAgo = recentOnly
     ? (() => {
@@ -85,7 +85,7 @@ async function fetchAllCandidates(
           completed++;
           scheduleProgress(label);
         }
-      })
+      }),
     );
     for (const r of batchResults) {
       results[r.idx] = r.shows;
@@ -183,7 +183,7 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
 async function fetchShowsByGenre(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void
+  onProgress?: (text: string) => void,
 ): Promise<{ groups: DiscoverGroups; failedPages: number[] }> {
   const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly, onProgress);
   return { groups: assignShowsToGroups(shows), failedPages };
@@ -301,10 +301,7 @@ export function invalidateDiscoverCache(tab: 'popular' | 'recent'): void {
 }
 
 // Helper: cerca uno show nella cache discover (popolari + recenti)
-export function findShowInDiscoverGroups(
-  showId: number,
-  groupsArr: Array<DiscoverGroups | null>
-): TvmazeShow | null {
+export function findShowInDiscoverGroups(showId: number, groupsArr: Array<DiscoverGroups | null>): TvmazeShow | null {
   for (const groups of groupsArr) {
     if (!groups) continue;
     for (const key of Object.keys(groups)) {

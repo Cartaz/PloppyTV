@@ -2,7 +2,14 @@
 
 import { getState, switchSeason, closeShow } from '../lib/store';
 import { safeId, escapeHtml, escapeAttr, getWatchedCount, formatDate } from '../lib/utils';
-import { moveShowToList, removeShow, toggleEpisode, markSeasonWatched, refreshShowEpisodes, showNeedsEpisodeNames } from '../lib/shows';
+import {
+  moveShowToList,
+  removeShow,
+  toggleEpisode,
+  markSeasonWatched,
+  refreshShowEpisodes,
+  showNeedsEpisodeNames,
+} from '../lib/shows';
 
 let _boundShowDetail = false;
 
@@ -41,7 +48,8 @@ export function renderShowDetail(main: HTMLElement): void {
   const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
-  const statusClass = statusLower.includes('running') || statusLower.includes('in corso') ? 'status-running' : 'status-ended';
+  const statusClass =
+    statusLower.includes('running') || statusLower.includes('in corso') ? 'status-running' : 'status-ended';
 
   let html =
     '<button class="btn btn-secondary" data-action="closeShow" style="margin-bottom:20px;">' +
@@ -54,59 +62,137 @@ export function renderShowDetail(main: HTMLElement): void {
   const bigImg = show.image ? show.image.replace('medium', 'original') : null;
   if (bigImg && show.image && bigImg !== show.image) {
     // Catena: original -> medium -> placeholder
-    html += '<img class="detail-poster" src="' + escapeAttr(bigImg) + '" alt="' + escapeAttr(show.name) + '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' + escapeAttr(show.image) + '">';
+    html +=
+      '<img class="detail-poster" src="' +
+      escapeAttr(bigImg) +
+      '" alt="' +
+      escapeAttr(show.name) +
+      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
+      escapeAttr(show.image) +
+      '">';
   } else if (show.image) {
     // Solo medium disponibile
-    html += '<img class="detail-poster" src="' + escapeAttr(show.image) + '" alt="' + escapeAttr(show.name) + '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
+    html +=
+      '<img class="detail-poster" src="' +
+      escapeAttr(show.image) +
+      '" alt="' +
+      escapeAttr(show.name) +
+      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
   } else {
     html += '<div class="detail-poster-placeholder">Immagine non disponibile</div>';
   }
   html +=
     '<div class="detail-info">' +
-    '<h1 class="detail-name">' + escapeHtml(show.name) + '</h1>' +
+    '<h1 class="detail-name">' +
+    escapeHtml(show.name) +
+    '</h1>' +
     '<div class="detail-meta">' +
-    '<span><span class="status-badge ' + statusClass + '">' + escapeHtml(show.status) + '</span></span>' +
+    '<span><span class="status-badge ' +
+    statusClass +
+    '">' +
+    escapeHtml(show.status) +
+    '</span></span>' +
     (show.premiered ? '<span>' + formatDate(show.premiered) + '</span>' : '') +
-    '<span>' + escapeHtml(show.network) + '</span>' +
-    '<span>' + show.totalSeasons + ' stagioni</span>' +
-    '<span>' + show.totalEpisodes + ' episodi</span>' +
+    '<span>' +
+    escapeHtml(show.network) +
+    '</span>' +
+    '<span>' +
+    show.totalSeasons +
+    ' stagioni</span>' +
+    '<span>' +
+    show.totalEpisodes +
+    ' episodi</span>' +
     '</div>' +
-    '<div class="detail-genres">' + show.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') + '</div>' +
-    '<div class="detail-progress-block' + (isCompleted ? ' completed' : '') + '">' +
+    '<div class="detail-genres">' +
+    show.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') +
+    '</div>' +
+    '<div class="detail-progress-block' +
+    (isCompleted ? ' completed' : '') +
+    '">' +
     '<div class="detail-progress-meta">' +
-    '<span>' + watched + ' / ' + show.totalEpisodes + ' episodi visti</span>' +
-    '<span>' + Math.round(progress) + '%</span></div>' +
+    '<span>' +
+    watched +
+    ' / ' +
+    show.totalEpisodes +
+    ' episodi visti</span>' +
+    '<span>' +
+    Math.round(progress) +
+    '%</span></div>' +
     '<div class="detail-progress-track">' +
-    '<div class="detail-progress-fill" style="width:' + progress + '%"></div></div></div>';
+    '<div class="detail-progress-fill" style="width:' +
+    progress +
+    '%"></div></div></div>';
 
   if (show.summary) {
-    html += '<div class="detail-summary">' + show.summary.split('\n').map((p) => '<p>' + escapeHtml(p) + '</p>').join('') + '</div>';
+    html +=
+      '<div class="detail-summary">' +
+      show.summary
+        .split('\n')
+        .map((p) => '<p>' + escapeHtml(p) + '</p>')
+        .join('') +
+      '</div>';
   }
 
   html += '<div class="detail-actions">';
-  if (show.list !== 'watching') html += '<button class="btn btn-primary" data-action="moveShow" data-show-id="' + show.id + '" data-list="watching">In corso</button>';
-  if (show.list !== 'towatch') html += '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' + show.id + '" data-list="towatch">Da vedere</button>';
-  if (show.list !== 'completed') html += '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' + show.id + '" data-list="completed">Completata</button>';
-  html += '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' + show.id + '" title="Aggiorna episodi e metadati da TVMaze">Aggiorna dati</button>';
-  html += '<button class="btn btn-danger" data-action="removeShow" data-show-id="' + show.id + '" data-show-name="' + escapeAttr(show.name) + '">Rimuovi</button></div></div></div>';
+  if (show.list !== 'watching')
+    html +=
+      '<button class="btn btn-primary" data-action="moveShow" data-show-id="' +
+      show.id +
+      '" data-list="watching">In corso</button>';
+  if (show.list !== 'towatch')
+    html +=
+      '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
+      show.id +
+      '" data-list="towatch">Da vedere</button>';
+  if (show.list !== 'completed')
+    html +=
+      '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
+      show.id +
+      '" data-list="completed">Completata</button>';
+  html +=
+    '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' +
+    show.id +
+    '" title="Aggiorna episodi e metadati da TVMaze">Aggiorna dati</button>';
+  html +=
+    '<button class="btn btn-danger" data-action="removeShow" data-show-id="' +
+    show.id +
+    '" data-show-name="' +
+    escapeAttr(show.name) +
+    '">Rimuovi</button></div></div></div>';
 
   if (seasons.length === 0) {
-    html += '<div class="empty-state"><div class="empty-state-title">Nessun episodio disponibile</div><div class="empty-state-text">Questa serie non ha episodi registrati.</div></div>';
+    html +=
+      '<div class="empty-state"><div class="empty-state-title">Nessun episodio disponibile</div><div class="empty-state-text">Questa serie non ha episodi registrati.</div></div>';
     main.innerHTML = html;
     return;
   }
 
   html += '<div class="season-tabs">';
   for (const s of seasons) {
-    html += '<div class="season-tab ' + (parseInt(s, 10) === state.currentSeason ? 'active' : '') + '" data-action="switchSeason" data-season="' + parseInt(s, 10) + '">Stagione ' + s + '</div>';
+    html +=
+      '<div class="season-tab ' +
+      (parseInt(s, 10) === state.currentSeason ? 'active' : '') +
+      '" data-action="switchSeason" data-season="' +
+      parseInt(s, 10) +
+      '">Stagione ' +
+      s +
+      '</div>';
   }
   html += '</div>';
 
   if (state.currentSeason != null) {
     html +=
       '<div class="season-actions">' +
-      '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' + show.id + '" data-season="' + state.currentSeason + '" data-watched="1">Segna tutti come visti</button>' +
-      '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' + show.id + '" data-season="' + state.currentSeason + '" data-watched="0">Segna tutti come non visti</button>' +
+      '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' +
+      show.id +
+      '" data-season="' +
+      state.currentSeason +
+      '" data-watched="1">Segna tutti come visti</button>' +
+      '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' +
+      show.id +
+      '" data-season="' +
+      state.currentSeason +
+      '" data-watched="0">Segna tutti come non visti</button>' +
       '</div>';
     const eps = show.seasons[state.currentSeason] || [];
     // Calcola runtime medio se presente (per info bonus)
@@ -118,11 +204,27 @@ export function renderShowDetail(main: HTMLElement): void {
       const epNumberLabel = 'S' + state.currentSeason + 'E' + ep.num;
       const runtimeLabel = ep.runtime ? ' • ' + ep.runtime + ' min' : '';
       html +=
-        '<div class="episode-item ' + (ep.watched ? 'watched' : '') + '" data-action="toggleEpisode" data-show-id="' + show.id + '" data-season="' + state.currentSeason + '" data-ep="' + ep.num + '" style="cursor:pointer;">' +
-        '<div class="episode-checkbox ' + (ep.watched ? 'checked' : '') + '"></div>' +
+        '<div class="episode-item ' +
+        (ep.watched ? 'watched' : '') +
+        '" data-action="toggleEpisode" data-show-id="' +
+        show.id +
+        '" data-season="' +
+        state.currentSeason +
+        '" data-ep="' +
+        ep.num +
+        '" style="cursor:pointer;">' +
+        '<div class="episode-checkbox ' +
+        (ep.watched ? 'checked' : '') +
+        '"></div>' +
         '<div class="episode-info">' +
-        '<div class="episode-name">' + epTitle + '</div>' +
-        '<div class="episode-meta">' + epNumberLabel + (ep.airdate ? ' • ' + formatDate(ep.airdate) : '') + runtimeLabel + '</div>' +
+        '<div class="episode-name">' +
+        epTitle +
+        '</div>' +
+        '<div class="episode-meta">' +
+        epNumberLabel +
+        (ep.airdate ? ' • ' + formatDate(ep.airdate) : '') +
+        runtimeLabel +
+        '</div>' +
         '</div></div>';
     }
     html += '</div>';

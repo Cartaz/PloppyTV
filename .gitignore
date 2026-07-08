@@ -9,3 +9,6 @@ dist-ssr
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+coverage/
+*.lcov
+

@@ -36,7 +36,7 @@ registerRoute(
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 }),
     ],
-  })
+  }),
 );
 
 // Immagini poster TVMaze: cache-first con fallback network
@@ -48,7 +48,7 @@ registerRoute(
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 }),
     ],
-  })
+  }),
 );
 
 // Catch handler per navigazioni offline.

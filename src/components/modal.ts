@@ -138,7 +138,9 @@ export function initModal(): void {
     if (e.key !== 'Tab') return;
     if (_stack.length === 0) return;
     if (!_modalActions) return;
-    const focusables = _modalActions.querySelectorAll<HTMLElement>('button, [href], input, [tabindex]:not([tabindex="-1"])');
+    const focusables = _modalActions.querySelectorAll<HTMLElement>(
+      'button, [href], input, [tabindex]:not([tabindex="-1"])',
+    );
     if (focusables.length === 0) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];

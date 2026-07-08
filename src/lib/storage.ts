@@ -10,13 +10,7 @@
 
 import type { SavedData, Show } from '../types';
 import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
-import {
-  getState,
-  setShows,
-  setStorageDisabled,
-  setQuotaWarned,
-  emitChange,
-} from './store';
+import { getState, setShows, setStorageDisabled, setQuotaWarned, emitChange } from './store';
 import { normalizeShow, reconcileAllLists } from './normalize';
 import { showToast } from '../components/toast';
 import { isModalOpen } from '../components/modal';
@@ -131,7 +125,7 @@ function _saveDataNow(): boolean {
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ version: SCHEMA_VERSION, shows: stripped, savedAt: _lastSavedAt } satisfies SavedData)
+          JSON.stringify({ version: SCHEMA_VERSION, shows: stripped, savedAt: _lastSavedAt } satisfies SavedData),
         );
         showToast('Salvato senza immagini (spazio limitato).', 'warning');
         return true;

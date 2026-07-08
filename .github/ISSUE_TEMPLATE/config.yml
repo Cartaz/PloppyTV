@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Domanda generale / discussione
+    url: https://github.com/Cartaz/PloppyTV/discussions
+    about: Per domande aperte, idee vaghe, o discussioni che non sono ancora bug o feature request, usa le Discussioni GitHub.
+  - name: Privacy policy
+    url: https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md
+    about: Domande su come PloppyTV gestisce i dati? Leggi la Privacy Policy prima di aprire un issue.
+  - name: Roadmap
+    url: https://github.com/Cartaz/PloppyTV#roadmap
+    about: Vuoi sapere se una feature è già pianificata? Controlla la roadmap nel README.

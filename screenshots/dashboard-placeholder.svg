@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1d2e"/>
+      <stop offset="100%" stop-color="#0f1119"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6b35"/>
+      <stop offset="100%" stop-color="#ff8a5b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="0" y="0" width="220" height="720" fill="#15182a"/>
+  <rect x="20" y="30" width="40" height="40" rx="8" fill="url(#accent)"/>
+  <text x="70" y="55" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#ffffff">PloppyTV</text>
+  <g font-family="Inter, sans-serif" font-size="13" fill="#9ca3af">
+    <rect x="10" y="100" width="200" height="36" rx="6" fill="#2a2e45"/>
+    <text x="40" y="122">Dashboard</text>
+    <rect x="10" y="146" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="168">In corso</text>
+    <circle cx="200" cy="164" r="10" fill="url(#accent)"/>
+    <text x="200" y="168" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+    <rect x="10" y="192" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="214">Da vedere</text>
+    <rect x="10" y="238" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="260">Completate</text>
+    <rect x="10" y="284" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="306">Scopri</text>
+    <rect x="10" y="330" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="352">Calendario</text>
+    <rect x="10" y="376" width="200" height="36" rx="6" fill="transparent"/>
+    <text x="40" y="398">Statistiche</text>
+  </g>
+  <text x="260" y="60" font-family="Inter, sans-serif" font-size="28" font-weight="800" fill="#ffffff">Dashboard</text>
+  <text x="260" y="88" font-family="Inter, sans-serif" font-size="13" fill="#9ca3af">Il tuo tracker personale per serie TV</text>
+  <g>
+    <rect x="260" y="120" width="230" height="100" rx="12" fill="#1f2238" stroke="#2a2e45"/>
+    <text x="280" y="150" font-family="Inter, sans-serif" font-size="11" fill="#9ca3af">SERIE IN CORSO</text>
+    <text x="280" y="190" font-family="Inter, sans-serif" font-size="32" font-weight="800" fill="#ff6b35">3</text>
+    <rect x="510" y="120" width="230" height="100" rx="12" fill="#1f2238" stroke="#2a2e45"/>
+    <text x="530" y="150" font-family="Inter, sans-serif" font-size="11" fill="#9ca3af">EPISODI VISTI</text>
+    <text x="530" y="190" font-family="Inter, sans-serif" font-size="32" font-weight="800" fill="#ffffff">142</text>
+    <rect x="760" y="120" width="230" height="100" rx="12" fill="#1f2238" stroke="#2a2e45"/>
+    <text x="780" y="150" font-family="Inter, sans-serif" font-size="11" fill="#9ca3af">ORE TOTALI</text>
+    <text x="780" y="190" font-family="Inter, sans-serif" font-size="32" font-weight="800" fill="#ffffff">106h</text>
+    <rect x="1010" y="120" width="230" height="100" rx="12" fill="#1f2238" stroke="#2a2e45"/>
+    <text x="1030" y="150" font-family="Inter, sans-serif" font-size="11" fill="#9ca3af">PROSSIMO EP</text>
+    <text x="1030" y="185" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#ffffff">The Last of Us</text>
+    <text x="1030" y="205" font-family="Inter, sans-serif" font-size="11" fill="#9ca3af">S2E4 - domani</text>
+  </g>
+  <text x="260" y="260" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#ffffff">Prossimi episodi</text>
+  <g>
+    <rect x="260" y="280" width="180" height="240" rx="8" fill="#1f2238"/>
+    <rect x="270" y="290" width="160" height="220" rx="6" fill="#2a2e45"/>
+    <text x="280" y="470" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#fff">The Last of Us</text>
+    <text x="280" y="488" font-family="Inter, sans-serif" font-size="10" fill="#9ca3af">S2 E4 - domani</text>
+    <rect x="270" y="500" width="160" height="4" rx="2" fill="#2a2e45"/>
+    <rect x="270" y="500" width="100" height="4" rx="2" fill="url(#accent)"/>
+    <rect x="460" y="280" width="180" height="240" rx="8" fill="#1f2238"/>
+    <rect x="470" y="290" width="160" height="220" rx="6" fill="#2a2e45"/>
+    <text x="480" y="470" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#fff">Severance</text>
+    <text x="480" y="488" font-family="Inter, sans-serif" font-size="10" fill="#9ca3af">S2 E7 - 3 giorni</text>
+    <rect x="470" y="500" width="160" height="4" rx="2" fill="#2a2e45"/>
+    <rect x="470" y="500" width="130" height="4" rx="2" fill="url(#accent)"/>
+    <rect x="660" y="280" width="180" height="240" rx="8" fill="#1f2238"/>
+    <rect x="670" y="290" width="160" height="220" rx="6" fill="#2a2e45"/>
+    <text x="680" y="470" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#fff">House of the Dragon</text>
+    <text x="680" y="488" font-family="Inter, sans-serif" font-size="10" fill="#9ca3af">S2 E8 - 5 giorni</text>
+    <rect x="670" y="500" width="160" height="4" rx="2" fill="#2a2e45"/>
+    <rect x="670" y="500" width="80" height="4" rx="2" fill="url(#accent)"/>
+    <rect x="860" y="280" width="180" height="240" rx="8" fill="#1f2238"/>
+    <rect x="870" y="290" width="160" height="220" rx="6" fill="#2a2e45"/>
+    <text x="880" y="470" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#fff">Andor</text>
+    <text x="880" y="488" font-family="Inter, sans-serif" font-size="10" fill="#9ca3af">S2 E5 - 1 settimana</text>
+    <rect x="870" y="500" width="160" height="4" rx="2" fill="#2a2e45"/>
+    <rect x="870" y="500" width="110" height="4" rx="2" fill="url(#accent)"/>
+  </g>
+  <text x="640" y="690" font-family="Inter, sans-serif" font-size="11" fill="#4b5563" text-anchor="middle">PloppyTV v1.1.0 - placeholder screenshot - sostituisci con uno screenshot reale</text>
+</svg>

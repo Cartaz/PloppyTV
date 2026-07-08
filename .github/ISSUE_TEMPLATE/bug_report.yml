@@ -1,0 +1,92 @@
+name: Bug Report
+description: Segnala un bug in PloppyTV
+title: '[bug] '
+labels: ['bug', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie per segnalare questo bug! Aiutaci a riprodurlo compilando i campi sotto.
+        Più dettaglio fornisci, più velocemente possiamo fixare.
+
+  - type: input
+    id: version
+    attributes:
+      label: Versione di PloppyTV
+      description: Visibile in About (icona "i" nella sidebar) → "Versione X.Y.Z"
+      placeholder: '1.1.0'
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser e sistema operativo
+      placeholder: 'Chrome 126 su macOS 14 / Safari 17 su iOS 17 / Firefox 127 su Ubuntu 24.04'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: PWA installata o usata via browser?
+      options:
+        - Installata come PWA (icona su home/desktop)
+        - Usata via browser (URL diretto)
+        - Non sono sicuro
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passi per riprodurre
+      description: Lista numerata, specifica. "Fai questo, poi quello" non è sufficiente.
+      placeholder: |
+        1. Apri PloppyTV
+        2. Vai su "Scopri"
+        3. Cerca "Breaking Bad"
+        4. Clicca sulla card
+        5. Vedi errore "TypeError: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento atteso
+      description: Cosa pensavi che dovesse succedere?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportamento attuale
+      description: Cosa è successo invece? Incolla qui eventuali errori dalla console del browser (F12 → Console).
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshot / registrazioni
+      description: Trascina qui screenshot o GIF. Opzionale ma molto utile.
+
+  - type: checkboxes
+    id: reproducibility
+    attributes:
+      label: Riproducibilità
+      options:
+        - label: Si riproduce dopo ricaricamento della pagina (F5)
+          required: false
+        - label: Si riproduce dopo reset dati (Impostazioni → Reset)
+          required: false
+        - label: Si riproduce in una finestra di navigazione privata/incognito
+          required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contesto aggiuntivo
+      description: Altro che potrebbe aiutare (numero di serie tracciate, dati importati di recente, modalità offline attiva, ecc.)
