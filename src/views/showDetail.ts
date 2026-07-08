@@ -1,16 +1,28 @@
 // Vista dettaglio show con episodi
 
-import { getState, switchSeason } from '../lib/store';
+import { getState, switchSeason, closeShow } from '../lib/store';
 import { safeId, escapeHtml, escapeAttr, getWatchedCount, formatDate } from '../lib/utils';
 import { moveShowToList, removeShow, toggleEpisode, markSeasonWatched, refreshShowEpisodes, showNeedsEpisodeNames } from '../lib/shows';
+
+let _boundShowDetail = false;
+
+/**
+ * Resetta la guardia di idempotenza. Deve essere chiamato dal renderer
+ * PRIMA di bindShowDetailEvents per evitare accumulo di listener ad ogni
+ * re-render. Vedi bug C5/T1.
+ */
+export function resetBoundGuard(): void {
+  _boundShowDetail = false;
+}
 
 export function renderShowDetail(main: HTMLElement): void {
   const state = getState();
   const showId = safeId(state.currentShowId);
   const show = state.shows.find((s) => s.id === showId);
   if (!show) {
-    state.currentShowId = null;
-    import('./dashboard').then(({ renderDashboard }) => renderDashboard(main));
+    // H13: usa closeShow() invece di mutare currentShowId direttamente,
+    // così emitChange viene triggerato e la nav si aggiorna.
+    closeShow();
     return;
   }
   if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
@@ -123,8 +135,14 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 }
 
-// Bind eventi via event delegation sul main content
+// Bind eventi via event delegation sul main content.
+// CRITICAL FIX (C5/T1): guardia _boundShowDetail evita di aggiungere un
+// nuovo listener ad ogni re-render. Il renderer chiama resetBoundGuard()
+// prima del bind, così ad ogni cambio vista la guardia è false e il listener
+// viene aggiunto una sola volta per quella vista.
 export function bindShowDetailEvents(main: HTMLElement): void {
+  if (_boundShowDetail) return;
+  _boundShowDetail = true;
   main.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;

@@ -14,8 +14,16 @@ let _recentCache: DiscoverGroups | null = null;
 let _popularLoading = false;
 let _recentLoading = false;
 
+let _boundDiscover = false;
+
+/** Reset guardia listener — vedi C5/T1 */
+export function resetBoundGuard(): void {
+  _boundDiscover = false;
+}
+
 function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
-  const carouselId = 'carousel-' + genre.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '-' + Math.random().toString(36).slice(2, 8);
+  // Carousel ID stabile (no Math.random) per essere riferito deterministicamente
+  const carouselId = 'carousel-' + genre.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
   let html = '<div class="genre-carousel">';
   html += '<div class="carousel-header">';
   html += '<div><span class="carousel-title">' + escapeHtml(genre) + '</span><span class="carousel-count">' + shows.length + ' serie</span></div>';
@@ -76,10 +84,17 @@ function renderDiscoverError(err: { name?: string }): string {
   let msg = 'Errore caricamento. Riprova.';
   if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
   else if (err.name === 'TimeoutError') msg = 'Timeout caricamento.';
+  else if (err.name === 'ParseError') msg = 'Risposta API non valida. Riprova.';
   return '<div class="empty-state"><div class="empty-state-title">' + escapeHtml(msg) + '</div>' +
     '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>';
 }
 
+/**
+ * Carica il tab richiesto. CRITICAL FIX (H15): dopo l'await verifichiamo
+ * che `getState()._discoverTab` sia ancora il tab che stavamo caricando;
+ * se l'utente ha switchato tab durante il fetch, scartiamo il risultato
+ * per non sovrascrivere la vista del nuovo tab.
+ */
 async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
   const el = document.getElementById('discoverContent');
   if (!el) return;
@@ -91,14 +106,15 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     }
     if (_popularLoading) return;
     _popularLoading = true;
-    // Se il preload è già a buon punto, mostriamo subito il caricamento solo se serve
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
-      // Si attacca alla promise condivisa (avviata dal preload all'avvio dell'app)
       _popularCache = await getDiscoverPromise('popular');
+      // H15: scarta se l'utente ha cambiato tab durante il fetch
+      if (getState()._discoverTab !== 'popular') return;
       el.innerHTML = renderDiscoverContent(_popularCache);
       bindCarousels(el);
     } catch (e) {
+      if (getState()._discoverTab !== 'popular') return;
       el.innerHTML = renderDiscoverError(e as { name?: string });
     } finally {
       _popularLoading = false;
@@ -114,9 +130,12 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
       _recentCache = await getDiscoverPromise('recent');
+      // H15: scarta se l'utente ha cambiato tab durante il fetch
+      if (getState()._discoverTab !== 'recent') return;
       el.innerHTML = renderDiscoverContent(_recentCache);
       bindCarousels(el);
     } catch (e) {
+      if (getState()._discoverTab !== 'recent') return;
       el.innerHTML = renderDiscoverError(e as { name?: string });
     } finally {
       _recentLoading = false;
@@ -155,6 +174,8 @@ export function renderDiscover(main: HTMLElement): void {
 }
 
 export function bindDiscoverEvents(main: HTMLElement): void {
+  if (_boundDiscover) return;
+  _boundDiscover = true;
   main.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;

@@ -2,9 +2,25 @@
 
 import type { Episode } from '../types';
 
+/**
+ * Converte un valore in un ID positivo e intero.
+ * Rifuta tipi non numerici/stringa, valori booleani, array, oggetti,
+ * notazioni esadecimali/scientifiche e numeri oltre MAX_SAFE_INTEGER.
+ */
 export function safeId(v: unknown): number {
-  const n = Number(v);
-  return Number.isInteger(n) && n > 0 ? n : 0;
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'boolean') return 0;
+  if (typeof v === 'object') return 0;
+  if (typeof v === 'string') {
+    // Accetta solo stringhe che rappresentano un intero decimale
+    if (!/^-?\d+$/.test(v)) return 0;
+  }
+  const n = typeof v === 'string' ? Number(v) : Number(v);
+  if (!Number.isFinite(n)) return 0;
+  if (!Number.isInteger(n)) return 0;
+  if (n <= 0) return 0;
+  if (n > Number.MAX_SAFE_INTEGER) return 0;
+  return n;
 }
 
 export function safeNum(v: unknown): number {
@@ -20,11 +36,18 @@ export function safeImageUrl(u: unknown): string | null {
   return u;
 }
 
+/**
+ * Rimuove i tag HTML e decodifica le entity più comuni.
+ * Rimuove anche il contenuto di <script> e <style> (non solo i tag),
+ * evitando che codice JavaScript finisca come testo visibile.
+ */
 export function stripHtml(html: unknown): string {
   if (!html) return '';
   const str = String(html);
-  // Lavora senza DOMParser (compatibile con Web Worker)
   return str
+    // Rimuovi contenuto di script/style (compreso il testo interno)
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]*>/g, '')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -32,6 +55,8 @@ export function stripHtml(html: unknown): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/&#x27;/g, "'")
+    .replace(/&apos;/g, "'")
     .trim();
 }
 
@@ -43,6 +68,11 @@ export function getPosterUrl(show: { image?: { medium?: string; original?: strin
 }
 
 // ===== DATE HELPERS (timezone-safe) =====
+/**
+ * Parsa una data ISO. Per date "YYYY-MM-DD" (senza tempo) usa costruttore
+ * locale per evitare shift di fuso. Per altre stringhe usa Date standard.
+ * Validazione stretta: rifiuta date rollover come 2024-02-30.
+ */
 export function parseISODateLocal(str: unknown): Date | null {
   if (!str || typeof str !== 'string') return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
@@ -50,10 +80,16 @@ export function parseISODateLocal(str: unknown): Date | null {
     const d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
   }
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  if (isNaN(d.getTime())) return null;
-  if (d.getFullYear() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1 || d.getDate() !== Number(m[3])) return null;
-  return d;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  // Validazione stretta: rifiuta 2024-13-45, 2024-02-30, ecc.
+  if (mo < 1 || mo > 12) return null;
+  if (d < 1 || d > 31) return null;
+  const date = new Date(y, mo - 1, d);
+  if (isNaN(date.getTime())) return null;
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return date;
 }
 
 export function localISODate(d: Date): string {
@@ -121,6 +157,12 @@ interface HasSeasons {
   seasons?: Record<number, Episode[]>;
 }
 
+/**
+ * Trova il primo episodio non watched, iterando le stagioni in ordine numerico
+ * e gli episodi di ogni stagione in ordine di `num`.
+ * Senza il sort per `num`, un array non ordinato restituirebbe l'episodio
+ * sbagliato come "prossimo".
+ */
 export function findNextEpisode<T extends HasSeasons>(show: T | null): { season: number; num: number; airdate: string | null; name: string | null } | null {
   if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return null;
   try {
@@ -130,7 +172,9 @@ export function findNextEpisode<T extends HasSeasons>(show: T | null): { season:
     for (const s of seasons) {
       const eps = show.seasons![Number(s)];
       if (!Array.isArray(eps)) continue;
-      for (const ep of eps) {
+      // Ordina per num per restituire davvero il primo episodio non visto
+      const sorted = [...eps].sort((a, b) => a.num - b.num);
+      for (const ep of sorted) {
         if (ep && !ep.watched) {
           return { season: parseInt(s, 10), num: ep.num, airdate: ep.airdate || null, name: ep.name ?? null };
         }

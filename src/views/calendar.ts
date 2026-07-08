@@ -5,6 +5,13 @@ import { computeCalendarAsync } from '../worker/client';
 import { escapeHtml, formatDate, parseISODateLocal, isSameLocalDay } from '../lib/utils';
 import type { CalendarEpisode } from '../types';
 
+let _boundCalendar = false;
+
+/** Reset guardia listener — vedi C5/T1 */
+export function resetBoundGuard(): void {
+  _boundCalendar = false;
+}
+
 function renderCalendarSkeleton(main: HTMLElement): void {
   main.innerHTML =
     '<h1 class="page-title">Calendario</h1>' +
@@ -124,6 +131,8 @@ export async function renderCalendar(main: HTMLElement): Promise<void> {
 }
 
 export function bindCalendarEvents(main: HTMLElement): void {
+  if (_boundCalendar) return;
+  _boundCalendar = true;
   main.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;

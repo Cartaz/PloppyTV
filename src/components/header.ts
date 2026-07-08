@@ -2,6 +2,7 @@
 
 import { getState } from '../lib/store';
 import { switchView } from '../lib/store';
+import { showModal } from './modal';
 
 export function updateBadges(): void {
   const state = getState();
@@ -29,8 +30,7 @@ export function initHeader(): void {
 
   // About
   document.getElementById('aboutBtn')?.addEventListener('click', () => {
-    import('../components/modal').then(({ showModal }) => {
-      showModal(
+    showModal(
         'Informazioni su PloppyTV',
         '<p>PloppyTV è un\'alternativa self-contained a TV Time, funzionante interamente nel browser senza server.</p>' +
           '<p><strong>Caratteristiche:</strong></p>' +
@@ -57,7 +57,6 @@ export function initHeader(): void {
           '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">I tuoi dati sono salvati solo nel tuo browser (localStorage). Usa Esporta/Importa per i backup.</p>',
         [{ label: 'Chiudi' }]
       );
-    });
   });
 
   // Sidebar mobile

@@ -1,6 +1,6 @@
 // Service Worker con strategie differenziate (usando workbox via vite-plugin-pwa)
 
-import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL, matchPrecache } from 'workbox-precaching';
 import { clientsClaim } from 'workbox-core';
 import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
@@ -51,12 +51,23 @@ registerRoute(
   })
 );
 
-// Catch handler per navigazioni offline: fallback a index.html cached
+// Catch handler per navigazioni offline.
+// CRITICAL FIX (H1/T3): usa matchPrecache invece di caches.open('workbox-precache-v2').
+// Motivo: il cache name reale include un suffix di scope
+// (es. `workbox-precache-v2-https://example.com/PloppyTV/`), quindi
+// caches.open senza suffix apre una cache vuota. Inoltre Workbox precacha
+// con `?__WB_REVISION__=...` come query string, quindi cache.match senza
+// ignoreSearch non trova la entry. matchPrecache gestisce entrambi.
 setCatchHandler(async ({ request }) => {
   if (request.mode === 'navigate') {
-    const cache = await caches.open('workbox-precache-v2');
-    const cached = await cache.match('index.html');
+    const cached = await matchPrecache('index.html');
     if (cached) return cached;
+    // Last resort: prova network (utente tornato online ma precache miss)
+    try {
+      return await fetch(request);
+    } catch {
+      // fallthrough to Response.error()
+    }
   }
   if (request.destination === 'image') {
     return new Response('', { status: 404, statusText: 'Not Found' });

@@ -14,7 +14,18 @@ function computeStats(shows: Show[]): StatsResult {
   const totalMinutes = shows.reduce((sum, s) => sum + getWatchedCount(s) * (safeNum(s.runtime) || 45), 0);
   const totalDays = Math.floor(totalMinutes / 1440);
   const remHours = Math.floor((totalMinutes % 1440) / 60);
-  const timeLabel = totalDays > 0 ? totalDays + 'g ' + remHours + 'h' : Math.floor(totalMinutes / 60) + 'h';
+  // timeLabel migliorato: include minuti residui se < 1h
+  const remMin = totalMinutes % 60;
+  let timeLabel: string;
+  if (totalDays > 0) {
+    timeLabel = totalDays + 'g ' + remHours + 'h';
+  } else if (totalMinutes >= 60) {
+    timeLabel = remHours + 'h' + (remMin > 0 ? ' ' + remMin + 'min' : '');
+  } else if (totalMinutes > 0) {
+    timeLabel = totalMinutes + 'min';
+  } else {
+    timeLabel = '0min';
+  }
 
   // Generi
   const genreStats: Record<string, { episodes: number; shows: Set<number> }> = {};
@@ -32,17 +43,22 @@ function computeStats(shows: Show[]): StatsResult {
     .slice(0, 5)
     .map(([genre, st]) => ({ genre, episodes: st.episodes, shows: st.shows.size }));
 
-  // Top serie
+  // Top serie — clamp pct a [0, 100] per gestire stato inconsistente
+  // (watched > totalEpisodes non dovrebbe accadere ma potrebbe a causa di
+  // dati corrotti o import malformati).
   const topShows = shows
     .map((s) => {
       const watched = getWatchedCount(s);
-      const pct = s.totalEpisodes > 0 ? (watched / s.totalEpisodes) * 100 : 0;
+      const rawPct = s.totalEpisodes > 0 ? (watched / s.totalEpisodes) * 100 : 0;
+      const pct = Math.max(0, Math.min(100, rawPct));
       return { showId: s.id, showName: s.name, image: s.image, watched, totalEpisodes: s.totalEpisodes, pct };
     })
     .sort((a, b) => b.pct - a.pct || b.watched - a.watched)
     .slice(0, 10);
 
-  const totalProgress = totalEpisodes > 0 ? Math.round((totalWatched / totalEpisodes) * 100) : 0;
+  // totalProgress — clamp a [0, 100] per la stessa ragione
+  const rawTotalProgress = totalEpisodes > 0 ? Math.round((totalWatched / totalEpisodes) * 100) : 0;
+  const totalProgress = Math.max(0, Math.min(100, rawTotalProgress));
 
   return {
     totalShows,
@@ -79,13 +95,15 @@ function computeCalendar(shows: Show[], weekOffset: number): { week: CalendarEpi
     if (!nextEp || !nextEp.airdate) continue;
     const epDate = parseISODateLocal(nextEp.airdate);
     if (!epDate) continue;
+    // Valida nextEp.num (era "S1Eundefined" quando num mancava)
+    const num = safeNum(nextEp.num);
     const epObj: CalendarEpisode = {
       showId: show.id,
       showName: show.name,
       totalEpisodes: show.totalEpisodes,
       watchedCount: getWatchedCount(show),
       season: nextEp.season,
-      num: nextEp.num,
+      num,
       name: nextEp.name ?? null,
       date: localISODate(epDate),
     };
@@ -103,14 +121,30 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
   try {
     if (msg.type === 'stats') {
       const result = computeStats(msg.shows);
-      const response: WorkerResponse = { type: 'stats', result };
+      const response: WorkerResponse = { type: 'stats', id: msg.id, result };
       (self as unknown as Worker).postMessage(response);
     } else if (msg.type === 'calendar') {
-      const { week, afterWeek, weekStart, weekEnd } = computeCalendar(msg.shows, msg.weekOffset);
-      const response: WorkerResponse = { type: 'calendar', result: week, weekStart, weekEnd, afterWeek };
+      // Defensive: weekOffset NaN/oob → tratta come 0
+      const safeOffset = Number.isFinite(msg.weekOffset) ? Math.floor(msg.weekOffset) : 0;
+      const { week, afterWeek, weekStart, weekEnd } = computeCalendar(msg.shows, safeOffset);
+      const response: WorkerResponse = { type: 'calendar', id: msg.id, result: week, weekStart, weekEnd, afterWeek };
+      (self as unknown as Worker).postMessage(response);
+    } else {
+      // Messaggio malformato: rispondi con error invece di restare silente
+      const response: WorkerResponse = {
+        type: 'error',
+        id: (msg as { id?: number })?.id ?? -1,
+        message: 'Unknown message type: ' + String((msg as { type?: string })?.type),
+      };
       (self as unknown as Worker).postMessage(response);
     }
   } catch (e) {
     console.error('[worker] error:', e);
+    const response: WorkerResponse = {
+      type: 'error',
+      id: (msg as { id?: number })?.id ?? -1,
+      message: e instanceof Error ? e.message : 'Worker runtime error',
+    };
+    (self as unknown as Worker).postMessage(response);
   }
 };

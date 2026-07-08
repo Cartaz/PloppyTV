@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="PloppyTV">
   <meta name="application-name" content="PloppyTV">
   <meta name="format-detection" content="telephone=no">
+  <meta name="color-scheme" content="dark light">
 
   <!-- Preconnect per ridurre latenza prima del fetch API/poster -->
   <link rel="preconnect" href="https://api.tvmaze.com" crossorigin>
@@ -102,8 +103,8 @@
   </div>
 
   <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
-  <div class="modal-overlay" id="modal">
-    <div class="modal">
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="modal" tabindex="-1">
       <div class="modal-title" id="modalTitle"></div>
       <div class="modal-body" id="modalBody"></div>
       <div class="modal-actions" id="modalActions"></div>

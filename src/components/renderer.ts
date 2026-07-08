@@ -3,6 +3,7 @@
 import { getState, openShow, closeShow, switchView } from '../lib/store';
 import { initImageFallback } from './imageFallback';
 import { updateBadges } from './header';
+import { showToast } from './toast';
 
 let _mainEl: HTMLElement | null = null;
 let _boundDelegated = false;
@@ -54,6 +55,29 @@ export function render(): void {
   });
 }
 
+/**
+ * Render di una vista via import dinamico.
+ * CRITICAL FIX (C6): wrap in try/catch. Se il chunk 404 (o preview server
+ * serve HTML 200 invece del JS), `import()` lancia SyntaxError. Senza
+ * catch diventa unhandled rejection e l'UI resta bricked. Con catch
+ * mostriamo un fallback UI + toast.
+ */
+async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promise<T | null> {
+  try {
+    return await chunkPromise;
+  } catch (e) {
+    console.error('[renderer] chunk load failed:', e);
+    main.innerHTML =
+      '<div class="empty-state">' +
+      '<div class="empty-state-title">Errore caricamento vista</div>' +
+      '<div class="empty-state-text">Ricarica la pagina per riprovare. Se il problema persiste, svuota la cache del browser.</div>' +
+      '<button class="btn btn-primary" style="margin-top:12px;" onclick="location.reload()">Ricarica</button>' +
+      '</div>';
+    showToast('Errore caricamento modulo — ricarica la pagina', 'error');
+    return null;
+  }
+}
+
 async function _doRender(): Promise<void> {
   const myToken = ++_renderToken;
   const main = getMain();
@@ -65,54 +89,67 @@ async function _doRender(): Promise<void> {
   });
 
   if (state.currentShowId) {
-    const { renderShowDetail, bindShowDetailEvents } = await import('../views/showDetail');
+    const mod = await safeImport(import('../views/showDetail'), main);
     if (myToken !== _renderToken) return;
-    renderShowDetail(main);
-    bindShowDetailEvents(main);
+    if (!mod) return;
+    // CRITICAL FIX (C5): reset bound guard PRIMA del bind, così non accumuliamo
+    // listener ad ogni re-render. Il modulo è cached, quindi l'oggetto `mod`
+    // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
+    mod.resetBoundGuard();
+    mod.renderShowDetail(main);
+    mod.bindShowDetailEvents(main);
     return;
   }
 
   switch (state.currentView) {
     case 'dashboard': {
-      const { renderDashboard } = await import('../views/dashboard');
+      const mod = await safeImport(import('../views/dashboard'), main);
       if (myToken !== _renderToken) return;
-      renderDashboard(main);
+      if (!mod) return;
+      mod.renderDashboard(main);
       break;
     }
     case 'watching':
     case 'towatch':
     case 'completed': {
-      const { renderShowList } = await import('../views/showList');
+      const mod = await safeImport(import('../views/showList'), main);
       const titles: Record<string, string> = { watching: 'In corso', towatch: 'Da vedere', completed: 'Completate' };
       if (myToken !== _renderToken) return;
-      renderShowList(main, state.currentView as 'watching' | 'towatch' | 'completed', titles[state.currentView]);
+      if (!mod) return;
+      mod.renderShowList(main, state.currentView as 'watching' | 'towatch' | 'completed', titles[state.currentView]);
       break;
     }
     case 'discover': {
-      const { renderDiscover, bindDiscoverEvents } = await import('../views/discover');
+      const mod = await safeImport(import('../views/discover'), main);
       if (myToken !== _renderToken) return;
-      renderDiscover(main);
-      bindDiscoverEvents(main);
+      if (!mod) return;
+      mod.resetBoundGuard();
+      mod.renderDiscover(main);
+      mod.bindDiscoverEvents(main);
       break;
     }
     case 'calendar': {
-      const { renderCalendar, bindCalendarEvents } = await import('../views/calendar');
+      const mod = await safeImport(import('../views/calendar'), main);
       if (myToken !== _renderToken) return;
-      await renderCalendar(main);
+      if (!mod) return;
+      mod.resetBoundGuard();
+      await mod.renderCalendar(main);
       if (myToken !== _renderToken) return;
-      bindCalendarEvents(main);
+      mod.bindCalendarEvents(main);
       break;
     }
     case 'stats': {
-      const { renderStats } = await import('../views/stats');
+      const mod = await safeImport(import('../views/stats'), main);
       if (myToken !== _renderToken) return;
-      await renderStats(main);
+      if (!mod) return;
+      await mod.renderStats(main);
       break;
     }
     default: {
-      const { renderDashboard } = await import('../views/dashboard');
+      const mod = await safeImport(import('../views/dashboard'), main);
       if (myToken !== _renderToken) return;
-      renderDashboard(main);
+      if (!mod) return;
+      mod.renderDashboard(main);
     }
   }
 }

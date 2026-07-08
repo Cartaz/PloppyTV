@@ -17,6 +17,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "noImplicitReturns": true,
     "forceConsistentCasingInFileNames": true,
 
     "types": ["vite/client", "vite-plugin-pwa/client", "node"]

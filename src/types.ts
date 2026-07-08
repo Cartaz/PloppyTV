@@ -24,6 +24,14 @@ export interface Show {
   network: string;
   runtime: number;
   list: ListName;
+  /**
+   * `true` se l'utente ha spostato manualmente la serie in `list`.
+   * Le funzioni di auto-reconciliation (updateShowListStatus) rispettano
+   * questo flag: non retrocedono mai una serie con `manualList=true`,
+   * ma possono ancora promuoverla a `completed` quando tutti gli episodi
+   * sono stati visti.
+   */
+  manualList?: boolean;
   seasons: Record<number, Episode[]>;
   totalSeasons: number;
   totalEpisodes: number;
@@ -106,11 +114,13 @@ export interface StatsResult {
   topShows: Array<{ showId: number; showName: string; image: string | null; watched: number; totalEpisodes: number; pct: number }>;
 }
 
-// Messaggi Worker
+// Messaggi Worker — ogni richiesta porta un `id` (correlation) e la risposta
+// lo riporta, in modo che il client possa scartare risposte stale o tardive.
 export type WorkerRequest =
-  | { type: 'stats'; shows: Show[] }
-  | { type: 'calendar'; shows: Show[]; weekOffset: number };
+  | { type: 'stats'; id: number; shows: Show[] }
+  | { type: 'calendar'; id: number; shows: Show[]; weekOffset: number };
 
 export type WorkerResponse =
-  | { type: 'stats'; result: StatsResult }
-  | { type: 'calendar'; result: CalendarEpisode[]; weekStart: string; weekEnd: string; afterWeek: CalendarEpisode[] };
+  | { type: 'stats'; id: number; result: StatsResult }
+  | { type: 'calendar'; id: number; result: CalendarEpisode[]; weekStart: string; weekEnd: string; afterWeek: CalendarEpisode[] }
+  | { type: 'error'; id: number; message: string };

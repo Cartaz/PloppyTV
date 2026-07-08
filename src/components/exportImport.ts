@@ -8,7 +8,7 @@ import { normalizeShow } from '../lib/normalize';
 import { reconcileAllLists } from '../lib/normalize';
 import { getWatchedCount } from '../lib/utils';
 import { showToast } from './toast';
-import { showModal, type ModalAction } from './modal';
+import { showModal, closeAllModals, type ModalAction } from './modal';
 import { updateBadges } from './header';
 import { localISODate } from '../lib/utils';
 import { MAX_IMPORT_SIZE } from '../lib/constants';
@@ -109,6 +109,8 @@ export function initExportImport(): void {
       const mergeAction: ModalAction = {
         label: 'Unisci (smart)',
         onClick: () => {
+          // Snapshot per rollback in caso di save fallito
+          const prevShows = getState().shows.map((s) => ({ ...s }));
           let added = 0;
           let updated = 0;
           const currentShows = getState().shows;
@@ -127,7 +129,9 @@ export function initExportImport(): void {
             }
           }
           if (!saveData({ immediate: true })) {
-            showToast('Import annullato: storage insufficiente', 'error');
+            // Rollback: ripristina lo snapshot precedente
+            setShows(prevShows);
+            showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');
             return;
           }
           updateBadges();
@@ -139,6 +143,10 @@ export function initExportImport(): void {
       const replaceAction: ModalAction = {
         label: 'Sostituisci tutto',
         style: 'btn-danger',
+        // CRITICAL FIX (C2/T6): keepOpen = true impedisce che il closeModal()
+        // automatico dopo onClick chiuda il modale genitore prima che la
+        // modale di conferma figlia sia visibile.
+        keepOpen: true,
         onClick: () => {
           showModal(
             'Conferma sostituzione',
@@ -153,17 +161,21 @@ export function initExportImport(): void {
                 label: 'Sì, sostituisci tutto',
                 style: 'btn-danger',
                 onClick: () => {
-                  const prev = getState().shows;
+                  // Snapshot per rollback
+                  const prev = getState().shows.map((s) => ({ ...s }));
                   reconcileAllLists(dedupedShows);
                   setShows(dedupedShows);
                   if (!saveData({ immediate: true })) {
+                    // Rollback al precedente stato
                     setShows(prev);
-                    showToast('Import annullato: storage insufficiente', 'error');
+                    showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');
                     return;
                   }
                   updateBadges();
                   emitChange();
                   showToast('Backup importato (sostituzione)', 'success');
+                  // Chiudi entrambi i modali (genitore + figlia)
+                  closeAllModals();
                 },
               },
             ]

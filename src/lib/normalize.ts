@@ -4,13 +4,22 @@ import type { ListName, Show, TvmazeShow, Episode, TvmazeEpisode } from '../type
 import { ALLOWED_LISTS } from '../types';
 import { safeId, safeImageUrl, safeNum, stripHtml, getPosterUrl, getWatchedCount } from './utils';
 
+/**
+ * Normalizza uno Show da sorgente non fidata (localStorage, backup JSON).
+ * Allinea la sanitizzazione a `buildShowFromTvmaze`:
+ *  - stripHtml su summary
+ *  - slice su name/status/network/summary per evitare storage bloat
+ *  - deduplica generi
+ *  - validazione stretta di addedAt (deve essere finito e positivo)
+ */
 export function normalizeShow(raw: unknown): Show | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   const id = safeId(r.id);
   if (!id) return null;
 
-  const name = typeof r.name === 'string' ? r.name : 'Senza titolo';
+  // name: sanifica HTML (eventuale) e tronca
+  const name = (typeof r.name === 'string' ? r.name : 'Senza titolo').slice(0, 200);
 
   // seasons: Record<number, Episode[]>
   const seasons: Record<number, Episode[]> = {};
@@ -40,28 +49,36 @@ export function normalizeShow(raw: unknown): Show | null {
 
   const totalEpisodes =
     typeof r.totalEpisodes === 'number' && Number.isFinite(r.totalEpisodes) && r.totalEpisodes >= 0
-      ? r.totalEpisodes
+      ? Math.floor(r.totalEpisodes)
       : Object.values(seasons).reduce((sum, eps) => sum + eps.length, 0);
 
   const totalSeasons =
     typeof r.totalSeasons === 'number' && Number.isFinite(r.totalSeasons) && r.totalSeasons >= 0
-      ? r.totalSeasons
+      ? Math.floor(r.totalSeasons)
       : Object.keys(seasons).length;
 
+  // Generi: filtra stringhe, deduplica, tronca a 20
   const genres: string[] = Array.isArray(r.genres)
-    ? r.genres.filter((g): g is string => typeof g === 'string').slice(0, 20)
+    ? Array.from(new Set(r.genres.filter((g): g is string => typeof g === 'string' && g.length > 0))).slice(0, 20)
     : [];
 
   const list: ListName = ALLOWED_LISTS.includes(r.list as ListName) ? (r.list as ListName) : 'towatch';
 
   const image = safeImageUrl(r.image);
-  const status = typeof r.status === 'string' ? r.status : 'N/D';
-  const network = typeof r.network === 'string' ? r.network : 'N/D';
-  const premiered = typeof r.premiered === 'string' ? r.premiered : null;
-  const summary = typeof r.summary === 'string' ? r.summary : '';
+  const status = (typeof r.status === 'string' ? r.status : 'N/D').slice(0, 50);
+  const network = (typeof r.network === 'string' ? r.network : 'N/D').slice(0, 100);
+  const premiered = typeof r.premiered === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.premiered) ? r.premiered : null;
+  // summary: stripHtml per neutralizzare eventuale HTML grezzo (XSS latente)
+  const summary = stripHtml(r.summary).slice(0, 5000);
   const runtime =
-    typeof r.runtime === 'number' && Number.isFinite(r.runtime) && r.runtime >= 1 ? r.runtime : 45;
-  const addedAt = typeof r.addedAt === 'number' ? r.addedAt : Date.now();
+    typeof r.runtime === 'number' && Number.isFinite(r.runtime) && r.runtime >= 1 && r.runtime <= 1000
+      ? Math.floor(r.runtime)
+      : 45;
+  const addedAt =
+    typeof r.addedAt === 'number' && Number.isFinite(r.addedAt) && r.addedAt > 0
+      ? Math.floor(r.addedAt)
+      : Date.now();
+  const manualList = r.manualList === true;
 
   return {
     id,
@@ -74,6 +91,7 @@ export function normalizeShow(raw: unknown): Show | null {
     network,
     runtime,
     list,
+    manualList,
     seasons,
     totalSeasons,
     totalEpisodes,
@@ -109,9 +127,9 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
     name: String(tvmazeShow.name || 'Senza titolo').slice(0, 200),
     image: safeImageUrl(getPosterUrl(tvmazeShow)),
     status: String(tvmazeShow.status || 'N/D').slice(0, 50),
-    premiered: typeof tvmazeShow.premiered === 'string' ? tvmazeShow.premiered : null,
+    premiered: typeof tvmazeShow.premiered === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(tvmazeShow.premiered) ? tvmazeShow.premiered : null,
     genres: Array.isArray(tvmazeShow.genres)
-      ? tvmazeShow.genres.filter((g): g is string => typeof g === 'string').slice(0, 20)
+      ? Array.from(new Set(tvmazeShow.genres.filter((g): g is string => typeof g === 'string' && g.length > 0))).slice(0, 20)
       : [],
     summary: stripHtml(tvmazeShow.summary).slice(0, 5000),
     network: String(
@@ -121,6 +139,7 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
     ).slice(0, 100),
     runtime: safeNum(tvmazeShow.runtime || tvmazeShow.averageRuntime) || 45,
     list: ALLOWED_LISTS.includes(list) ? list : 'towatch',
+    manualList: false,
     seasons,
     totalSeasons,
     totalEpisodes,

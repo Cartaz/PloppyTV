@@ -56,6 +56,24 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
   return html;
 }
 
+/**
+ * Abortisce la ricerca corrente (se in flight) e incrementa `searchSeq`
+ * in modo che eventuali risposte stale vengano scartate.
+ * Da chiamare in OGNI branch che deve invalidare la search in corso:
+ * input handler (validazione, too-long, empty), selectSearchResult, ecc.
+ */
+function invalidateCurrentSearch(): void {
+  if (searchAbortController) {
+    searchAbortController.abort();
+    searchAbortController = null;
+  }
+  searchSeq++;
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
+  }
+}
+
 async function doSearch(query: string): Promise<void> {
   const now = Date.now();
   if (now - lastSearchTime < MIN_SEARCH_INTERVAL_MS) {
@@ -125,7 +143,7 @@ async function doSearch(query: string): Promise<void> {
     if (err.name === 'TimeoutError') msg = 'Ricerca timeout. Verifica la connessione.';
     else if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
     else if (err.status === 429) msg = 'Troppe ricerche. Attendi qualche secondo.';
-    else if (err.name === 'SyntaxError') msg = 'Risposta API non valida. Riprova.';
+    else if (err.name === 'ParseError' || err.name === 'SyntaxError') msg = 'Risposta API non valida. Riprova.';
     _searchResults.innerHTML = '<div class="search-no-results">' + escapeHtml(msg) + '</div>';
     lastSearchResults = [];
   }
@@ -138,6 +156,10 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     showToast('Dati serie non validi', 'error');
     return;
   }
+  // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq,
+  // altrimenti una risposta tardiva di doSearch potrebbe riapparire
+  // dopo che l'utente ha già selezionato un risultato.
+  invalidateCurrentSearch();
   if (_searchResults) {
     _searchResults.classList.remove('active');
     _searchResults.innerHTML = '';
@@ -165,15 +187,27 @@ export function initSearch(): void {
       _searchResults!.innerHTML = '';
       lastSearchResults = [];
       searchSelectedIdx = -1;
-      if (searchAbortController) searchAbortController.abort();
+      // H10: abortisce anche quando la query è troppo corta
+      invalidateCurrentSearch();
       return;
     }
     if (query.length > MAX_QUERY_LENGTH) {
+      // H10: branch > MAX_QUERY_LENGTH deve abortire la search in-flight
+      invalidateCurrentSearch();
       _searchResults!.innerHTML =
         '<div class="search-no-results">Query troppo lunga (max ' + MAX_QUERY_LENGTH + ' caratteri)</div>';
       _searchResults!.classList.add('active');
       return;
     }
+    // H10: abortisce la search precedente prima di schedulare la nuova.
+    // Senza questo, c'è una finestra stale di 350ms (durata del debounce)
+    // in cui una risposta della query precedente potrebbe sovrascrivere
+    // i risultati della nuova.
+    if (searchAbortController) {
+      searchAbortController.abort();
+      searchAbortController = null;
+    }
+    searchSeq++;
     searchTimeout = setTimeout(() => doSearch(query), 350);
   });
 

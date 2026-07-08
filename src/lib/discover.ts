@@ -20,11 +20,20 @@ export interface DiscoverGroups {
   _other: TvmazeShow[];
 }
 
+/**
+ * Esegue le fetch di pagina con concurrency limitato (batch di 3) invece
+ * di `Promise.all` su tutte le pagine in parallelo. TVMaze chiude le
+ * connessioni sotto burst (9-11 fetch paralleli), facendo fallire 2-5 pagine.
+ * Con batch di 3 si riduce drasticamente la probabilità di fallimento.
+ *
+ * Ritorna `{ shows, failedPages }` così il caller può decidere se cachare
+ * solo in caso di successo completo.
+ */
 async function fetchAllCandidates(
   pages: number[],
   recentOnly: boolean,
   onProgress?: (text: string) => void
-): Promise<TvmazeShow[]> {
+): Promise<{ shows: TvmazeShow[]; failedPages: number[] }> {
   const sixMonthsAgo = recentOnly
     ? (() => {
         const d = new Date();
@@ -57,26 +66,35 @@ async function fetchAllCandidates(
   const label = recentOnly ? 'Caricamento ultimi arrivi' : 'Caricamento serie popolari';
   scheduleProgress(label);
 
-  const fetchPromises = pages.map(
-    (page) =>
-      (async (): Promise<TvmazeShow[]> => {
+  // Concurrency limitato: batch di 3 pagine alla volta
+  const CONCURRENCY = 3;
+  const failedPages: number[] = [];
+  const results: TvmazeShow[][] = new Array(pages.length).fill([]);
+
+  for (let i = 0; i < pages.length; i += CONCURRENCY) {
+    const batch = pages.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async (page, j) => {
         try {
           const pageShows = await getShowsPage(page);
-          return Array.isArray(pageShows) ? pageShows : [];
+          return { idx: i + j, shows: Array.isArray(pageShows) ? pageShows : [] };
         } catch (e) {
           console.warn('Errore caricamento pagina ' + page + ':', e);
-          return [];
+          return { idx: i + j, shows: [] as TvmazeShow[], failed: page };
         } finally {
           completed++;
           scheduleProgress(label);
         }
-      })()
-  );
-
-  const pagesResults = await Promise.all(fetchPromises);
+      })
+    );
+    for (const r of batchResults) {
+      results[r.idx] = r.shows;
+      if ('failed' in r && r.failed !== undefined) failedPages.push(r.failed);
+    }
+  }
 
   const all: TvmazeShow[] = [];
-  for (const pageShows of pagesResults) {
+  for (const pageShows of results) {
     for (const show of pageShows) {
       if (!show || !show.image || !show.name || !show.weight || show.weight <= 0) continue;
       if (recentOnly) {
@@ -95,7 +113,7 @@ async function fetchAllCandidates(
     const rB = b.rating?.average ?? 0;
     return rB - rA;
   });
-  return all;
+  return { shows: all, failedPages };
 }
 
 function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
@@ -166,9 +184,9 @@ async function fetchShowsByGenre(
   pages: number[],
   recentOnly: boolean,
   onProgress?: (text: string) => void
-): Promise<DiscoverGroups> {
-  const candidates = await fetchAllCandidates(pages, recentOnly, onProgress);
-  return assignShowsToGroups(candidates);
+): Promise<{ groups: DiscoverGroups; failedPages: number[] }> {
+  const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly, onProgress);
+  return { groups: assignShowsToGroups(shows), failedPages };
 }
 
 function readCache(key: string): DiscoverGroups | null {
@@ -185,7 +203,15 @@ function readCache(key: string): DiscoverGroups | null {
   return null;
 }
 
-function writeCache(key: string, groups: DiscoverGroups): void {
+/**
+ * Scrive la cache solo se i dati sono completi (no failedPages).
+ * In caso di transient failure, scriverebbe cache stale per 1h.
+ */
+function writeCache(key: string, groups: DiscoverGroups, failedPages: number[]): void {
+  if (failedPages.length > 0) {
+    console.warn('[discover] skip cache write: ' + failedPages.length + ' pages failed');
+    return;
+  }
   try {
     localStorage.setItem(key, JSON.stringify({ groups, cachedAt: Date.now() }));
   } catch {
@@ -196,16 +222,16 @@ function writeCache(key: string, groups: DiscoverGroups): void {
 export async function getPopularShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_CACHE_KEY);
   if (cached) return cached;
-  const groups = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false, onProgress);
-  writeCache(DISCOVER_CACHE_KEY, groups);
+  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false, onProgress);
+  writeCache(DISCOVER_CACHE_KEY, groups, failedPages);
   return groups;
 }
 
 export async function getRecentShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_RECENT_CACHE_KEY);
   if (cached) return cached;
-  const groups = await fetchShowsByGenre(DISCOVER_RECENT_PAGES, true, onProgress);
-  writeCache(DISCOVER_RECENT_CACHE_KEY, groups);
+  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_RECENT_PAGES, true, onProgress);
+  writeCache(DISCOVER_RECENT_CACHE_KEY, groups, failedPages);
   return groups;
 }
 

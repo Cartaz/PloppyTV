@@ -41,11 +41,14 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
       return null;
     }
     const show = buildShowFromTvmaze(tvmazeShow, episodes, list);
+    // Se l'utente ha scelto esplicitamente una lista, marchiala come manuale
+    // così reconcileList/updateShowListStatus non la retrocederanno.
+    if (list !== 'towatch') show.manualList = true;
     replaceShow(show);
     if (!saveData({ immediate: true })) {
       // rollback
       removeShowFromState(show.id);
-      showToast('Impossibile salvare (storage pieno?)', 'error');
+      showToast('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
       return null;
     }
     updateBadges();
@@ -79,11 +82,13 @@ export function removeShow(showId: number, showName: string): void {
         label: 'Rimuovi',
         style: 'btn-danger',
         onClick: () => {
-          const snapshot = getState().shows;
+          const snapshot = getState().shows.map((s) => ({ ...s }));
           removeShowFromState(showId);
           if (!saveData({ immediate: true })) {
+            // Rollback: ripristina lo snapshot E ri-triggera il render
             setState({ shows: snapshot });
-            showToast('Impossibile rimuovere (storage error)', 'error');
+            emitChange();
+            showToast('Impossibile rimuovere (storage error o modifiche in altro tab)', 'error');
             return;
           }
           updateBadges();
@@ -96,6 +101,11 @@ export function removeShow(showId: number, showName: string): void {
   );
 }
 
+/**
+ * Sposta manualmente una serie in un'altra lista. Imposta `manualList=true`
+ * così le azioni successive (toggleEpisode, markSeason) non retrocedono
+ * la serie a meno che l'utente non raggiunga naturalmente `completed`.
+ */
 export function moveShowToList(showId: number, list: ListName): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
@@ -103,10 +113,13 @@ export function moveShowToList(showId: number, list: ListName): void {
   if (!ALLOWED_LISTS.includes(list)) return;
   if (show.list === list) return;
   const prevList = show.list;
+  const prevManual = show.manualList ?? false;
   show.list = list;
+  show.manualList = true;
   if (!saveData({ immediate: true })) {
     show.list = prevList;
-    showToast('Spostamento non salvato', 'error');
+    show.manualList = prevManual;
+    showToast('Spostamento non salvato (modifiche in altro tab?)', 'error');
     return;
   }
   updateBadges();
@@ -114,6 +127,12 @@ export function moveShowToList(showId: number, list: ListName): void {
   emitChange();
 }
 
+/**
+ * Toggle watched su un episodio. Usa `saveData({ immediate: true })`:
+ * il ritorno booleano riflette davvero l'esito del salvataggio (a differenza
+ * della versione debounced che ritornava sempre true), permettendo il
+ * rollback corretto in caso di fallenza.
+ */
 export function toggleEpisode(showId: number, seasonNum: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
@@ -122,12 +141,15 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
   if (!ep) return;
   const prevWatched = ep.watched;
   const prevList = show.list;
+  const prevManual = show.manualList ?? false;
   ep.watched = !ep.watched;
   updateShowListStatus(show);
-  if (!saveData()) {
+  if (!saveData({ immediate: true })) {
+    // Rollback reale (saveData immediate ritorna false su failure)
     ep.watched = prevWatched;
     show.list = prevList;
-    showToast('Modifica non salvata (storage error)', 'error');
+    show.manualList = prevManual;
+    showToast('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
     return;
   }
   updateBadges();
@@ -140,6 +162,7 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
   if (!show || !show.seasons[seasonNum]) return;
   const prevEps = show.seasons[seasonNum].map((e) => ({ ...e }));
   const prevList = show.list;
+  const prevManual = show.manualList ?? false;
   show.seasons[seasonNum].forEach((ep) => {
     ep.watched = watched;
   });
@@ -147,7 +170,8 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
   if (!saveData({ immediate: true })) {
     show.seasons[seasonNum] = prevEps;
     show.list = prevList;
-    showToast('Modifica non salvata', 'error');
+    show.manualList = prevManual;
+    showToast('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
     return;
   }
   updateBadges();
@@ -172,6 +196,13 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     _refreshInFlight.delete(id);
     return false;
   }
+
+  // Snapshot per rollback
+  const prevSeasons = JSON.parse(JSON.stringify(show.seasons)) as Show['seasons'];
+  const prevTotalEpisodes = show.totalEpisodes;
+  const prevTotalSeasons = show.totalSeasons;
+  const prevList = show.list;
+  const prevManual = show.manualList ?? false;
 
   try {
     const episodes = await getShowEpisodes(id);
@@ -199,11 +230,16 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     show.seasons = newSeasons;
     show.totalEpisodes = totalEpisodes;
     show.totalSeasons = Object.keys(newSeasons).length;
-    // Ricalcola list status
     updateShowListStatus(show);
 
     if (!saveData({ immediate: true })) {
-      showToast('Impossibile salvare aggiornamento (storage pieno?)', 'error');
+      // Rollback
+      show.seasons = prevSeasons;
+      show.totalEpisodes = prevTotalEpisodes;
+      show.totalSeasons = prevTotalSeasons;
+      show.list = prevList;
+      show.manualList = prevManual;
+      showToast('Impossibile salvare aggiornamento (storage o modifiche in altro tab)', 'error');
       return false;
     }
     updateBadges();
