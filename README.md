@@ -107,7 +107,6 @@ ploppytv/
 │   ├── favicon.ico
 │   └── icons/                 # icone PWA (192, 512, maskable, ...)
 ├── scripts/
-<<<<<<< HEAD
 │   └── test-entry.ts          # Re-export delle funzioni interne per stress-test manuali
 ├── tests/                     # Suite Vitest
 │   ├── helpers.ts             # Factory per Show/Episode
@@ -115,9 +114,7 @@ ploppytv/
 │   ├── watched.test.ts        # Test su getWatchedCount, findNextEpisode
 │   ├── normalize.test.ts      # Test su normalizeShow, buildShowFromTvmaze, reconcileAllLists
 │   └── store.test.ts          # Test su reconcileList, updateShowListStatus, manualList
-=======
 │   └── test-entry.ts          # Re-export delle funzioni interne per test/stress-test manuali
->>>>>>> 42d8811d9c3c2dff71384a0f377e0a3b00541213
 └── src/
     ├── main.ts                # Entry point: init moduli + register SW
     ├── types.ts               # Tipi condivisi UI ↔ worker
