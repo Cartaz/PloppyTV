@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PloppyTV — Roadmap Hobby · Ampliamento features per uso personale</title>
+<meta name="description" content="Roadmap actionabile per PloppyTV in chiave hobby/personale: feature utili per uso proprio e condivisione con conoscenti, senza backend, account o monetizzazione.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN TOKENS (stesso sistema del report comparativo)
+   ============================================================ */
+:root {
+  --c-bg: #f8fafc;
+  --c-bg-elevated: #ffffff;
+  --c-surface: #f1f5f9;
+  --c-surface-2: #e2e8f0;
+  --c-border: #cbd5e1;
+  --c-border-soft: #e2e8f0;
+
+  --c-text: #0f172a;
+  --c-text-muted: #475569;
+  --c-text-soft: #64748b;
+
+  --c-primary: #4f46e5;
+  --c-primary-hover: #4338ca;
+  --c-primary-soft: #eef2ff;
+  --c-accent: #0ea5e9;
+  --c-accent-soft: #e0f2fe;
+
+  --c-success: #10b981;
+  --c-warning: #f59e0b;
+  --c-danger: #ef4444;
+  --c-info: #3b82f6;
+
+  --c-ploppytv: #ff6b35;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+  --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --space-8: 48px; --space-10: 64px; --space-12: 96px;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+  --r-xl: 24px; --r-full: 999px;
+
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.07);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.10), 0 8px 10px -6px rgb(15 23 42 / 0.08);
+
+  --max-w: 1280px;
+  --header-h: 64px;
+}
+
+[data-theme="dark"] {
+  --c-bg: #0b1120;
+  --c-bg-elevated: #111827;
+  --c-surface: #1e293b;
+  --c-surface-2: #334155;
+  --c-border: #334155;
+  --c-border-soft: #1e293b;
+  --c-text: #f1f5f9;
+  --c-text-muted: #cbd5e1;
+  --c-text-soft: #94a3b8;
+  --c-primary: #818cf8;
+  --c-primary-hover: #6366f1;
+  --c-primary-soft: rgba(129, 140, 248, 0.12);
+  --c-accent: #38bdf8;
+  --c-accent-soft: rgba(56, 189, 248, 0.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 20px); }
+body {
+  font-family: var(--font-sans);
+  background: var(--c-bg);
+  color: var(--c-text);
+  line-height: 1.6;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+img, svg { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
+a { color: var(--c-primary); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--c-primary-hover); text-decoration: underline; }
+code { font-family: var(--font-mono); font-size: 0.9em; background: var(--c-surface); padding: 2px 6px; border-radius: var(--r-sm); color: var(--c-primary); }
+
+.container { width: 100%; max-width: var(--max-w); margin: 0 auto; padding: 0 var(--space-5); }
+
+/* ============ HEADER ============ */
+#progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px;
+  background: linear-gradient(90deg, var(--c-ploppytv), var(--c-accent));
+  width: 0%; z-index: 1000; transition: width 0.1s ease-out;
+  box-shadow: 0 0 8px rgba(255, 107, 53, 0.4);
+}
+header.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: color-mix(in srgb, var(--c-bg-elevated) 85%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--c-border-soft);
+  height: var(--header-h); display: flex; align-items: center;
+}
+header.nav .container { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.brand { display: flex; align-items: center; gap: var(--space-3); font-weight: 700; font-size: 15px; }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  background: linear-gradient(135deg, #ff6b35, #ed1c24);
+  display: grid; place-items: center; color: white; font-weight: 800; font-size: 14px;
+}
+.nav-links { display: flex; gap: var(--space-1); list-style: none; overflow-x: auto; scrollbar-width: none; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a {
+  display: block; padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm); font-size: 13px; font-weight: 500;
+  color: var(--c-text-muted); white-space: nowrap; transition: all 0.15s;
+}
+.nav-links a:hover { background: var(--c-surface); color: var(--c-text); text-decoration: none; }
+.nav-links a.active { background: var(--c-primary-soft); color: var(--c-primary); }
+.nav-actions { display: flex; gap: var(--space-2); align-items: center; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: var(--r-sm);
+  display: grid; place-items: center; color: var(--c-text-muted); transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--c-surface); color: var(--c-text); }
+.icon-btn svg { width: 18px; height: 18px; }
+@media (max-width: 768px) { .nav-links { display: none; } }
+
+/* ============ HERO ============ */
+.hero { padding: var(--space-12) 0 var(--space-10); position: relative; overflow: hidden; }
+.hero-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.hero-bg::before {
+  content: ''; position: absolute; top: -100px; right: -100px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, var(--c-ploppytv) 0%, transparent 60%);
+  opacity: 0.18; filter: blur(40px);
+}
+.hero-bg::after {
+  content: ''; position: absolute; bottom: -100px; left: -100px;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, var(--c-accent) 0%, transparent 60%);
+  opacity: 0.15; filter: blur(40px);
+}
+.hero .container { position: relative; z-index: 1; }
+.hero-kicker {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4); background: var(--c-primary-soft);
+  color: var(--c-primary); border-radius: var(--r-full);
+  font-size: 13px; font-weight: 600; letter-spacing: 0.02em; margin-bottom: var(--space-5);
+}
+.hero-kicker .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-success); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.3); } }
+.hero h1 {
+  font-size: clamp(36px, 6vw, 64px); font-weight: 900; letter-spacing: -0.03em;
+  line-height: 1.05; margin-bottom: var(--space-5);
+  background: linear-gradient(135deg, var(--c-text) 0%, var(--c-text-muted) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero h1 .accent {
+  background: linear-gradient(135deg, var(--c-ploppytv) 0%, var(--c-accent) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-sub {
+  font-size: clamp(16px, 2vw, 20px); color: var(--c-text-muted);
+  max-width: 760px; margin-bottom: var(--space-8); line-height: 1.6;
+}
+.hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-top: var(--space-8); }
+.stat-card {
+  background: var(--c-bg-elevated); border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-lg); padding: var(--space-5); transition: all 0.2s;
+}
+.stat-card:hover { transform: translateY(-2px); border-color: var(--c-primary); box-shadow: var(--shadow-md); }
+.stat-value { font-family: var(--font-mono); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--c-text); line-height: 1.2; }
+.stat-label { font-size: 13px; color: var(--c-text-soft); margin-top: var(--space-1); font-weight: 500; }
+.stat-trend {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
+  margin-top: var(--space-2); padding: 2px 8px; border-radius: var(--r-full);
+  background: var(--c-surface); color: var(--c-text-muted);
+}
+
+/* ============ SECTION ============ */
+section { padding: var(--space-10) 0; scroll-margin-top: calc(var(--header-h) + 20px); }
+.section-head { margin-bottom: var(--space-8); }
+.section-kicker {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-primary); margin-bottom: var(--space-2);
+}
+.section-title { font-size: clamp(28px, 4vw, 40px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: var(--space-3); }
+.section-desc { font-size: 17px; color: var(--c-text-muted); max-width: 760px; line-height: 1.6; }
+
+/* ============ PRINCIPI ============ */
+.principles-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5);
+  margin-bottom: var(--space-10);
+}
+.principle-card {
+  background: var(--c-bg-elevated); border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-lg); padding: var(--space-5); transition: all 0.2s;
+  border-left: 3px solid var(--c-success);
+}
+.principle-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.principle-card .pc-icon {
+  width: 36px; height: 36px; border-radius: var(--r-sm);
+  background: rgba(16, 185, 129, 0.10); display: grid; place-items: center;
+  font-size: 18px; margin-bottom: var(--space-3);
+}
+.principle-card h4 { font-size: 16px; font-weight: 700; margin-bottom: var(--space-2); }
+.principle-card p { font-size: 13px; color: var(--c-text-muted); line-height: 1.55; }
+
+.principle-card.no { border-left-color: var(--c-danger); }
+.principle-card.no .pc-icon { background: rgba(239, 68, 68, 0.10); }
+
+/* ============ ROADMAP ============ */
+.roadmap { position: relative; margin-top: var(--space-8); }
+.roadmap::before {
+  content: ''; position: absolute; left: 24px; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(to bottom, var(--c-ploppytv), var(--c-accent));
+}
+.roadmap-phase { display: grid; grid-template-columns: 60px 1fr; gap: var(--space-5); margin-bottom: var(--space-6); position: relative; }
+.roadmap-marker {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: var(--c-bg-elevated); border: 3px solid var(--c-ploppytv);
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-weight: 800; font-size: 14px;
+  color: var(--c-ploppytv); position: relative; z-index: 1;
+}
+.roadmap-phase:nth-child(2) .roadmap-marker { border-color: var(--c-accent); color: var(--c-accent); }
+.roadmap-phase:nth-child(3) .roadmap-marker { border-color: #8b5cf6; color: #8b5cf6; }
+.roadmap-phase:nth-child(4) .roadmap-marker { border-color: #ec4899; color: #ec4899; }
+.roadmap-phase:nth-child(5) .roadmap-marker { border-color: #10b981; color: #10b981; }
+
+.roadmap-content {
+  background: var(--c-bg-elevated); border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-lg); padding: var(--space-5); transition: all 0.2s;
+}
+.roadmap-content:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }
+.roadmap-content .rc-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.roadmap-content h4 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.roadmap-content .timeline {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--c-text-soft); padding: 4px 10px; background: var(--c-surface); border-radius: var(--r-full);
+}
+.roadmap-content .focus {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 4px 10px; border-radius: var(--r-full); margin-left: auto;
+}
+.focus.p0 { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+.focus.p1 { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.focus.p2 { background: rgba(14, 165, 233, 0.12); color: #0284c7; }
+.focus.p3 { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.focus.p4 { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+
+.roadmap-content > p { font-size: 14px; color: var(--c-text-muted); margin-bottom: var(--space-3); line-height: 1.6; }
+
+.roadmap-items {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3); margin-top: var(--space-3);
+}
+.roadmap-item {
+  padding: var(--space-3); background: var(--c-surface);
+  border-radius: var(--r-sm); border-left: 3px solid var(--c-ploppytv);
+  font-size: 13px; transition: all 0.15s;
+}
+.roadmap-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.roadmap-item .ri-title { font-weight: 600; color: var(--c-text); margin-bottom: 4px; }
+.roadmap-item .ri-desc { color: var(--c-text-muted); font-size: 12px; line-height: 1.5; margin-top: 4px; }
+.roadmap-item .ri-meta {
+  display: flex; gap: var(--space-2); font-size: 11px;
+  color: var(--c-text-soft); font-family: var(--font-mono); margin-top: 6px;
+  flex-wrap: wrap;
+}
+.ri-tag { padding: 1px 6px; border-radius: var(--r-sm); background: var(--c-bg-elevated); border: 1px solid var(--c-border-soft); }
+.ri-tag.new { background: rgba(16, 185, 129, 0.10); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
+.ri-tag.fix { background: rgba(239, 68, 68, 0.10); color: #dc2626; border-color: rgba(239, 68, 68, 0.3); }
+.ri-tag.i18n { background: rgba(14, 165, 233, 0.10); color: #0284c7; border-color: rgba(14, 165, 233, 0.3); }
+.ri-tag.a11y { background: rgba(139, 92, 246, 0.10); color: #7c3aed; border-color: rgba(139, 92, 246, 0.3); }
+.ri-tag.perf { background: rgba(245, 158, 11, 0.10); color: #d97706; border-color: rgba(245, 158, 11, 0.3); }
+
+/* ============ CALLOUT ============ */
+.callout {
+  background: var(--c-primary-soft); border-left: 3px solid var(--c-primary);
+  border-radius: var(--r-md); padding: var(--space-4) var(--space-5);
+  margin: var(--space-5) 0; font-size: 14px; color: var(--c-text); line-height: 1.6;
+}
+.callout strong { color: var(--c-primary); }
+.callout.warning { background: rgba(245, 158, 11, 0.08); border-left-color: var(--c-warning); }
+.callout.warning strong { color: #d97706; }
+.callout.success { background: rgba(16, 185, 129, 0.08); border-left-color: var(--c-success); }
+.callout.success strong { color: #059669; }
+.callout.danger { background: rgba(239, 68, 68, 0.08); border-left-color: var(--c-danger); }
+.callout.danger strong { color: #dc2626; }
+
+/* ============ FOOTER ============ */
+footer { padding: var(--space-8) 0; border-top: 1px solid var(--c-border-soft); background: var(--c-bg-elevated); margin-top: var(--space-10); }
+footer .container { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+footer p { font-size: 13px; color: var(--c-text-soft); }
+footer .footer-meta { font-family: var(--font-mono); font-size: 12px; }
+
+/* ============ REVEAL (graceful, sempre visibile di default) ============ */
+.reveal { opacity: 1; transform: none; transition: opacity 0.6s ease, transform 0.6s ease; }
+html.js-enabled .reveal { opacity: 0; transform: translateY(20px); }
+html.js-enabled .reveal.visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html.js-enabled .reveal { opacity: 1; transform: none; }
+}
+</style>
+<script>
+  // Mark JS as enabled BEFORE first paint
+  document.documentElement.classList.add('js-enabled');
+</script>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<!-- ============ HEADER ============ -->
+<header class="nav">
+  <div class="container">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <span>PloppyTV · Roadmap Hobby</span>
+    </div>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="#intro" class="active">Intro</a></li>
+        <li><a href="#principi">Principi</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#non-fare">Cosa NON fare</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme" title="Cambia tema">
+        <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="intro">
+  <div class="hero-bg"></div>
+  <div class="container">
+    <span class="hero-kicker"><span class="dot"></span> Roadmap hobby · Luglio 2026</span>
+    <h1>PloppyTV <span class="accent">roadmap</span><br>ampliamento per uso personale</h1>
+    <p class="hero-sub">Piano di sviluppo per PloppyTV in chiave <strong>hobby e uso personale</strong>: feature utili per te e per i tuoi conoscenti, senza backend, account, monetizzazione o API pubblica. L'obiettivo è rendere l'app più ricca, affidabile e piacevole da usare quotidianamente — restando una PWA local-first che puoi condividere con un link.</p>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-value" data-count="5">0</div>
+        <div class="stat-label">Fasi roadmap</div>
+        <div class="stat-trend">P1 → P5 · ~12 mesi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" data-count="32">0</div>
+        <div class="stat-label">Feature/action items</div>
+        <div class="stat-trend">Tutte local-first</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" data-count="0">0</div>
+        <div class="stat-label">Costi hosting</div>
+        <div class="stat-trend">Solo GitHub Pages free</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" data-count="0">0</div>
+        <div class="stat-label">Backend / account</div>
+        <div class="stat-trend">Local-only by design</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRINCIPI ============ -->
+<section id="principi" style="background: var(--c-bg-elevated);">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-kicker">01 · Principi guida</div>
+      <h2 class="section-title">Cosa resta dentro, cosa resta fuori</h2>
+      <p class="section-desc">Lo scenario <strong>Hobby project personale</strong> pone confini chiari: PloppyTV resta una PWA local-first, gratuita, open source, manutenuta da te. Le feature vanno scelte in base a "lo userò davvero?" e non a "servirebbe per monetizzare?".</p>
+    </div>
+
+    <div class="principles-grid">
+      <div class="principle-card reveal">
+        <div class="pc-icon">✓</div>
+        <h4>Local-first sempre</h4>
+        <p>Tutti i dati su localStorage + JSON export. Nessun backend, nessun account, nessun sync server. Multi-device via export/import manuale o via sync client-side (es. Google Drive Picker API). Backup automatico opzionale su cloud storage dell'utente.</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="pc-icon">✓</div>
+        <h4>Privacy by design</h4>
+        <p>Nessun tracking, nessun analytics, nessun cookie di terze parti. Le uniche chiamate network sono verso TVMaze (metadata) e, opzionalmente, verso un LLM per AI discovery (con toggle esplicito e API key inserita dall'utente). GDPR native senza sforzo.</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="pc-icon">✓</div>
+        <h4>PWA cross-platform</h4>
+        <p>Una codebase, tutte le piattaforme: iOS, Android, desktop, tablet. Installabile 1-click, funziona offline, aggiornamenti via service worker. zero fee Apple/Google. Distribuzione ai conoscenti = "vai su questo URL e premi Aggiungi a Home".</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="pc-icon">✓</div>
+        <h4>Open source MIT</h4>
+        <p>Repo pubblica, audit-able, fork-able. LICENSE file MIT aggiunto in P1. I conoscenti possono ispezionare il codice, proporti modifiche, forkare per personalizzazioni. Community potenziale ma non obbligo.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Niente backend</h4>
+        <p>Nessun server da mantenere, pagare, monitorare. Nessun database. Nessuna API REST. Se serve sync multi-device, si usa cloud storage esistente (Google Drive, iCloud, Dropbox) via OAuth client-side — mai un backend proprietario.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Niente account / login</h4>
+        <p>L'utente apre l'app e inizia a usarla. Nessuna registrazione, nessuna email, nessuna password. Per sync opzionale tra dispositivi, si usa l'account Google/Apple che l'utente ha già — mai un sistema di auth custom.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Niente monetizzazione</h4>
+        <p>Nessun paywall, nessun abbonamento, nessun ads. Se in futuro vuoi accettare donazioni spontanee, GitHub Sponsors o "Buy me a coffee" link nell'about. Ma niente feature locked dietro pagamento.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Niente social community</h4>
+        <p>Nessun follower, nessuna bacheca pubblica, nessun sistema di recensioni condivise. Le recensioni e i rating sono <strong>privati</strong> — solo tu vedi le tue opinioni. Posizione coerente con "hobby personale" e anti-burnout.</p>
+      </div>
+    </div>
+
+    <div class="callout reveal">
+      <strong>Test decisionale:</strong> prima di aggiungere qualsiasi feature, chiediti "lo userò io almeno una volta a settimana?" e "lo spiegherei in 30 secondi a un amico non tecnico?". Se una delle due risposte è no, la feature non entra in roadmap. Questo filtro mantiene il progetto leggero e curato.
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section id="roadmap">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-kicker">02 · Roadmap actionabile</div>
+      <h2 class="section-title">5 fasi in 12 mesi</h2>
+      <p class="section-desc">Cinque fasi priorizzate per ampliamento di features in chiave hobby. P1 e P2 sono fondamenta + quality of life (massimo ROI per uso quotidiano). P3-P5 sono feature più ambiziose ma opzionali — puoi fermarti a P2 ed essere già felice.</p>
+    </div>
+
+    <div class="roadmap">
+
+      <!-- P1 -->
+      <div class="roadmap-phase reveal">
+        <div class="roadmap-marker">P1</div>
+        <div class="roadmap-content">
+          <div class="rc-head">
+            <h4>Fondamenta & igiene del progetto</h4>
+            <span class="timeline">Settimana 1-2</span>
+            <span class="focus p0">Critico</span>
+          </div>
+          <p>Colmare i gap bloccanti identificati nel deep dive del report comparativo. Senza questi, il progetto non è "condivisibile con conoscenti" in buona fede. Tutte task a basso sforzo, massimo ritorno in credibilità e robustezza.</p>
+          <div class="roadmap-items">
+            <div class="roadmap-item">
+              <div class="ri-title">LICENSE MIT</div>
+              <div class="ri-desc">Aggiungere file LICENSE standard MIT. Senza, il codice è tecnicamente "All rights reserved" anche se la repo è pubblica.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>5 min</span><span>1 commit</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Privacy policy formale</div>
+              <div class="ri-desc">Pagina Markdown chiara: cosa raccoglie PloppyTV (nulla), cosa invia a TVMaze (ricerche), come disinstallare (reset 1-click). Link nell'about.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>1 ora</span><span>1 pagina MD</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">ESLint + Prettier</div>
+              <div class="ri-desc">Config minimale: eslint:recommended, @typescript-eslint, prettier. Pre-commit hook con husky. Previene regressioni nei prossimi refactor.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>2 ore</span><span>2 file config</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Vitest setup + 10 test core</div>
+              <div class="ri-desc">Test su normalize.ts, utils.ts (date, watched count), store.ts (reconcileList). Coverage target 30%. Previene regressioni nei 145 bug già fixati.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>3 giorni</span><span>vitest config</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">CONTRIBUTING.md</div>
+              <div class="ri-desc">Anche se sei l'unico dev, documentare setup, struttura cartelle, convenzioni commit. Aiuta te stesso tra 6 mesi e i conoscenti che vorranno forkare.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>1 giorno</span><span>issue templates</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">README arricchito con screenshot</div>
+              <div class="ri-desc">3-4 screenshot della PWA in azione (dashboard, discover, calendario, stats). Aiuta i conoscenti a capire cosa sono per installare.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 ora</span><span>screenshots/</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">GitHub Release v2.1.0</div>
+              <div class="ri-desc">Prima release "ufficiale" con tag, changelog, binary. Milestone psicologica: il progetto esce dalla fase "bozza" ed entra "usabile".</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>30 min</span><span>tag + notes</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2 -->
+      <div class="roadmap-phase reveal">
+        <div class="roadmap-marker">P2</div>
+        <div class="roadmap-content">
+          <div class="rc-head">
+            <h4>Quality of life quotidiana</h4>
+            <span class="timeline">Mese 1-3 · 8 settimane</span>
+            <span class="focus p1">Alto</span>
+          </div>
+          <p>Feature che migliorano l'uso quotidiano per te e i tuoi conoscenti. Focus su: cose che ti mancano quando usi l'app tutti i giorni, scorciatoie, dati più ricchi, UX più fluida. Niente architettura nuova — solo polish sul modello locale esistente.</p>
+          <div class="roadmap-items">
+            <div class="roadmap-item">
+              <div class="ri-title">Rating 5★ per episodio</div>
+              <div class="ri-desc">Stelle 1-5 per ogni episodio visto. Mostra media stagione nella vista dettaglio. Privato, niente condivisione. Ti aiuta a ricordare quali episodi rivedere.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>schema v2</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Note private per episodio</div>
+              <div class="ri-desc">Campo testo libero per ogni episodio (max 500 char). "Questa scena mi ha commosso", "spoiler di X", ecc. Solo tuo, mai inviato da nessuna parte.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>3 giorni</span><span>editor episodio</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Tag personalizzabili per serie</div>
+              <div class="ri-desc">Crea tag tipo "da rivedere", "con Alice", "estate 2026". Filtra la watchlist per tag. Utile quando hai 50+ serie in tracking.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>4 giorni</span><span>multi-select UI</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Search avanzata nella tua libreria</div>
+              <div class="ri-desc">Filtra per genere, status, rating ≥ N, network, anno premiere. Es: "tutte le serie crime di HBO rated ≥ 4 viste nel 2025".</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>filter bar</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">"Rivedi un episodio casuale"</div>
+              <div class="ri-desc">Bottone che suggerisce un episodio gold (rating 5★) dalla tua libreria, random. Quando non sai cosa guardare e vuoi qualcosa che sai già che ti piace.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 giorni</span><span>fun feature</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Keyboard shortcuts</div>
+              <div class="ri-desc">/ focus search, g d vai a dashboard, g c calendario, g s stats, j/k naviga episodi, w toggle watched. Cheat sheet con ? attivabile.</div>
+              <div class="ri-meta"><span class="ri-tag a11y">a11y</span><span>3 giorni</span><span>power user</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">i18n IT + EN</div>
+              <div class="ri-desc">Framework i18n leggero (es. nanostore + custom). Tutte le stringhe in en.json + it.json. Default da navigator.language. Permette ai conoscenti non-italiani di usarlo.</div>
+              <div class="ri-meta"><span class="ri-tag i18n">i18n</span><span>2 settimane</span><span>audience ×3</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Statistiche Year-in-Review</div>
+              <div class="ri-desc">Pagina "Il tuo 2026 in TV": top 5 serie viste, ore totali, genere dominante, stagione più longeva. Card condivisibile come immagine (canvas export). Per te e per inviare agli amici a fine anno.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>canvas share</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Notifiche push per nuovi episodi</div>
+              <div class="ri-desc">SW registration per push notification 1 ora prima dell'episodio delle serie in watching. Permission richiesta esplicitamente. Funziona solo se l'app è installata PWA.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>Notification API</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P3 -->
+      <div class="roadmap-phase reveal">
+        <div class="roadmap-marker">P3</div>
+        <div class="roadmap-content">
+          <div class="rc-head">
+            <h4>Sync multi-device senza backend</h4>
+            <span class="timeline">Mese 4-6 · 10 settimane</span>
+            <span class="focus p2">Medio</span>
+          </div>
+          <p>Il vero gap rispetto a TV Time/Trakt: se cambi dispositivo perdi tutto. Soluzione hobby-compatible: sync via cloud storage esistente (Google Drive, iCloud Drive, Dropbox) usando le API OAuth client-side. Mai un backend proprietario. Sempre opt-in.</p>
+          <div class="roadmap-items">
+            <div class="roadmap-item">
+              <div class="ri-title">Export automatico periodico su file</div>
+              <div class="ri-desc">Ogni 24h o su modifica importante, export JSON in una cartella "PloppyTV/backups/" scaricabile. Primo step verso sync: hai sempre un backup fresco.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>3 giorni</span><span>File System Access</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Google Drive sync (opt-in)</div>
+              <div class="ri-desc">OAuth client-side con Google Identity Services. Salva <code>ploppytv_data_v1.json</code> nel Drive dell'utente. Nessun backend tuo, zero costi, zero responsabilità GDPR (è Google a gestire).</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>GIS + Drive API</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Conflict resolution su sync</div>
+              <div class="ri-desc">Last-write-wins per entità singole (show, episodio, rating). Merge per array (es. tag). Modalità "scegli quale versione tenere" se conflict non risolvibile automaticamente.</div>
+              <div class="ri-meta"><span class="ri-tag fix">fix</span><span>1 settimana</span><span>LWW + manual</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">iCloud Drive sync (opt-in, iOS-only)</div>
+              <div class="ri-desc">Su iOS PWA installata, usare iCloud Drive via CloudKit JS. Complesso ma copre gli amici Apple puristi. Documenta bene i limiti.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>3 settimane</span><span>CloudKit JS</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Dropbox sync (opt-in)</div>
+              <div class="ri-desc">OAuth via Dropbox Chooser/Saver. Alternativa a Google per chi non usa i servizi Google. Stesso pattern: file JSON, LWW merge.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>Dropbox API</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">UI "Sync status" in header</div>
+              <div class="ri-desc">Icona cloud che mostra: offline / synced X min fa / syncing / conflict. Click per aprire pannello sync con scelta provider.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>3 giorni</span><span>header widget</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P4 -->
+      <div class="roadmap-phase reveal">
+        <div class="roadmap-marker">P4</div>
+        <div class="roadmap-content">
+          <div class="rc-head">
+            <h4>AI e discovery intelligente</h4>
+            <span class="timeline">Mese 7-9 · 10 settimane</span>
+            <span class="focus p3">Basso-medio</span>
+          </div>
+          <p>Feature ambiziose che usano LLM esterni per scoprire nuove serie in modo intelligente. Tutte con toggle esplicito on/off e API key inserita dall'utente (mai hardcoded). Puoi usare free tier OpenAI, Ollama locale, o z-ai SDK. Nessun costo per te se l'utente usa la propria key.</p>
+          <div class="roadmap-items">
+            <div class="roadmap-item">
+              <div class="ri-title">AI mood-based discovery</div>
+              <div class="ri-desc">"Voglio qualcosa di leggero, massimo 30 min per ep, crime, anni 2020+". LLM chiama TVMaze API e torna 5 suggerimenti con motivazione. Per feature-parity con Refract.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>LLM + TVMaze</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Settings AI provider</div>
+              <div class="ri-desc">Pannello dove l'utente inserisce: provider (OpenAI / Anthropic / Ollama locale / z-ai SDK), API key, modello. Salvato in localStorage. Default off.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>4 giorni</span><span>privacy-first</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">"Mostra simili a questa serie"</div>
+              <div class="ri-desc">Sul detail page, bottone che usa LLM + TVMaze per trovare 5 serie simili basate su genere, attori, themes. Più preciso del semplice "stesso genere" di oggi.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>context-aware</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Riepilogo stagione AI</div>
+              <div class="ri-desc">Bottone "Riepiloga stagione X" che chiama LLM con il plot degli episodi (da TVMaze) e torna un riassunto di 3 paragrafi. Utile prima di riprendere una serie dopo mesi.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>recap feature</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Recommendation basata sui tuoi rating</div>
+              <div class="ri-desc">"Hai dato 5★ a queste 10 serie — ecco 5 suggerimenti TVMaze che potrebbero piacerti". Embedding via LLM sui tuoi show rated 4-5★, cosine similarity con catalogo.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>local embeddings</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Off-mode completo (no AI)</div>
+              <div class="ri-desc">Tutte le feature AI sono disabled di default. L'app funziona perfettamente senza. Nessuna chiamata network aggiuntiva se l'utente non opta-in.</div>
+              <div class="ri-meta"><span class="ri-tag a11y">a11y</span><span>always</span><span>graceful degradation</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P5 -->
+      <div class="roadmap-phase reveal">
+        <div class="roadmap-marker">P5</div>
+        <div class="roadmap-content">
+          <div class="rc-head">
+            <h4>Bonus opzionali & nice-to-have</h4>
+            <span class="timeline">Mese 10-12 · 8 settimane</span>
+            <span class="focus p4">Opzionale</span>
+          </div>
+          <p>Feature che non servono ma che sono divertenti o utili per sharing con conoscenti. Puoi fare anche solo 1 o 2 di queste e fermarti lì. Sono i "deliziosi piccoli upgrade" che rendono l'app piacevole.</p>
+          <div class="roadmap-items">
+            <div class="roadmap-item">
+              <div class="ri-title">Movies tracking (opzionale, in toggle)</div>
+              <div class="ri-desc">Toggle nelle impostazioni: "Abilita anche movies". Usa TMDB API (free). List separate da serie TV. Per amici che vogliono un unico tracker.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>TMDB API</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Achievements privati</div>
+              <div class="ri-desc">"Hai visto 100 episodi", "Prima serie completata", "Maratona: 5 episodi in un giorno". Solo tuoi, niente leaderboard. Gamification personale leggera.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>badge system</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Widget iOS / Android home</div>
+              <div class="ri-desc">Widget "Prossimo episodio" da aggiungere alla home del telefono. Su iOS via PWA Web Widgets API (iOS 17+). Su Android via standard PWA shortcuts.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>iOS 17+ only</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Tema personalizzabile dall'utente</div>
+              <div class="ri-desc">Color picker per primary color. 3 preset: arancio (default), viola, verde. Dark/light/system esistenti. Salva in localStorage.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>3 giorni</span><span>cosmetic</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Bookmark/share pagina serie</div>
+              <div class="ri-desc">URL <code>#show/42</code> condivisibile. Se un amico ha PloppyTV installato, apre direttamente il detail page. Se non lo ha, suggerisce di installarlo.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 giorni</span><span>deep linking</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Export "Watch diary" come PDF</div>
+              <div class="ri-desc">Genera un PDF stampabile con la tua watch history del mese/anno. Per chi vuole tenere un "diario TV" cartaceo o archiviare offline.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>1 settimana</span><span>jsPDF</span></div>
+            </div>
+            <div class="roadmap-item">
+              <div class="ri-title">Import da TV Time (per amici che migrano)</div>
+              <div class="ri-desc">Uploader per il file ZIP di gdpr.tvtime.com. Parsea watch history + ratings e importa nella tua libreria. Timing-critical: TV Time chiude 15 luglio 2026.</div>
+              <div class="ri-meta"><span class="ri-tag new">new</span><span>2 settimane</span><span>tvmaze ID mapping</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="callout success reveal" style="margin-top: var(--space-8);">
+      <strong>Stop condition:</strong> puoi fermarti a P2 ed essere già felice. P3 (sync) è il vero salto di qualità. P4 (AI) è geek e opzionale. P5 è dessert. La regola d'oro è: <strong>se una fase ti stressa, salta alla successiva</strong>. È un progetto tuo, non un lavoro.
+    </div>
+  </div>
+</section>
+
+<!-- ============ COSA NON FARE ============ -->
+<section id="non-fare" style="background: var(--c-bg-elevated);">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-kicker">03 · Anti-roadmap</div>
+      <h2 class="section-title">Cosa NON fare (anti-pattern hobby)</h2>
+      <p class="section-desc">Feature che appaiono nella roadmap "indie premium" ma che NON devono entrare in un progetto hobby personale. Riconoscerle è altrettanto importante quanto pianificare cosa fare.</p>
+    </div>
+
+    <div class="principles-grid">
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Backend proprietario</h4>
+        <p>Nessun Supabase, Firebase, Vercel functions, Postgres. Se serve sync, usa cloud storage esistente (P3). Un backend = costi, monitoring, security, downtime, burnout. TV Time è morta anche per questo.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Account system custom</h4>
+        <p>Nessuna registrazione email/password, nessun OAuth custom per "account PloppyTV". Se serve identità per sync, usa l'account Google/Apple che l'utente ha già. Mai gestire password.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>API pubblica OAuth2</h4>
+        <p>Nessuna API REST esposta. È il moat di Trakt, ma richiede infrastruttura, rate limiting, auth, docs, versioning. Per uso hobby non serve: l'utente usa la PWA direttamente.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Paywall / premium tier</h4>
+        <p>Nessuna feature locked dietro abbonamento. Se vuoi donazioni spontanee, metti un link "Support the project" nell'about (GitHub Sponsors / Buy me a coffee). Ma niente gating.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Social community features</h4>
+        <p>Nessun follower, nessun profilo pubblico, nessuna bacheca, nessun sistema di recensioni condivise. I rating sono privati. Per condividere opinioni con amici usa chat esterne (WhatsApp, Telegram).</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Scrobbling Plex/Kodi/Netflix</h4>
+        <p>Richiede integrazioni native, webhook, bridge server. Complessità enorme per ROI nullo in un progetto personale. Se ti serve scrobbling, usa Trakt per quello e PloppyTV come tracker separato.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Analytics / tracking utenti</h4>
+        <p>Nessun Google Analytics, nessun Plausible, nessun PostHog. Se vuoi sapere come si usa l'app, chiedi ai tuoi conoscenti direttamente. Privacy-first è USP, non ostacolo.</p>
+      </div>
+      <div class="principle-card no reveal">
+        <div class="pc-icon">✗</div>
+        <h4>Multi-language support espanso</h4>
+        <p>IT + EN (P2) bastano per conoscenti. Aggiungere FR/ES/DE richiede traduzioni mantenute, contributors, CI. Per un progetto hobby è overhead. Se un amico vuole FR, fork e traduce lui.</p>
+      </div>
+    </div>
+
+    <div class="callout warning reveal">
+      <strong>Red flag da watchare:</strong> se ti ritrovi a pensare "questa feature sarebbe figa ma serve un server", fermati. Significa che la feature non è adatta al tuo scenario hobby. Torna ai principi P1-P4: local-first, no backend, no account, no monetizzazione. Il constraint genera creatività, non limita.
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="container">
+    <div>
+      <p>PloppyTV · Roadmap hobby · Ampliamento features per uso personale e condivisione con conoscenti</p>
+      <p class="footer-meta">Luglio 2026 · Scenario "Hobby project personale" · Local-first sempre · No backend, no account, no monetizzazione</p>
+    </div>
+    <div style="display: flex; gap: var(--space-3); align-items: center;">
+      <a href="https://github.com/Cartaz/PloppyTV" target="_blank" rel="noopener" style="font-size: 13px; font-weight: 600;">↗ Repo PloppyTV</a>
+      <span style="color: var(--c-border);">·</span>
+      <button onclick="window.scrollTo({top:0,behavior:'smooth'})" style="font-size: 13px; font-weight: 600; color: var(--c-primary);">↑ Torna su</button>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ============================================================
+// THEME TOGGLE (localStorage-safe)
+// ============================================================
+(function() {
+  const root = document.documentElement;
+  const toggle = document.getElementById('theme-toggle');
+  const iconSun = document.getElementById('icon-sun');
+  const iconMoon = document.getElementById('icon-moon');
+
+  function safeGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function safeSet(key, val) { try { localStorage.setItem(key, val); } catch (e) { /* ignore */ } }
+
+  const saved = safeGet('ploppytv-theme') || 'light';
+  if (saved === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    iconSun.style.display = 'none';
+    iconMoon.style.display = 'block';
+  }
+
+  toggle.addEventListener('click', () => {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      root.removeAttribute('data-theme');
+      safeSet('ploppytv-theme', 'light');
+      iconSun.style.display = 'block';
+      iconMoon.style.display = 'none';
+    } else {
+      root.setAttribute('data-theme', 'dark');
+      safeSet('ploppytv-theme', 'dark');
+      iconSun.style.display = 'none';
+      iconMoon.style.display = 'block';
+    }
+  });
+})();
+
+// ============================================================
+// PROGRESS BAR
+// ============================================================
+(function() {
+  const bar = document.getElementById('progress-bar');
+  function update() {
+    const scroll = window.scrollY;
+    const height = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = height > 0 ? (scroll / height) * 100 : 0;
+    bar.style.width = pct + '%';
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+
+// ============================================================
+// ACTIVE NAV LINK ON SCROLL
+// ============================================================
+(function() {
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  function update() {
+    const scrollPos = window.scrollY + 100;
+    let current = '';
+    sections.forEach(sec => { if (scrollPos >= sec.offsetTop) current = sec.id; });
+    navLinks.forEach(link => { link.classList.toggle('active', link.getAttribute('href') === '#' + current); });
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+
+// ============================================================
+// REVEAL ON SCROLL (con fallback di sicurezza)
+// ============================================================
+(function() {
+  const reveals = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    reveals.forEach(el => el.classList.add('visible'));
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+  reveals.forEach(el => observer.observe(el));
+  // Safety net
+  setTimeout(() => { reveals.forEach(el => el.classList.add('visible')); }, 2500);
+})();
+
+// ============================================================
+// ANIMATED COUNTERS
+// ============================================================
+(function() {
+  const counters = document.querySelectorAll('[data-count]');
+  const animate = (el) => {
+    const target = parseInt(el.dataset.count, 10);
+    const duration = 1200;
+    const start = performance.now();
+    const formatter = (val) => target >= 1000 ? val.toLocaleString('it-IT') : val.toString();
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = Math.floor(target * eased);
+      el.textContent = formatter(value);
+      if (progress < 1) requestAnimationFrame(tick);
+      else el.textContent = formatter(target);
+    }
+    requestAnimationFrame(tick);
+  };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) { animate(entry.target); observer.unobserve(entry.target); }
+    });
+  }, { threshold: 0.5 });
+  counters.forEach(c => observer.observe(c));
+})();
+</script>
+
+</body>
+</html>
