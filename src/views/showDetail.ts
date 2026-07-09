@@ -1,4 +1,14 @@
 // Vista dettaglio show con episodi
+//
+// FIXES applicati:
+//  - BUG-14-01: resetBoundGuard + bindShowDetailEvents — removeEventListener
+//    del vecchio handler prima di bindarne uno nuovo (no accumulation).
+//  - BUG-14-02: progress bar clamped a [0, 100] (no >100% su dati corrotti).
+//  - BUG-14-03: bigImg URL replace usa regex /\/medium_(portrait|landscape)\//
+//    invece di string.replace('medium', ...) (no match su filename "medium").
+//  - BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
+//  - H17 a11y: episode-item e season-tab hanno role/tabindex/aria-*;
+//    keydown listener (Enter/Space) triggera click.
 
 import { getState, switchSeason, closeShow } from '../lib/store';
 import { safeId, escapeHtml, escapeAttr, getWatchedCount, formatDate } from '../lib/utils';
@@ -12,6 +22,9 @@ import {
 } from '../lib/shows';
 
 let _boundShowDetail = false;
+let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
+let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let _showDetailMain: HTMLElement | null = null;
 
 /**
  * Resetta la guardia di idempotenza. Deve essere chiamato dal renderer
@@ -34,8 +47,9 @@ export function renderShowDetail(main: HTMLElement): void {
   }
   if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
 
+  // BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
   const seasons = Object.keys(show.seasons)
-    .filter((k) => !isNaN(parseInt(k, 10)))
+    .filter((k) => /^\d+$/.test(k))
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 
   if (seasons.length === 0) {
@@ -45,7 +59,9 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 
   const watched = getWatchedCount(show);
-  const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
+  // BUG-14-02: clamp progress a [0, 100] per gestire watched > totalEpisodes.
+  const rawProgress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
+  const progress = Math.max(0, Math.min(100, rawProgress));
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
   const statusClass =
@@ -58,8 +74,8 @@ export function renderShowDetail(main: HTMLElement): void {
 
   html += '<div class="detail-header">';
   // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
-  // show.image è già la versione medium (vedi getPosterUrl); bigImg è la original.
-  const bigImg = show.image ? show.image.replace('medium', 'original') : null;
+  // BUG-14-03: regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
+  const bigImg = show.image ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/') : null;
   if (bigImg && show.image && bigImg !== show.image) {
     // Catena: original -> medium -> placeholder
     html +=
@@ -167,11 +183,14 @@ export function renderShowDetail(main: HTMLElement): void {
     return;
   }
 
-  html += '<div class="season-tabs">';
+  html += '<div class="season-tabs" role="tablist">';
   for (const s of seasons) {
+    const isActive = parseInt(s, 10) === state.currentSeason;
     html +=
       '<div class="season-tab ' +
-      (parseInt(s, 10) === state.currentSeason ? 'active' : '') +
+      (isActive ? 'active' : '') +
+      '" role="tab" tabindex="0" aria-selected="' +
+      (isActive ? 'true' : 'false') +
       '" data-action="switchSeason" data-season="' +
       parseInt(s, 10) +
       '">Stagione ' +
@@ -195,7 +214,6 @@ export function renderShowDetail(main: HTMLElement): void {
       '" data-watched="0">Segna tutti come non visti</button>' +
       '</div>';
     const eps = show.seasons[state.currentSeason] || [];
-    // Calcola runtime medio se presente (per info bonus)
     html += '<div class="episode-list">';
     for (const ep of eps) {
       const epTitle = ep.name
@@ -203,6 +221,9 @@ export function renderShowDetail(main: HTMLElement): void {
         : '<span style="color:var(--text-muted);font-style:italic;">Episodio ' + ep.num + '</span>';
       const epNumberLabel = 'S' + state.currentSeason + 'E' + ep.num;
       const runtimeLabel = ep.runtime ? ' • ' + ep.runtime + ' min' : '';
+      const ariaLabel = ep.name
+        ? escapeAttr(ep.name + ' (' + epNumberLabel + ')')
+        : escapeAttr('Episodio ' + ep.num + ' (' + epNumberLabel + ')');
       html +=
         '<div class="episode-item ' +
         (ep.watched ? 'watched' : '') +
@@ -212,6 +233,8 @@ export function renderShowDetail(main: HTMLElement): void {
         state.currentSeason +
         '" data-ep="' +
         ep.num +
+        '" role="button" tabindex="0" aria-label="' +
+        ariaLabel +
         '" style="cursor:pointer;">' +
         '<div class="episode-checkbox ' +
         (ep.watched ? 'checked' : '') +
@@ -238,14 +261,23 @@ export function renderShowDetail(main: HTMLElement): void {
 }
 
 // Bind eventi via event delegation sul main content.
-// CRITICAL FIX (C5/T1): guardia _boundShowDetail evita di aggiungere un
-// nuovo listener ad ogni re-render. Il renderer chiama resetBoundGuard()
-// prima del bind, così ad ogni cambio vista la guardia è false e il listener
-// viene aggiunto una sola volta per quella vista.
+// CRITICAL FIX (C5/T1 + BUG-14-01): guardia _boundShowDetail + removeEventListener
+// del vecchio handler prima di bindarne uno nuovo. Il renderer chiama
+// resetBoundGuard() prima del bind, così ad ogni cambio vista la guardia è
+// false e il listener viene aggiunto una sola volta per quella vista.
 export function bindShowDetailEvents(main: HTMLElement): void {
   if (_boundShowDetail) return;
   _boundShowDetail = true;
-  main.addEventListener('click', (e) => {
+  // BUG-14-01: removeEventListener del vecchio handler (solo se stesso stesso main).
+  if (_showDetailClickHandler && _showDetailMain === main) {
+    main.removeEventListener('click', _showDetailClickHandler);
+  }
+  if (_showDetailKeydownHandler && _showDetailMain === main) {
+    main.removeEventListener('keydown', _showDetailKeydownHandler);
+  }
+  _showDetailMain = main;
+
+  const clickHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
@@ -266,5 +298,20 @@ export function bindShowDetailEvents(main: HTMLElement): void {
     } else if (action === 'refreshShow') {
       void refreshShowEpisodes(showId);
     }
-  });
+  };
+  // H17 a11y: keydown Enter/Space su elementi con role=button o role=tab.
+  const keydownHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const role = target.getAttribute('role');
+    if (role === 'button' || role === 'tab') {
+      e.preventDefault();
+      target.click();
+    }
+  };
+  _showDetailClickHandler = clickHandler;
+  _showDetailKeydownHandler = keydownHandler;
+  main.addEventListener('click', clickHandler);
+  main.addEventListener('keydown', keydownHandler);
 }

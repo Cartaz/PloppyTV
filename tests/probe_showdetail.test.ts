@@ -6,12 +6,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Show } from '../src/types';
-import type * as ShowsNS from '../src/lib/shows';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import * as ShowsNS from '../src/lib/shows';
 import { makeShow, makeShowWithSeasons, markWatchedFirst, makeEpisode } from './helpers';
 
 // Mock the network/mutation functions in shows.ts; keep pure helpers (showNeedsEpisodeNames) real.
 vi.mock('../src/lib/shows.ts', async (importOriginal) => {
-  const actual = await importOriginal<ShowsNS>();
+  const actual = await importOriginal<typeof ShowsNS>();
   return {
     ...actual,
     moveShowToList: vi.fn(),

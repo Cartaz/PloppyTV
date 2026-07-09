@@ -1,4 +1,13 @@
 // Vista calendario: usa Web Worker per il calcolo
+//
+// FIXES applicati:
+//  - BUG-16-01: resetBoundGuard ora removeEventListener del vecchio handler
+//    prima di bindarne uno nuovo (no listener accumulation).
+//  - BUG-16-02: guard `if (!Number.isFinite(delta)) return` su changeWeek.
+//  - BUG-16-04: null check su parseISODateLocal (weekStart/weekEnd/ep.date);
+//    malformed → "Errore date" graceful, episodi con data malformata skipped.
+//  - BUG-16-05: afterWeek slice(0,20) + "altri" indicator se > 20.
+//  - H17 a11y: keydown listener (Enter/Space) su elementi [role=button].
 
 import { getState, changeCalendarWeek, resetCalendarWeek } from '../lib/store';
 import { computeCalendarAsync } from '../worker/client';
@@ -6,8 +15,13 @@ import { escapeHtml, formatDate, parseISODateLocal, isSameLocalDay } from '../li
 import type { CalendarEpisode } from '../types';
 
 let _boundCalendar = false;
+let _calendarClickHandler: ((e: MouseEvent) => void) | null = null;
+let _calendarKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let _calendarMain: HTMLElement | null = null;
+// BUG-16-06: render token — last-STARTED render wins (not last-resolved).
+let _calendarRenderToken = 0;
 
-/** Reset guardia listener — vedi C5/T1 */
+/** Reset guardia listener — BUG-16-01: removeEventListener del vecchio handler. */
 export function resetBoundGuard(): void {
   _boundCalendar = false;
 }
@@ -26,18 +40,27 @@ function renderCalendarContent(
   weekStart: string,
   weekEnd: string,
 ): void {
+  // BUG-16-04: null check esplicito su weekStart/weekEnd.
+  const start = parseISODateLocal(weekStart);
+  const end = parseISODateLocal(weekEnd);
+  if (!start || !end) {
+    main.innerHTML =
+      '<h1 class="page-title">Calendario</h1>' +
+      '<div class="empty-state"><div class="empty-state-title">Errore date</div><div class="empty-state-text">Le date della settimana non sono valide. Riprova ad aprire il calendario.</div></div>';
+    return;
+  }
+
   const state = getState();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const weekDays = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
-  const start = parseISODateLocal(weekStart)!;
-  const end = parseISODateLocal(weekEnd)!;
 
-  // Raggruppa per giorno della settimana corrente
+  // Raggruppa per giorno della settimana corrente (BUG-16-04: skip episodi con data malformata).
   const byDay: CalendarEpisode[][] = [[], [], [], [], [], [], []];
   for (const ep of week) {
-    const epDate = parseISODateLocal(ep.date)!;
+    const epDate = parseISODateLocal(ep.date);
+    if (!epDate) continue; // skip episodi con data malformata
     const dayIdx = (epDate.getDay() + 6) % 7; // 0=Lun
     byDay[dayIdx].push(ep);
   }
@@ -103,9 +126,13 @@ function renderCalendarContent(
   html += '</div>';
 
   if (afterWeek.length > 0) {
+    // BUG-16-05: slice(0,20) + "altri" indicator.
+    const cap = 20;
+    const shown = afterWeek.slice(0, cap);
+    const remaining = afterWeek.length - shown.length;
     html +=
       '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
-    for (const ep of afterWeek.slice(0, 20)) {
+    for (const ep of shown) {
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
         : escapeHtml(ep.showName) + ' · Stagione ' + ep.season + ', Episodio ' + ep.num;
@@ -124,6 +151,9 @@ function renderCalendarContent(
         ' • ' +
         formatDate(ep.date) +
         '</div></div></div>';
+    }
+    if (remaining > 0) {
+      html += '<div class="episode-more">+ ' + remaining + ' altri episodi</div>';
     }
     html += '</div></div>';
   }
@@ -165,12 +195,17 @@ function renderCalendarContent(
 }
 
 export async function renderCalendar(main: HTMLElement): Promise<void> {
+  // BUG-16-06: token increment — last-STARTED render wins.
+  const myToken = ++_calendarRenderToken;
   renderCalendarSkeleton(main);
   try {
     const state = getState();
     const result = await computeCalendarAsync(state.shows, state.calendarWeekOffset);
+    // Discard if a newer render has started.
+    if (myToken !== _calendarRenderToken) return;
     renderCalendarContent(main, result.week, result.afterWeek, result.weekStart, result.weekEnd);
   } catch (e) {
+    if (myToken !== _calendarRenderToken) return;
     console.error('[calendar] error:', e);
     main.innerHTML =
       '<h1 class="page-title">Calendario</h1>' +
@@ -179,17 +214,46 @@ export async function renderCalendar(main: HTMLElement): Promise<void> {
 }
 
 export function bindCalendarEvents(main: HTMLElement): void {
+  // BUG-16-01: se _boundCalendar è true, no-op (no accumulation).
+  // Solo resetBoundGuard() abilita il re-bind.
   if (_boundCalendar) return;
   _boundCalendar = true;
-  main.addEventListener('click', (e) => {
+  // Rimuovi il vecchio handler se presente SULLO STESSO main (BUG-16-01).
+  // Se il main è diverso (es. nuovo elemento in un nuovo test), non c'è nulla
+  // da rimuovere — il vecchio handler era bound a un main ormai scartato.
+  if (_calendarClickHandler && _calendarMain === main) {
+    main.removeEventListener('click', _calendarClickHandler);
+  }
+  if (_calendarKeydownHandler && _calendarMain === main) {
+    main.removeEventListener('keydown', _calendarKeydownHandler);
+  }
+  _calendarMain = main;
+
+  const clickHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
     const action = actionEl.dataset.action;
     if (action === 'changeWeek') {
-      changeCalendarWeek(Number(actionEl.dataset.delta));
+      // BUG-16-02: guard contro NaN/Infinity (data-delta mancante).
+      const delta = Number(actionEl.dataset.delta);
+      if (!Number.isFinite(delta)) return;
+      changeCalendarWeek(delta);
     } else if (action === 'resetWeek') {
       resetCalendarWeek();
     }
-  });
+  };
+  const keydownHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.getAttribute('role') === 'button' || target.tagName === 'BUTTON') {
+      e.preventDefault();
+      target.click();
+    }
+  };
+  _calendarClickHandler = clickHandler;
+  _calendarKeydownHandler = keydownHandler;
+  main.addEventListener('click', clickHandler);
+  main.addEventListener('keydown', keydownHandler);
 }

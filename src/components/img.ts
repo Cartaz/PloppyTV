@@ -8,10 +8,14 @@ export function imgTag(src: string | null, alt: string, cls: string, extraStyle 
     return '<div class="' + placeholderCls + '" style="' + extraStyle + '">' + escapeHtml(alt || 'N/D') + '</div>';
   }
   // Costruisci un fallback data-attribute per il delegato globale (vedi imageFallback.ts)
+  // BUG-17-01: extraStyle applicato anche all'<img> inline (non solo al placeholder).
+  const styleAttr = extraStyle ? ' style="' + escapeAttr(extraStyle) + '"' : '';
   return (
     '<img class="' +
     cls +
-    '" src="' +
+    '"' +
+    styleAttr +
+    ' src="' +
     escapeAttr(src) +
     '" alt="' +
     escapeAttr(alt || '') +

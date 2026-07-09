@@ -1,4 +1,11 @@
 // Client TVMaze con timeout, abort, errori tipizzati
+//
+// FIXES applicati:
+//  - C2: onExternalAbort listener resta attaccato fino a quando fetch settlea
+//    (rimosso nella `finally`, non come microtask). Così un abort esterno
+//    successivo (es. l'utente digita di nuovo) propaga correttamente
+//    l'abort al controller interno e aborta la fetch in-flight.
+//  - H6: searchShows/getShowEpisodes/getShowsPage coerce null → [] (body vuoto).
 
 import type { TvmazeEpisode, TvmazeSearchResult, TvmazeShow } from '../types';
 import { API_BASE, API_TIMEOUT_MS } from './constants';
@@ -23,28 +30,27 @@ export class ApiError extends Error {
  *  - `RateLimitError`: HTTP 429
  *  - `ApiError`: HTTP non ok (con `status`)
  *  - `ParseError`: body non JSON o JSON malformato (anche 200 OK con HTML)
+ *
+ * C2 FIX: l'`onExternalAbort` listener resta attaccato al signal esterno fino
+ * a quando la fetch non settlea (rimosso nella `finally`). Prima veniva
+ * rimosso come microtask, il che impediva a un abort esterno successivo
+ * (es. l'utente digita di nuovo dopo qualche decina di ms) di propagarsi
+ * alla fetch in-flight.
  */
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-  // Propaga abort dal signal esterno al controller interno.
-  // Importante: rimuoviamo il listener quando finiamo per evitare leak
-  // su signal long-lived (es. uno stesso AbortController usato per N richieste).
+  // C2 FIX: propaga abort dal signal esterno al controller interno.
+  // Il listener resta attaccato fino alla `finally` (non microtask cleanup).
+  let onExternalAbort: (() => void) | null = null;
   if (signal) {
     if (signal.aborted) {
       clearTimeout(timeoutId);
       controller.abort();
     } else {
-      const onExternalAbort = () => controller.abort();
+      onExternalAbort = () => controller.abort();
       signal.addEventListener('abort', onExternalAbort, { once: true });
-      // Cleanup del listener esterno alla prima risoluzione
-      const cleanup = () => signal.removeEventListener('abort', onExternalAbort);
-      // Lo agganciamo a microtask+macro per coprire sia fast-resolve che throw
-      Promise.resolve(controller.signal.aborted ? null : undefined)
-        .then(cleanup)
-        .catch(cleanup);
-      setTimeout(cleanup, API_TIMEOUT_MS + 50);
     }
   }
 
@@ -85,17 +91,28 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     throw e;
   } finally {
     clearTimeout(timeoutId);
+    // C2 FIX: rimuovi il listener solo qui, dopo che fetch ha settleato.
+    if (onExternalAbort && signal) {
+      signal.removeEventListener('abort', onExternalAbort);
+    }
   }
 }
 
+/**
+ * H6 FIX: searchShows/getShowEpisodes/getShowsPage coerciscono null → []
+ * (body vuoto da TVMaze ritorna null da apiGet; i caller si aspettano un array).
+ */
 export async function searchShows(query: string, signal?: AbortSignal): Promise<TvmazeSearchResult[]> {
-  return apiGet<TvmazeSearchResult[]>('/search/shows?q=' + encodeURIComponent(query), signal);
+  const r = await apiGet<TvmazeSearchResult[]>('/search/shows?q=' + encodeURIComponent(query), signal);
+  return r ?? [];
 }
 
 export async function getShowEpisodes(showId: number, signal?: AbortSignal): Promise<TvmazeEpisode[]> {
-  return apiGet<TvmazeEpisode[]>('/shows/' + encodeURIComponent(showId) + '/episodes', signal);
+  const r = await apiGet<TvmazeEpisode[]>('/shows/' + encodeURIComponent(showId) + '/episodes', signal);
+  return r ?? [];
 }
 
 export async function getShowsPage(page: number, signal?: AbortSignal): Promise<TvmazeShow[]> {
-  return apiGet<TvmazeShow[]>('/shows?page=' + encodeURIComponent(page), signal);
+  const r = await apiGet<TvmazeShow[]>('/shows?page=' + encodeURIComponent(page), signal);
+  return r ?? [];
 }

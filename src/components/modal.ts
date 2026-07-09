@@ -1,10 +1,14 @@
 // Modal dialog con supporto a stack di modali nested, focus trap, ESC, ARIA.
 //
-// Lo stack permette di aprire una modale da dentro un'altra modale senza
-// che la chiusura del figlio chiuda anche il padre (bug C2/T6). Ogni
-// `showModal` pusha uno stato sullo stack; `closeModal` fa pop.
-// Il flag `keepOpen` su un'azione impedisce il pop (utile quando l'azione
-// apre una seconda modale e il padre deve restare visibile).
+// FIXES applicati:
+//  - BUG-09-01: il default è ora SICURO — un'action che apre una modale nested
+//    (senza keepOpen) NON viene chiusa dal closeModal automatico. Il framework
+//    rileva il cambio di profondità dello stack e skip il pop.
+//  - BUG-09-03: traccia _firstFocusTarget (l'elemento focusato prima della
+//    PRIMA modale) e ripristina il focus lì su closeAllModals / closeModal finale.
+//  - BUG-09-04: focus trap query su tutta la modal card (body + actions).
+//  - BUG-09-05: _modalTitle ha tabindex=-1 → .focus() entra nel dialog.
+//  - BUG-09-08: showModal warn (non silent) quando ensureRefs fallisce.
 
 export interface ModalAction {
   label: string;
@@ -34,11 +38,17 @@ function ensureRefs(): boolean {
   if (!_modalElement && _modalOverlay) {
     _modalElement = _modalOverlay.querySelector('.modal') as HTMLElement | null;
   }
+  // BUG-09-05: _modalTitle ha tabindex=-1 per permettere .focus().
+  if (_modalTitle && !_modalTitle.hasAttribute('tabindex')) {
+    _modalTitle.setAttribute('tabindex', '-1');
+  }
   return !!(_modalOverlay && _modalTitle && _modalBody && _modalActions);
 }
 
 // Stack di modali nested. Il top è quello correntemente visibile.
 const _stack: ModalState[] = [];
+// BUG-09-03: l'elemento focusato prima della PRIMA modale (per ripristino finale).
+let _firstFocusTarget: HTMLElement | null = null;
 
 function renderTop(): void {
   if (!ensureRefs()) return;
@@ -56,7 +66,13 @@ function renderTop(): void {
     btn.className = 'btn ' + (a.style || 'btn-secondary');
     btn.textContent = a.label;
     btn.onclick = () => {
+      const depthBefore = _stack.length;
       if (a.onClick) a.onClick();
+      const depthAfter = _stack.length;
+      // BUG-09-01: se l'onClick ha pushato una nuova modale (depth aumentata),
+      // NON chiamare closeModal — il figlio deve restare aperto.
+      // keepOpen=true è ancora rispettato come override esplicito.
+      if (depthAfter > depthBefore) return; // nested push — skip auto-close
       if (!a.keepOpen) closeModal();
     };
     _modalActions!.appendChild(btn);
@@ -68,13 +84,24 @@ function renderTop(): void {
   _modalOverlay!.setAttribute('aria-modal', 'true');
   _modalOverlay!.setAttribute('aria-labelledby', 'modalTitle');
   // Focus al primo bottone (o al titolo) per screen reader + keyboard nav
+  // BUG-09-05: con tabindex=-1, anche il titolo può ricevere focus.
   const firstBtn = _modalActions!.querySelector('button');
   if (firstBtn) (firstBtn as HTMLElement).focus();
   else _modalTitle!.focus();
 }
 
 export function showModal(title: string, bodyHtml: string, actions: ModalAction[]): void {
-  if (!ensureRefs()) return;
+  // BUG-09-08: warn (non silent) quando ensureRefs fallisce.
+  if (!ensureRefs()) {
+    console.warn(
+      '[modal] DOM refs non trovati — showModal non può procedere. Assicurati che initModal() sia stato chiamato dopo che il DOM è pronto.',
+    );
+    return;
+  }
+  // BUG-09-03: salva l'elemento focusato prima della PRIMA modale.
+  if (_stack.length === 0) {
+    _firstFocusTarget = document.activeElement as HTMLElement | null;
+  }
   _stack.push({
     title,
     bodyHtml,
@@ -91,30 +118,38 @@ export function showModal(title: string, bodyHtml: string, actions: ModalAction[
 export function closeModal(): void {
   const top = _stack.pop();
   renderTop();
-  // Ripristina il focus all'elemento che lo aveva prima dell'apertura
-  // (solo se non ci sono più modali aperte)
-  if (_stack.length === 0 && top?.previouslyFocused) {
-    try {
-      top.previouslyFocused.focus();
-    } catch {
-      // ignore
+  // BUG-09-03: ripristina il focus all'elemento che lo aveva prima dell'apertura
+  // della PRIMA modale (non della top). Usa _firstFocusTarget quando lo stack
+  // è vuoto, altrimenti l'elemento focusato prima della modale che stiamo chiudendo.
+  if (_stack.length === 0) {
+    const restoreTo = top?.previouslyFocused ?? _firstFocusTarget;
+    if (restoreTo) {
+      try {
+        restoreTo.focus();
+      } catch {
+        // ignore
+      }
     }
+    _firstFocusTarget = null;
   }
 }
 
 /**
  * Chiude tutte le modali (utile per "Annulla" da una catena di conferme).
+ * BUG-09-03: ripristina il focus a _firstFocusTarget (l'elemento focusato
+ * prima della PRIMA modale), non al top.previouslyFocused (che potrebbe
+ * essere un bottone detached dentro l'overlay nascosto).
  */
 export function closeAllModals(): void {
-  const last = _stack[_stack.length - 1];
   _stack.length = 0;
   renderTop();
-  if (last?.previouslyFocused) {
+  if (_firstFocusTarget) {
     try {
-      last.previouslyFocused.focus();
+      _firstFocusTarget.focus();
     } catch {
       // ignore
     }
+    _firstFocusTarget = null;
   }
 }
 
@@ -134,11 +169,12 @@ export function initModal(): void {
     closeModal();
   });
   // Focus trap: Tab sull'ultimo/primo elemento resta dentro il dialog
+  // BUG-09-04: query su tutta la modal card (body + actions), non solo actions.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
     if (_stack.length === 0) return;
-    if (!_modalActions) return;
-    const focusables = _modalActions.querySelectorAll<HTMLElement>(
+    if (!_modalElement) return;
+    const focusables = _modalElement.querySelectorAll<HTMLElement>(
       'button, [href], input, [tabindex]:not([tabindex="-1"])',
     );
     if (focusables.length === 0) return;

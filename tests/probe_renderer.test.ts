@@ -14,8 +14,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Show } from '../src/types';
-import type * as StoreNS from '../src/lib/store';
-import type * as ShowDetailNS from '../src/views/showDetail';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import * as StoreNS from '../src/lib/store';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import * as ShowDetailNS from '../src/views/showDetail';
 
 // ---------- helpers ----------
 
@@ -47,7 +49,7 @@ function makeShow(over: Partial<Show> = {}): Show {
 }
 
 async function simulateRenderDetail(
-  showDetail: ShowDetailNS,
+  showDetail: typeof ShowDetailNS,
   main: HTMLElement,
 ): Promise<void> {
   showDetail.resetBoundGuard();
@@ -242,7 +244,7 @@ describe('BUG-12-01: showDetail listener accumulation (FIXED)', () => {
   it('switchSeason action fires EXACTLY once (FIXED — no accumulation)', async () => {
     const switchSeasonSpy = vi.fn();
     vi.doMock('../src/lib/store', async () => {
-      const actual = await vi.importActual<StoreNS>('../src/lib/store');
+      const actual = await vi.importActual<typeof StoreNS>('../src/lib/store');
       return { ...actual, switchSeason: switchSeasonSpy };
     });
     vi.doMock('../src/lib/shows', () => ({
@@ -353,7 +355,7 @@ describe('BUG-12-01: calendar listener accumulation (FIXED)', () => {
   it('changeWeek fires EXACTLY once after N re-renders (FIXED — no N× drift)', async () => {
     const changeCalendarWeekSpy = vi.fn();
     vi.doMock('../src/lib/store', async () => {
-      const actual = await vi.importActual<StoreNS>('../src/lib/store');
+      const actual = await vi.importActual<typeof StoreNS>('../src/lib/store');
       return { ...actual, changeCalendarWeek: changeCalendarWeekSpy };
     });
     vi.doMock('../src/worker/client', () => ({

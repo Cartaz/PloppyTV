@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { Show } from '../src/types';
-import { reconcileList, updateShowListStatus } from '../src/lib/store';
+import { updateShowListStatus } from '../src/lib/store';
 import { makeShowWithSeasons, markWatchedFirst } from './helpers';
 
-describe('reconcileList', () => {
+describe('updateShowListStatus (formerly reconcileList)', () => {
   it('promuove a completed quando tutti gli episodi sono watched, resetta manualList', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { list: 'watching', manualList: true });
     markWatchedFirst(show, 1, 2);
-    reconcileList(show);
+    updateShowListStatus(show);
     expect(show.list).toBe('completed');
     expect(show.manualList).toBe(false);
   });
@@ -15,22 +15,22 @@ describe('reconcileList', () => {
   it('promuove towatch→watching al primo episodio watched', () => {
     const show = makeShowWithSeasons({ 1: 3 }, { list: 'towatch' });
     markWatchedFirst(show, 1, 1);
-    reconcileList(show);
+    updateShowListStatus(show);
     expect(show.list).toBe('watching');
   });
 
   it('retrocede completed→towatch se totalEpisodes=0', () => {
     const show = makeShowWithSeasons({}, { list: 'completed', totalEpisodes: 0 });
-    reconcileList(show);
+    updateShowListStatus(show);
     expect(show.list).toBe('towatch');
   });
 
   it('non retrocede mai una serie con manualList=true', () => {
     // Serie con manualList=true in completed, ma con 0 episodi watched:
-    // reconcileList NON dovrebbe retrocederla (rispetta manual override).
+    // updateShowListStatus NON dovrebbe retrocederla (rispetta manual override).
     const show = makeShowWithSeasons({ 1: 3 }, { list: 'completed', manualList: true });
     // Nessun episodio watched, ma manualList=true → resta completed
-    reconcileList(show);
+    updateShowListStatus(show);
     expect(show.list).toBe('completed');
   });
 });

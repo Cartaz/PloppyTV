@@ -124,7 +124,6 @@ describe('Agent-03 (post-fix): emitChange RAF guard with setTimeout fallback', (
     const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
     const original = w.requestAnimationFrame;
     // Remove RAF to simulate env without it (e.g. SSR, headless non-visual).
-    // @ts-expect-error intentional delete
     delete w.requestAnimationFrame;
 
     let threw = false;
@@ -147,7 +146,6 @@ describe('Agent-03 (post-fix): emitChange RAF guard with setTimeout fallback', (
   it('G. emitChange without RAF: listeners fire via setTimeout fallback (FIXED)', async () => {
     const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
     const origRAF = w.requestAnimationFrame;
-    // @ts-expect-error intentional delete
     delete w.requestAnimationFrame;
 
     const marker = vi.fn();
@@ -256,7 +254,7 @@ describe('Agent-03: subscribe Set-dedup hazard (BUG-03-06, left as-is)', () => {
 describe('Agent-03: emitChange semantics of mutators', () => {
   let emitSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
-    emitSpy = vi.spyOn({ emitChange }, 'emitChange');
+    emitSpy = vi.spyOn({ emitChange }, 'emitChange') as unknown as ReturnType<typeof vi.spyOn>;
     setState({
       shows: [],
       currentView: 'dashboard',
@@ -350,7 +348,6 @@ describe('Agent-03 (post-fix): openShow window.scrollTo guard (FIXED)', () => {
     // undefined and confirming openShow does not throw.
     const w = window as unknown as { scrollTo?: (x: number, y: number) => void };
     const original = w.scrollTo;
-    // @ts-expect-error intentional delete
     delete w.scrollTo;
     const { openShow } = await import('../src/lib/store');
     let threw = false;

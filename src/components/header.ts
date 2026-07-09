@@ -9,9 +9,22 @@ export function updateBadges(): void {
   const w = document.getElementById('badge-watching');
   const tw = document.getElementById('badge-towatch');
   const c = document.getElementById('badge-completed');
-  if (w) w.textContent = String(state.shows.filter((s) => s.list === 'watching').length);
-  if (tw) tw.textContent = String(state.shows.filter((s) => s.list === 'towatch').length);
-  if (c) c.textContent = String(state.shows.filter((s) => s.list === 'completed').length);
+  const wCount = state.shows.filter((s) => s.list === 'watching').length;
+  const twCount = state.shows.filter((s) => s.list === 'towatch').length;
+  const cCount = state.shows.filter((s) => s.list === 'completed').length;
+  if (w) {
+    w.textContent = String(wCount);
+    // BUG-20-10: aria-label dinamico per screen reader.
+    w.setAttribute('aria-label', wCount + ' serie in corso');
+  }
+  if (tw) {
+    tw.textContent = String(twCount);
+    tw.setAttribute('aria-label', twCount + ' serie da vedere');
+  }
+  if (c) {
+    c.textContent = String(cCount);
+    c.setAttribute('aria-label', cCount + ' serie completate');
+  }
 }
 
 export function initHeader(): void {

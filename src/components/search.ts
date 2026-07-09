@@ -1,4 +1,11 @@
 // Search box: input -> API TVMaze, fallback fuzzy, keyboard nav
+//
+// FIXES applicati:
+//  - BUG-10-02: Escape cleara lastSearchResults/DOM + abortisce in-flight.
+//  - BUG-10-03: click outside cleara DOM/lastSearchResults.
+//  - BUG-10-05: selectSearchResult retain input quando addShowToList fallisce.
+//  - BUG-10-07: fallback altQuery error (Network/Timeout) propaga al outer catch.
+//  - BUG-20-08: ARIA combobox/listbox/option/aria-selected/aria-expanded.
 
 import type { ListName, TvmazeSearchResult } from '../types';
 import { searchShows, ApiError } from '../lib/api';
@@ -40,7 +47,8 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         : 'N/D';
       const network = (show.network && show.network.name) || (show.webChannel && show.webChannel.name) || 'N/D';
       return (
-        '<div class="search-result-item" data-idx="' +
+        // BUG-20-08: role=option, aria-selected=false sui result items.
+        '<div class="search-result-item" role="option" aria-selected="false" data-idx="' +
         idx +
         '">' +
         (img
@@ -75,8 +83,6 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
 /**
  * Abortisce la ricerca corrente (se in flight) e incrementa `searchSeq`
  * in modo che eventuali risposte stale vengano scartate.
- * Da chiamare in OGNI branch che deve invalidare la search in corso:
- * input handler (validazione, too-long, empty), selectSearchResult, ecc.
  */
 function invalidateCurrentSearch(): void {
   if (searchAbortController) {
@@ -88,6 +94,25 @@ function invalidateCurrentSearch(): void {
     clearTimeout(searchTimeout);
     searchTimeout = null;
   }
+}
+
+/** BUG-20-08: toggle aria-expanded sull'input. */
+function setExpanded(expanded: boolean): void {
+  if (_searchInput) {
+    _searchInput.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  }
+}
+
+/** BUG-10-02/03: clear completo di DOM + stato + abort. */
+function clearSearchState(): void {
+  invalidateCurrentSearch();
+  if (_searchResults) {
+    _searchResults.classList.remove('active');
+    _searchResults.innerHTML = '';
+  }
+  lastSearchResults = [];
+  searchSelectedIdx = -1;
+  setExpanded(false);
 }
 
 async function doSearch(query: string): Promise<void> {
@@ -106,6 +131,7 @@ async function doSearch(query: string): Promise<void> {
   if (!_searchResults) return;
   _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>Ricerca in corso...</div>';
   _searchResults.classList.add('active');
+  setExpanded(true);
 
   try {
     const results = await searchShows(query, signal);
@@ -139,6 +165,8 @@ async function doSearch(query: string): Promise<void> {
           const err = e2 as { name?: string };
           if (err.name === 'AbortError') return;
           if (mySeq !== searchSeq) return;
+          // BUG-10-07: propaga l'errore del fallback al outer catch.
+          throw e2;
         }
       }
       _searchResults.innerHTML =
@@ -178,22 +206,31 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     showToast('Dati serie non validi', 'error');
     return;
   }
-  // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq,
-  // altrimenti una risposta tardiva di doSearch potrebbe riapparire
-  // dopo che l'utente ha già selezionato un risultato.
+  // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
   invalidateCurrentSearch();
+  // BUG-10-05: NON clearare l'input qui — aspetta il risultato di addShowToList.
+  // Se addShowToList fallisce (es. già in lista), l'utente può riprovare.
   if (_searchResults) {
     _searchResults.classList.remove('active');
     _searchResults.innerHTML = '';
   }
-  if (_searchInput) _searchInput.value = '';
   lastSearchResults = [];
   searchSelectedIdx = -1;
-  await addShowToList(show, list);
+  setExpanded(false);
+  const result = await addShowToList(show, list);
+  // BUG-10-05: clear input solo se addShowToList ha avuto successo (truthy).
+  if (result && _searchInput) {
+    _searchInput.value = '';
+  }
 }
 
 function updateSearchSelection(items: NodeListOf<Element>): void {
-  items.forEach((el, i) => el.classList.toggle('selected', i === searchSelectedIdx));
+  // BUG-20-08: toggle anche aria-selected, non solo la classe.
+  items.forEach((el, i) => {
+    const selected = i === searchSelectedIdx;
+    el.classList.toggle('selected', selected);
+    el.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
 }
 
 export function initSearch(): void {
@@ -201,30 +238,33 @@ export function initSearch(): void {
   _searchResults = document.getElementById('searchResults');
   if (!_searchInput || !_searchResults) return;
 
+  // BUG-20-08: ARIA combobox/listbox attributes.
+  _searchInput.setAttribute('role', 'combobox');
+  _searchInput.setAttribute('aria-expanded', 'false');
+  _searchInput.setAttribute('aria-autocomplete', 'list');
+  _searchInput.setAttribute('aria-controls', 'searchResults');
+  _searchResults.setAttribute('role', 'listbox');
+  _searchResults.setAttribute('aria-label', 'Risultati di ricerca');
+
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);
     const query = _searchInput!.value.trim();
     if (query.length < 2) {
-      _searchResults!.classList.remove('active');
-      _searchResults!.innerHTML = '';
-      lastSearchResults = [];
-      searchSelectedIdx = -1;
-      // H10: abortisce anche quando la query è troppo corta
-      invalidateCurrentSearch();
+      clearSearchState();
       return;
     }
     if (query.length > MAX_QUERY_LENGTH) {
       // H10: branch > MAX_QUERY_LENGTH deve abortire la search in-flight
       invalidateCurrentSearch();
       _searchResults!.innerHTML =
-        '<div class="search-no-results">Query troppo lunga (max ' + MAX_QUERY_LENGTH + ' caratteri)</div>';
+        '<div class="search-no-results" role="status">Query troppo lunga (max ' +
+        MAX_QUERY_LENGTH +
+        ' caratteri)</div>';
       _searchResults!.classList.add('active');
+      setExpanded(true);
       return;
     }
     // H10: abortisce la search precedente prima di schedulare la nuova.
-    // Senza questo, c'è una finestra stale di 350ms (durata del debounce)
-    // in cui una risposta della query precedente potrebbe sovrascrivere
-    // i risultati della nuova.
     if (searchAbortController) {
       searchAbortController.abort();
       searchAbortController = null;
@@ -253,7 +293,8 @@ export function initSearch(): void {
       searchSelectedIdx = Math.max(searchSelectedIdx - 1, -1);
       updateSearchSelection(items);
     } else if (e.key === 'Escape') {
-      _searchResults!.classList.remove('active');
+      // BUG-10-02: clear completo (DOM + stato + abort).
+      clearSearchState();
       _searchInput!.blur();
     }
   });
@@ -278,7 +319,8 @@ export function initSearch(): void {
 
   document.addEventListener('click', (e) => {
     if (!(e.target as HTMLElement).closest('.search-wrap')) {
-      _searchResults!.classList.remove('active');
+      // BUG-10-03: clear completo anche su click outside.
+      clearSearchState();
     }
   });
 }

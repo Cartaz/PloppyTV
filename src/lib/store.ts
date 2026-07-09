@@ -1,4 +1,15 @@
 // Store centralizzato con subscribe (pattern observer minimale)
+//
+// FIXES applicati:
+//  - BUG-03-02: getStateSnapshot deep-clona anche gli array di episodi
+//    (non solo l'oggetto seasons) → snapshot non condiviso con live state.
+//  - BUG-03-03: emitChange guarda RAF con fallback a setTimeout(...,0).
+//  - BUG-03-04: openShow guarda window.scrollTo (no throw se assente).
+//  - BUG-03-05 / H11: reconcileList DELETATO (dead code).
+//  - updateShowListStatus e reconcileAllLists (in normalize.ts) allineati:
+//    entrambi rispettano manualList, demoted watching→towatch su watched=0,
+//    demote completed→towatch su watched=0 (no manualList), clear manualList
+//    su auto-promotion a completed.
 
 import type { ListName, Show } from '../types';
 import { getWatchedCount } from './utils';
@@ -50,11 +61,18 @@ export function getState(): AppState {
  * Ritorna una deep-copy dello stato. Da usare quando si vuole inviare i dati
  * a un worker, persistere, o esporre a consumer esterni senza rischiare
  * mutazioni esterne dell'oggetto ritornato.
+ *
+ * BUG-03-02 (FIXED): deep-clona anche gli array di episodi dentro seasons,
+ * non solo l'oggetto seasons. Prima, snapshot.seasons[k] === live.seasons[k]
+ * (stessa reference) → mutare gli episodi nello snapshot mutava anche il live.
  */
 export function getStateSnapshot(): AppState {
   return {
     ...state,
-    shows: state.shows.map((s) => ({ ...s, seasons: { ...s.seasons } })),
+    shows: state.shows.map((s) => ({
+      ...s,
+      seasons: Object.fromEntries(Object.entries(s.seasons).map(([k, eps]) => [k, eps.map((ep) => ({ ...ep }))])),
+    })),
   };
 }
 
@@ -68,10 +86,17 @@ export function subscribe(fn: Listener): () => void {
 }
 
 let _rafScheduled = false;
+
+/**
+ * BUG-03-03 (FIXED): emitChange guarda RAF — se requestAnimationFrame non è
+ * disponibile (SSR, headless non-visual), fallback a setTimeout(...,0).
+ * In entrambi i casi, i listener vengono invocati; non viene lanciato
+ * ReferenceError.
+ */
 export function emitChange(): void {
   if (_rafScheduled) return;
   _rafScheduled = true;
-  requestAnimationFrame(() => {
+  const flush = () => {
     _rafScheduled = false;
     listeners.forEach((l) => {
       try {
@@ -80,7 +105,14 @@ export function emitChange(): void {
         console.error('[store] listener error:', e);
       }
     });
-  });
+  };
+  // Guard: se RAF non disponibile, fallback a setTimeout.
+  const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
+  if (typeof w.requestAnimationFrame === 'function') {
+    w.requestAnimationFrame(flush);
+  } else {
+    setTimeout(flush, 0);
+  }
 }
 
 // ===== Mutators =====
@@ -91,11 +123,18 @@ export function switchView(view: string): void {
   emitChange();
 }
 
+/**
+ * BUG-03-04 (FIXED): openShow guarda window.scrollTo — se non disponibile
+ * (SSR, env di test), non lancia ReferenceError.
+ */
 export function openShow(showId: number): void {
   state.currentShowId = showId;
   state.currentSeason = 1;
   emitChange();
-  window.scrollTo(0, 0);
+  const w = window as unknown as { scrollTo?: (x: number, y: number) => void };
+  if (typeof w.scrollTo === 'function') {
+    w.scrollTo(0, 0);
+  }
 }
 
 export function closeShow(): void {
@@ -150,28 +189,14 @@ export function setQuotaWarned(v: boolean): void {
 
 /**
  * Riconcilia il `list` di una serie basandosi sul conteggio episodi watched.
- * Rispetta `manualList`: se l'utente ha spostato manualmente la serie,
- * non retrocede MAI (non fa towatch→watching→completed nel senso inverso).
- * Può ancora promuovere a `completed` quando tutti gli episodi sono visti,
- * perché quello è un fatto oggettivo (e in quel caso resetta manualList).
- */
-export function reconcileList(show: Show): void {
-  const watched = getWatchedCount(show);
-  if (show.totalEpisodes > 0 && watched === show.totalEpisodes) {
-    show.list = 'completed';
-    show.manualList = false; // auto-promotion clears manual override
-  } else if (watched > 0 && show.list === 'towatch') {
-    show.list = 'watching';
-  } else if (show.totalEpisodes === 0 && show.list === 'completed') {
-    show.list = 'towatch';
-  }
-  // Nota: non retrocediamo mai una serie con manualList=true
-}
-
-/**
- * Come `reconcileList` ma usato dopo azioni utente (toggle, mark season).
- * Rispetta `manualList`: una serie spostata manualmente a `completed`
- * non viene retrocessa a `watching` se l'utente segna un episodio come non visto.
+ * Usato dopo azioni utente (toggle, mark season).
+ *
+ * Rispetta `manualList`: una serie spostata manualmente non viene retrocessa.
+ * Auto-promotion a `completed` resetta manualList=false.
+ *
+ * Allineato con `reconcileAllLists` in normalize.ts (entrambi rispettano
+ * manualList, demote watching→towatch su watched=0, demote completed→towatch
+ * su watched=0 senza manualList).
  */
 export function updateShowListStatus(show: Show): void {
   const watchedCount = getWatchedCount(show);
@@ -187,6 +212,7 @@ export function updateShowListStatus(show: Show): void {
   if (watchedCount > 0) {
     if (show.list !== 'watching') show.list = 'watching';
   } else {
+    // watched=0 → demote a towatch (sia da completed che da watching).
     if (show.list === 'completed' || show.list === 'watching') show.list = 'towatch';
   }
 }

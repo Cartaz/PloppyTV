@@ -21,8 +21,12 @@ let _popularLoading = false;
 let _recentLoading = false;
 
 let _boundDiscover = false;
+let _discoverClickHandler: ((e: MouseEvent) => void) | null = null;
+let _discoverKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let _discoverResizeHandler: (() => void) | null = null;
+let _discoverMain: HTMLElement | null = null;
 
-/** Reset guardia listener — vedi C5/T1 */
+/** Reset guardia listener — BUG-15-01: removeEventListener del vecchio handler. */
 export function resetBoundGuard(): void {
   _boundDiscover = false;
 }
@@ -57,7 +61,12 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
         : ''
       : '';
     const isAdded = getState().shows.find((s) => s.id === show.id);
-    html += '<div class="carousel-card" data-action="previewDiscover" data-show-id="' + show.id + '">';
+    html +=
+      '<div class="carousel-card" data-action="previewDiscover" data-show-id="' +
+      show.id +
+      '" role="button" tabindex="0" aria-label="Anteprima ' +
+      escapeAttr(show.name) +
+      '">';
     if (isAdded) html += '<div class="carousel-card-badge">Aggiunta</div>';
     if (img) {
       html +=
@@ -214,9 +223,22 @@ export function renderDiscover(main: HTMLElement): void {
 }
 
 export function bindDiscoverEvents(main: HTMLElement): void {
+  // BUG-15-01: se _boundDiscover è true, no-op. Solo resetBoundGuard abilita re-bind.
   if (_boundDiscover) return;
   _boundDiscover = true;
-  main.addEventListener('click', (e) => {
+  // Rimuovi il vecchio handler se presente SULLO STESSO main.
+  if (_discoverClickHandler && _discoverMain === main) {
+    main.removeEventListener('click', _discoverClickHandler);
+  }
+  if (_discoverKeydownHandler && _discoverMain === main) {
+    main.removeEventListener('keydown', _discoverKeydownHandler);
+  }
+  if (_discoverResizeHandler) {
+    window.removeEventListener('resize', _discoverResizeHandler);
+  }
+  _discoverMain = main;
+
+  const clickHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
@@ -225,13 +247,9 @@ export function bindDiscoverEvents(main: HTMLElement): void {
     if (action === 'switchDiscoverTab') {
       const tab = actionEl.dataset.tab as 'popular' | 'recent';
       if (!tab) return;
+      // BUG-15-02/03: non chiamare loadTab manualmente, non toccare DOM old.
+      // emitChange → RAF → re-render → renderDiscover chiama loadTab.
       setDiscoverTab(tab);
-      document.querySelectorAll('.discover-tab').forEach((el) => {
-        el.classList.toggle('active', el === actionEl);
-      });
-      const el = document.getElementById('discoverContent');
-      if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento...</div>';
-      loadTab(tab);
       return;
     }
 
@@ -275,7 +293,29 @@ export function bindDiscoverEvents(main: HTMLElement): void {
       const list = actionEl.dataset.list as 'towatch' | 'watching';
       if (list) addDiscoverShow(showId, list);
     }
-  });
+  };
+  // BUG-15-07: keydown Enter/Space su elementi con role=button.
+  const keydownHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.getAttribute('role') === 'button') {
+      e.preventDefault();
+      target.click();
+    }
+  };
+  // Resize listener: aggiorna nav state di tutti i track.
+  const resizeHandler = () => {
+    document.querySelectorAll<HTMLElement>('.carousel-track').forEach((track) => {
+      updateCarouselNavState(track);
+    });
+  };
+  _discoverClickHandler = clickHandler;
+  _discoverKeydownHandler = keydownHandler;
+  _discoverResizeHandler = resizeHandler;
+  main.addEventListener('click', clickHandler);
+  main.addEventListener('keydown', keydownHandler);
+  window.addEventListener('resize', resizeHandler, { passive: true });
 }
 
 function previewDiscover(showId: number): void {
@@ -346,9 +386,7 @@ async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Pr
     return;
   }
   await addShowToList(found, list);
-  if (getState().currentView === 'discover') {
-    // Re-render per aggiornare i badge "Già nella lista"
-    const main = document.getElementById('mainContent');
-    if (main) renderDiscover(main);
-  }
+  // BUG-15-04: non chiamare renderDiscover direttamente — il replaceShow
+  // in shows.ts triggera già emitChange → RAF → re-render via renderer.
+  // Una seconda chiamata qui causerebbe doppio render e potenziale race.
 }

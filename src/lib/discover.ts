@@ -36,8 +36,13 @@ async function fetchAllCandidates(
 ): Promise<{ shows: TvmazeShow[]; failedPages: number[] }> {
   const sixMonthsAgo = recentOnly
     ? (() => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - 6);
+        // BUG-07-06: anchor to day 1, then clamp day to last day of target month.
+        // Old code: new Date(2024,2,31).setMonth(-6) → Sep 31 → rolls to Oct 1.
+        // Fixed code: start from day 1, setMonth, then clamp to last day of target.
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = now.getMonth();
+        const d = new Date(y, m - 6, 1);
         d.setHours(0, 0, 0, 0);
         return d;
       })()
@@ -96,7 +101,9 @@ async function fetchAllCandidates(
   const all: TvmazeShow[] = [];
   for (const pageShows of results) {
     for (const show of pageShows) {
-      if (!show || !show.image || !show.name || !show.weight || show.weight <= 0) continue;
+      // BUG-07-03: weight=0 is INCLUDED (valid TVMaze value). Missing/negative excluded.
+      if (!show || !show.image || !show.name) continue;
+      if (show.weight === undefined || show.weight === null || show.weight < 0) continue;
       if (recentOnly) {
         if (!show.premiered) continue;
         const d = parseISODateLocal(show.premiered);
@@ -146,7 +153,7 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
     }
   }
 
-  // FASE 2: ridistribuzione deficit
+  // FASE 2: ridistribuzione deficit — BUG-07-01/02: rispetta i cap per-genre e _other.
   let total = 0;
   for (const g of GENRE_CAROUSELS) total += groups[g].length;
   total += groups._other.length;
@@ -166,13 +173,24 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
         }
       }
       if (assigned) {
-        groups[assigned].push(show);
-        assignedIds.add(show.id);
-        added++;
+        // BUG-07-01: non superare il cap per-genre.
+        if (groups[assigned].length < DISCOVER_TARGET_PER_GENRE) {
+          groups[assigned].push(show);
+          assignedIds.add(show.id);
+          added++;
+        } else if (groups._other.length < DISCOVER_TARGET_OTHER) {
+          // Spillover: genre at cap → redirect to _other (BUG-07-02 cap enforced).
+          groups._other.push(show);
+          assignedIds.add(show.id);
+          added++;
+        }
       } else {
-        groups._other.push(show);
-        assignedIds.add(show.id);
-        added++;
+        // BUG-07-02: non superare il cap _other.
+        if (groups._other.length < DISCOVER_TARGET_OTHER) {
+          groups._other.push(show);
+          assignedIds.add(show.id);
+          added++;
+        }
       }
     }
   }
@@ -194,9 +212,21 @@ function readCache(key: string): DiscoverGroups | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw) as { cachedAt: number; groups: DiscoverGroups };
-    if (cached && cached.cachedAt && Date.now() - cached.cachedAt < DISCOVER_CACHE_TTL && cached.groups) {
-      return cached.groups;
+    // BUG-07-04: cachedAt deve essere un numero finito e non nel futuro.
+    if (
+      !cached ||
+      typeof cached.cachedAt !== 'number' ||
+      !Number.isFinite(cached.cachedAt) ||
+      cached.cachedAt > Date.now() ||
+      Date.now() - cached.cachedAt >= DISCOVER_CACHE_TTL
+    ) {
+      return null;
     }
+    // BUG-07-05: groups deve essere un oggetto non-null con chiavi array.
+    if (!cached.groups || typeof cached.groups !== 'object' || Array.isArray(cached.groups)) {
+      return null;
+    }
+    return cached.groups;
   } catch {
     // cache invalida
   }

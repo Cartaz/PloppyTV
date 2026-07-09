@@ -63,13 +63,17 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
 
   // Generi
   html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">Generi più visti</h2>';
+  // BUG-17-05: maxCount fallback a 1 se 0/NaN per evitare division-by-zero e pct >100.
   const maxCount = stats.topGenres.length > 0 ? stats.topGenres[0].episodes || 1 : 1;
   if (stats.topGenres.length === 0 || stats.topGenres.every((g) => g.episodes === 0)) {
     html += '<p style="color:var(--text-muted);">Nessun dato. Segna alcuni episodi come visti.</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:12px;">';
     for (const { genre, episodes, shows } of stats.topGenres) {
-      const pct = maxCount > 0 ? (episodes / maxCount) * 100 : 0;
+      // BUG-17-04: Math.round per evitare fractional widths nel CSS.
+      // BUG-17-05: clamp a [0, 100] per evitare barre >100% se maxCount è 0/inconsistente.
+      const rawPct = maxCount > 0 ? (episodes / maxCount) * 100 : 0;
+      const pct = Math.max(0, Math.min(100, Math.round(rawPct)));
       html +=
         '<div><div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">' +
         '<span>' +
@@ -124,12 +128,19 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   main.innerHTML = html;
 }
 
+// BUG-17-02: render token — last-STARTED render wins (non last-resolved).
+let _statsRenderToken = 0;
+
 export async function renderStats(main: HTMLElement): Promise<void> {
+  const myToken = ++_statsRenderToken;
   renderStatsSkeleton(main);
   try {
     const stats = await computeStatsAsync(getState().shows);
+    // BUG-17-02: discard if a newer render has started.
+    if (myToken !== _statsRenderToken) return;
     renderStatsContent(main, stats);
   } catch (e) {
+    if (myToken !== _statsRenderToken) return;
     console.error('[stats] error:', e);
     main.innerHTML =
       '<h1 class="page-title">Statistiche</h1>' +

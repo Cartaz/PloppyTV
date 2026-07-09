@@ -118,7 +118,9 @@ export function moveShowToList(showId: number, list: ListName): void {
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
   show.list = list;
-  show.manualList = true;
+  // BUG-06-01: towatch NON imposta manualList (permette promozione naturale).
+  // watching e completed impostano manualList=true (blocca retrocessione).
+  show.manualList = list !== 'towatch';
   if (!saveData({ immediate: true })) {
     show.list = prevList;
     show.manualList = prevManual;
@@ -210,6 +212,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
   try {
     const episodes = await getShowEpisodes(id);
     // Mantiene watched state esistente, aggiorna name/airdate/runtime
+    // BUG-06-04: matched by TVMaze id (più stabile di num quando TVMaze renumber).
     const newSeasons: Show['seasons'] = {};
     let totalEpisodes = 0;
     for (const ep of episodes) {
@@ -218,10 +221,25 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       const sn = safeId(ep.season);
       if (!sn) continue;
       if (!newSeasons[sn]) newSeasons[sn] = [];
-      const existingEp = show.seasons[sn]?.find((e) => e.num === safeId(ep.number));
+      const epId = safeId(ep.id);
+      const epNum = safeId(ep.number);
+      // BUG-06-04: prima prova match by id (stable TVMaze id).
+      let existingEp: { watched?: boolean } | undefined;
+      for (const seasonArr of Object.values(show.seasons)) {
+        if (!Array.isArray(seasonArr)) continue;
+        const found = seasonArr.find((e) => e && e.id === epId);
+        if (found) {
+          existingEp = found;
+          break;
+        }
+      }
+      // Fallback: match by num nella stessa stagione (backward compat).
+      if (!existingEp) {
+        existingEp = show.seasons[sn]?.find((e) => e.num === epNum);
+      }
       newSeasons[sn].push({
-        num: safeId(ep.number),
-        id: safeId(ep.id),
+        num: epNum,
+        id: epId,
         watched: existingEp?.watched ?? false,
         airdate: typeof ep.airdate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ep.airdate) ? ep.airdate : null,
         name: typeof ep.name === 'string' ? ep.name.slice(0, 300) : null,
@@ -270,7 +288,7 @@ export function showNeedsEpisodeNames(show: Show): boolean {
   for (const eps of Object.values(show.seasons)) {
     if (!Array.isArray(eps)) continue;
     for (const ep of eps) {
-      if (ep && (ep.name === undefined || ep.name === null)) return true;
+      if (ep && (ep.name === undefined || ep.name === null || ep.name === '')) return true;
     }
   }
   return false;

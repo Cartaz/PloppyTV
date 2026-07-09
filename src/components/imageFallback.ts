@@ -26,7 +26,8 @@ export function initImageFallback(): void {
       target.dataset.fallbackApplied = '1';
 
       const fallbackName = target.dataset.fallback || 'N/D';
-      const cls = target.dataset.fallbackFallbackCls || target.dataset.fallbackCls || 'img-placeholder';
+      // BUG-20-09: dead branch removed — only data-fallbackCls is read now.
+      const cls = target.dataset.fallbackCls || 'img-placeholder';
       const style = target.dataset.fallbackStyle || '';
       const placeholder = document.createElement('div');
       placeholder.className = cls;

@@ -203,8 +203,9 @@ describe('escapeHtml + escapeAttr', () => {
 
 describe('getPosterUrl', () => {
   it('preferisce medium, poi original, poi null', () => {
-    expect(getPosterUrl({ image: { medium: 'm.jpg', original: 'o.jpg' } })).toBe('m.jpg');
-    expect(getPosterUrl({ image: { original: 'o.jpg' } })).toBe('o.jpg');
+    // BUG-01-d: getPosterUrl ora valida via safeImageUrl (richiede http/https).
+    expect(getPosterUrl({ image: { medium: 'https://x/m.jpg', original: 'https://x/o.jpg' } })).toBe('https://x/m.jpg');
+    expect(getPosterUrl({ image: { original: 'https://x/o.jpg' } })).toBe('https://x/o.jpg');
     expect(getPosterUrl({ image: {} })).toBeNull();
     expect(getPosterUrl({ image: null })).toBeNull();
     expect(getPosterUrl(null)).toBeNull();

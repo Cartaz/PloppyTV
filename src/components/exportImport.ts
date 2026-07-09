@@ -1,20 +1,68 @@
 // Export/Import backup JSON
+//
+// FIXES applicati:
+//  - BUG-11-01: BOM detection UTF-8/UTF-16 LE/BE via readAsArrayBuffer + TextDecoder.
+//  - BUG-11-02: validazione `data.version` (warning toast su mancante/non-numero/futuro).
+//  - BUG-11-03: merge field-level — preserva addedAt/image/name/status/premiered/
+//    genres/summary/network/runtime locali; adotta solo seasons/totalEpisodes/
+//    totalSeasons/list/manualList dal backup.
+//  - BUG-11-04: merge chiama `updateShowListStatus` per riconciliare la list.
+//  - BUG-11-07: grammatica italiana singolare/plurale.
+//  - BUG-11-09: export JSON minified (no indent).
 
 import type { ExportedData, Show } from '../types';
 import { SCHEMA_VERSION } from '../lib/constants';
-import { getState, setShows, emitChange } from '../lib/store';
+import { getState, setShows, emitChange, updateShowListStatus } from '../lib/store';
 import { saveData, isStorageOK } from '../lib/storage';
-import { normalizeShow } from '../lib/normalize';
-import { reconcileAllLists } from '../lib/normalize';
-import { getWatchedCount } from '../lib/utils';
+import { normalizeShow, reconcileAllLists } from '../lib/normalize';
+import { getWatchedCount, localISODate } from '../lib/utils';
 import { showToast } from './toast';
 import { showModal, closeAllModals, type ModalAction } from './modal';
 import { updateBadges } from './header';
-import { localISODate } from '../lib/utils';
 import { MAX_IMPORT_SIZE } from '../lib/constants';
 
 const SUPPORTS_EXPORT =
   typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+
+/**
+ * Decodifica un ArrayBuffer in stringa gestendo BOM UTF-8/UTF-16 LE/BE.
+ * BUG-11-01: prima veniva usato readAsText(file,'utf-8') che mangle i file
+ * UTF-16. Ora usiamo readAsArrayBuffer e detectiamo il BOM.
+ */
+function decodeArrayBuffer(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  // UTF-16 LE BOM: FF FE
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    try {
+      return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+    } catch {
+      // fallback below
+    }
+  }
+  // UTF-16 BE BOM: FE FF
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    try {
+      return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+    } catch {
+      // fallback below
+    }
+  }
+  // UTF-8 BOM: EF BB BF
+  let start = 0;
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    start = 3;
+  }
+  return new TextDecoder('utf-8').decode(bytes.subarray(start));
+}
+
+/**
+ * Pluralizza una parola italiana in base al numero.
+ * feminine: 1 → "ignorata", 2+ → "ignorate", "nuova"/"nuove".
+ * masculine: 1 → "duplicato"/"saltato", 2+ → "duplicati"/"saltati".
+ */
+function pluralize(n: number, singular: string, plural: string): string {
+  return n === 1 ? singular : plural;
+}
 
 export function initExportImport(): void {
   document.getElementById('exportBtn')?.addEventListener('click', () => {
@@ -53,20 +101,25 @@ export function initExportImport(): void {
       showToast('Errore lettura file', 'error');
       input.value = '';
     };
+    // BUG-11-01: readAsArrayBuffer + BOM detection per supportare UTF-16.
     reader.onload = (ev) => {
-      let text = (ev.target?.result as string) || '';
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      const buf = (ev.target?.result as ArrayBuffer) || new ArrayBuffer(0);
+      let text: string;
+      try {
+        text = decodeArrayBuffer(buf);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'unknown';
+        showToast('File JSON non valido: ' + msg, 'error');
+        input.value = '';
+        return;
+      }
       let data: ExportedData;
       try {
         data = JSON.parse(text) as ExportedData;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast(
-          'File JSON non valido: ' +
-            msg +
-            ' (controlla che sia un file JSON valido, non corrotto o in encoding UTF-16)',
-          'error',
-        );
+        // BUG-11-01: non menzionare più UTF-16 (ora gestito).
+        showToast('File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido e non corrotto)', 'error');
         input.value = '';
         return;
       }
@@ -84,6 +137,13 @@ export function initExportImport(): void {
         );
         input.value = '';
         return;
+      }
+      // BUG-11-02: validazione version.
+      const hasVersion = typeof data.version === 'number' && Number.isFinite(data.version);
+      if (!hasVersion) {
+        showToast('Backup senza versione schema — importo comunque best-effort', 'warning');
+      } else if (data.version > SCHEMA_VERSION) {
+        showToast('Backup con versione futura (' + data.version + ') — potrebbero esserci incompatibilità', 'warning');
       }
       const validShows = data.shows.map(normalizeShow).filter((s): s is Show => s !== null);
       const skipped = data.shows.length - validShows.length;
@@ -103,15 +163,19 @@ export function initExportImport(): void {
         input.value = '';
         return;
       }
+      // BUG-11-07: grammatica italiana singolare/plurale.
       const skipMsg =
         skipped > 0
           ? ' (' +
             skipped +
-            ' ignorate per dati non validi' +
-            (duplicates > 0 ? ', ' + duplicates + ' duplicati saltati' : '') +
+            ' ' +
+            pluralize(skipped, 'ignorata per dati non validi', 'ignorate per dati non validi') +
+            (duplicates > 0
+              ? ', ' + duplicates + ' ' + pluralize(duplicates, 'duplicato saltato', 'duplicati saltati')
+              : '') +
             ')'
           : duplicates > 0
-            ? ' (' + duplicates + ' duplicati saltati)'
+            ? ' (' + duplicates + ' ' + pluralize(duplicates, 'duplicato saltato', 'duplicati saltati') + ')'
             : '';
 
       const mergeAction: ModalAction = {
@@ -131,7 +195,15 @@ export function initExportImport(): void {
               const existingWatched = getWatchedCount(existing);
               const newWatched = getWatchedCount(s);
               if (newWatched > existingWatched) {
-                Object.assign(existing, s);
+                // BUG-11-03: merge field-level — preserva i metadati locali,
+                // adotta solo seasons/totalEpisodes/totalSeasons/list/manualList.
+                existing.seasons = s.seasons;
+                existing.totalEpisodes = s.totalEpisodes;
+                existing.totalSeasons = s.totalSeasons;
+                existing.list = s.list;
+                existing.manualList = s.manualList;
+                // BUG-11-04: riconcilia list in base al nuovo watched count.
+                updateShowListStatus(existing);
                 updated++;
               }
             }
@@ -144,7 +216,15 @@ export function initExportImport(): void {
           }
           updateBadges();
           emitChange();
-          showToast('Importate ' + added + ' nuove, aggiornate ' + updated + ' serie', 'success');
+          // BUG-11-07: grammatica italiana.
+          const addedWord = pluralize(added, 'Importata', 'Importate');
+          const nuoveWord = pluralize(added, 'nuova', 'nuove');
+          const aggiornateWord = pluralize(updated, 'aggiornata', 'aggiornate');
+          const serieWord = pluralize(updated, 'serie', 'serie');
+          showToast(
+            addedWord + ' ' + added + ' ' + nuoveWord + ', ' + aggiornateWord + ' ' + updated + ' ' + serieWord,
+            'success',
+          );
         },
       };
 
@@ -202,7 +282,7 @@ export function initExportImport(): void {
         [{ label: 'Annulla' }, mergeAction, replaceAction],
       );
     };
-    reader.readAsText(file, 'utf-8');
+    reader.readAsArrayBuffer(file);
     input.value = '';
   });
 }
@@ -215,7 +295,8 @@ function doExport(): void {
       shows: getState().shows,
       exportedAt: new Date().toISOString(),
     };
-    data = JSON.stringify(payload, null, 2);
+    // BUG-11-09: JSON minified (no indent) per file di backup più piccoli.
+    data = JSON.stringify(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     showToast('Errore serializzazione: ' + msg, 'error');
