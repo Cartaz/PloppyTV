@@ -61,6 +61,7 @@ PloppyTV segue una roadmap hobby in 5 fasi (P1 → P5) su ~12 mesi, con un focus
 | Fase | Stato | Tema | Tempistica |
 | --- | --- | --- | --- |
 | **P1** | ✅ Completata in v1.1 | Fondamenta & igiene del progetto | Settimana 1-2 |
+| **P1.x** | ✅ v1.1.1 | Stress-test bug-fix release | Luglio 2026 |
 | **P2** | 🚧 Prossima | Quality of life quotidiana | Mese 1-3 |
 | **P3** | ⏳ Pianificata | Sync multi-device senza backend | Mese 4-6 |
 | **P4** | ⏳ Pianificata | AI e discovery intelligente | Mese 7-9 |
@@ -203,12 +204,14 @@ P1 ha introdotto una suite di test e tooling di qualità. Tutti gli script sono 
 | `npm run test:watch` | Vitest in watch mode durante lo sviluppo |
 | `npm run test:coverage` | Vitest + coverage report (soglia minima 30%) |
 
-I 64 test coprono i moduli critici di `src/lib/`:
+I 62 test coprono i moduli critici di `src/lib/`:
 
-- `utils.ts` (26 test): `safeId`, `safeNum`, `safeImageUrl`, `stripHtml`, `parseISODateLocal`, `escapeHtml`, `getPosterUrl`
+- `utils.ts` (27 test): `safeId`, `safeNum`, `safeImageUrl`, `stripHtml`, `parseISODateLocal`, `escapeHtml`, `getPosterUrl`
 - `normalize.ts` (18 test): `normalizeShow`, `buildShowFromTvmaze`, `reconcileAllLists`
-- `store.ts` (11 test): `reconcileList`, `updateShowListStatus` con rispetto di `manualList`
+- `store.ts` (8 test): `updateShowListStatus` con rispetto di `manualList`
 - `watched.ts` (9 test): `getWatchedCount`, `findNextEpisode` con ordinamento stagioni/episodi
+
+In v1.1.1 si sono aggiunti **18 probe test file** (`tests/probe_*.test.ts`, ~780 test) che fungono da **regression suite** per i bug fix della release (vedi [`docs/RELEASE_NOTES_v1.1.1.md`](./docs/RELEASE_NOTES_v1.1.1.md)).
 
 Il pre-commit hook (`.husky/pre-commit` → `lint-staged`) esegue ESLint e Prettier solo sui file modificati prima di ogni commit, bloccando il commit se ci sono errori. La CI (`.github/workflows/ci.yml`) esegue typecheck, lint, format check e test su ogni PR e push su `main`.
 
@@ -239,19 +242,43 @@ L'ultimo giro di sviluppo si è concentrato sulla robustezza dell'app in scenari
 | **Ricerca TVMaze**              | Corretta una race condition per cui i risultati di una ricerca precedente potevano sovrascrivere quelli di una più recente                                                                                                  |
 | **Normalizzazione dati**        | Sanitizzazione più rigorosa dei dati importati/da API (percentuali di progresso e conteggi episodi ora sempre in un range valido, niente più `NaN`/negativi)                                                                |
 
-## Affidabilità: fix da stress test
+## Release Notes v1.1.1 — Stress-test bug-fix release
 
-L'ultimo giro di sviluppo si è concentrato sulla robustezza dell'app in scenari reali (più tab aperte, worker che risponde in ritardo, SW che aggiorna in background, uso da tastiera/screen reader). In sintesi:
+**v1.1.1** is a reliability & quality release. No new features — every change fixes a bug found by an automated stress test. A parallel swarm of 20 sub-agents exercised every module and edge case, surfacing 143 bugs (3 Critical, 20 High, ~120 Medium/Low). 14 parallel fix-agents then patched them all with exclusive file ownership. Full report: [`docs/RELEASE_NOTES_v1.1.1.md`](./docs/RELEASE_NOTES_v1.1.1.md).
 
-| Area | Problema risolto |
-| --- | --- |
-| **Storage multi-tab** | Scritture concorrenti tra tab diverse ora usano un controllo ottimistico (CAS su `savedAt`): se un'altra tab ha già salvato, la scrittura corrente viene rifiutata invece di sovrascrivere silenziosamente i dati |
-| **Modali nidificate** | `modal.ts` ora gestisce uno **stack** di modali: aprire una modale da dentro un'altra non chiude più anche quella padre; aggiunti focus trap, `role="dialog"`, `aria-modal` e gestione ESC |
-| **Web Worker (stats/calendar)** | Le richieste al worker portano un `id` di correlazione: risposte in ritardo da richieste precedenti non vengono più confuse con quella corrente; aggiunto `worker.onerror` per catturare errori di caricamento dello script |
-| **Aggiornamento PWA** | Un nuovo Service Worker "in attesa" ora mostra un toast che permette di applicare subito l'update, invece di restare bloccato finché l'utente non chiude manualmente tutte le tab |
-| **Routing con hash** | Gli shortcut PWA (`#dashboard`, `#discover`, `#calendar`) e i deep link a una serie (`#show/<id>`) ora vengono interpretati anche dopo il caricamento iniziale e supportano avanti/indietro del browser |
-| **Ricerca TVMaze** | Corretta una race condition per cui i risultati di una ricerca precedente potevano sovrascrivere quelli di una più recente |
-| **Normalizzazione dati** | Sanitizzazione più rigorosa dei dati importati/da API (percentuali di progresso e conteggi episodi ora sempre in un range valido, niente più `NaN`/negativi) |
+### Critical fixes
+
+- **`reconcileAllLists` now respects `manualList`** — a show the user manually placed in "Da vedere" or "Completata" was silently reverted on every app load, every backup import, and every multi-tab sync. The reconciler now honors the manual override and clears it on auto-promotion to `completed` (aligned with `updateShowListStatus`).
+- **Search abort propagation fixed** — `apiGet`'s external-abort listener was removed on the next microtask (before the fetch settled), so in-flight requests were never cancelled. The search race-condition protection now actually works: phantom fetches no longer linger up to 10 s.
+- **`beforeunload` no longer wipes user data on init failure** — the unload handler was registered before `init()` ran; if init threw, it would save an empty `shows: []` over the user's localStorage on tab close. The handler now registers only after `loadData()` succeeds, and `init()` is wrapped in try/catch with a fallback UI.
+
+### High-severity highlights
+
+- **Event-listener accumulation** in `showDetail` / `discover` / `calendar` — `resetBoundGuard` now `removeEventListener`s the previous handler before binding a new one. Actions no longer fire N times after N re-renders (which caused double-toggles, N× saves, and accelerating calendar-week drift).
+- **Multi-tab data loss in `storage.ts`** (4 bugs) — `_localDirty` is now consulted (unsaved edits aren't overwritten), `_lastSavedAt` advances only after a successful write, `storage` events with `newValue=null` no longer wipe local data, and the modal-open branch no longer advances `_lastSavedAt` in a way that made CAS pass and corrupt the other tab.
+- **`getShowEpisodes` no longer crashes on empty body** — `apiGet` returns `null` on a 200 with empty body; the three API wrappers now coerce `null → []`.
+- **`normalize.ts` hardened** — strict date validation (rejects `2024-13-40`), `buildShowFromTvmaze` aligned with `normalizeShow` (rejects `id:0`, clamps runtime, filters `num>0`), `stripHtml` applied to `name`/`status`/`network`.
+- **Import merge is now field-level** — `Object.assign` wholesale-overwrite (which lost `addedAt` and local metadata) replaced with a merge that preserves local timestamps and reconciles list status.
+- **`init()` is guarded** — any `initX` throw now logs the error and shows a fallback "Errore di avvio — Ricarica" UI instead of bricking the app.
+- **Keyboard accessibility** — all clickable `<div data-action>` elements (nav items, show cards, episode items, season tabs, calendar episodes, carousel cards) now carry `role="button"` / `role="tab"` + `tabindex="0"` and respond to Enter/Space. Toasts are `aria-live`, search results are a WAI-ARIA `listbox`, nav badges have `aria-label`.
+- **`worker.onerror` disables the broken worker** — a script-load error no longer leaves the worker cached forever, triggering a 500 ms timeout + main-thread fallback on every stats/calendar request.
+
+### Medium / Low
+
+Progress bars clamped to [0,100] across all views; `safeImageUrl` applied in `getPosterUrl`; episode dedup; UTF-16 BOM handling for imports; complete modal focus trap (body links included); correct maskable icon; `<noscript>` fallback; worker/fallback code deduped into a shared `src/worker/compute.ts`; and ~80 more.
+
+### Metrics
+
+- **Tests**: 842 passing (62 baseline + 780 probe regression suite), 0 failing
+- **Typecheck**: clean (`tsc --noEmit`)
+- **Lint**: 0 errors, 0 warnings (`--max-warnings=0`)
+- **Format**: all files Prettier-compliant
+- **Build**: 28 precache entries (165 KiB), `sw.js` generated
+- **Diff**: 27 source files changed (+1194 / −589 lines), 1 new module (`src/worker/compute.ts`), 18 new probe test files
+
+### Upgrade
+
+No action required. The `ploppytv_data_v1` localStorage schema is unchanged and fully compatible. The app updates automatically via the Service Worker; a toast offers to apply the update immediately.
 
 ## Novità recenti
 

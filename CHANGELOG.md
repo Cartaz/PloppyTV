@@ -2,6 +2,53 @@
 
 Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il formato si ispira a [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e il progetto segue [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-07-09
+
+### Stress-test bug-fix release
+
+Release di affidabilità e qualità. Nessuna nuova feature: ogni cambiamento fixa un bug trovato da uno stress test automatizzato. Uno swarm di 20 sub-agent paralleli ha esercitato ogni modulo ed edge case, individuando **143 bug** (3 Critici, 20 Alti, 51 Medi, 69 Bassi). 14 fix-agent paralleli li hanno poi patchati con ownership file esclusiva. I probe test dello stress test sono mantenuti come **regression suite da 780 test**. Dettagli completi in [`docs/RELEASE_NOTES_v1.1.1.md`](./docs/RELEASE_NOTES_v1.1.1.md).
+
+### Critici (3)
+
+- **`reconcileAllLists` ora rispetta `manualList`** — una serie collocata manualmente in "Da vedere"/"Completata" veniva silenziosamente ribaltata a ogni caricamento, import e sync multi-tab. Ora il reconciler onora l'override manuale e azzera `manualList` su auto-promozione a `completed`. La funzione dead-code `reconcileList` (stesso bug) è stata eliminata.
+- **Propagazione dell'abort in `apiGet` riparata** — il listener `onExternalAbort` veniva rimosso al microtask successivo (prima che la fetch terminasse), quindi le richieste in-flight non venivano mai abortite. La "search race-condition fix" ora tiene davvero. Fix: cleanup nel `finally`.
+- **`beforeunload` non sovrascrive più i dati se `init()` fallisce** — il listener era registrato prima di `init()`; se init lanciava, salvava `shows: []` sui dati dell'utente alla chiusura tab. Ora registrato dopo `loadData()` + init wrap in try/catch con UI di fallback.
+
+### Alti (20, selezione)
+
+- **Accumulo di event-listener** in `showDetail`/`discover`/`calendar` — `resetBoundGuard` ora `removeEventListener` prima di bindare. Le azioni non fire più N volte dopo N re-render (double-toggles, N× saveData, drift accelerante del calendario).
+- **4 bug di perdita/corruzione dati multi-tab in `storage.ts`** — `_localDirty` consultato, `_lastSavedAt` avanzato post-write, no wipe su `newValue=null`, no advance a modal aperto.
+- **`getShowEpisodes` non crasha su body vuoto** — i wrapper API coerciscono `null → []`.
+- **`normalize.ts` indurito** — validazione date stretta, `buildShowFromTvmaze` allineato a `normalizeShow` (id/runtime/num), `stripHtml` su name/status/network.
+- **Merge import field-level** — `Object.assign` (che perdeva `addedAt`/metadata locale) sostituito con merge che preserva i timestamp locali e riconcilia lo stato list.
+- **`init()` guardato** con UI di fallback "Errore di avvio".
+- **Accessibilità tastiera** — tutti i `div[data-action]` ora hanno `role`/`tabindex` + Enter/Space. Toast `aria-live`, search `listbox`, badge `aria-label`.
+- **`worker.onerror` disabilita il worker rotto** (no loop 500ms).
+
+### Medi / Bassi (~120)
+
+Clamp progress ovunque, `safeImageUrl` in `getPosterUrl`, dedupe episodi, BOM UTF-16, focus trap modale completo, icona maskable corretta, `<noscript>`, dedupe worker/fallback in `src/worker/compute.ts`, e ~110 altri.
+
+### Aggiunto
+
+- `docs/RELEASE_NOTES_v1.1.1.md` — release notes complete in inglese
+- `src/worker/compute.ts` — modulo condiviso per `computeStats`/`computeCalendar` (dedupe worker/fallback)
+- `tests/probe_*.test.ts` (18 file, ~780 test) — regression suite per i bug fix
+
+### Modificato
+
+- 27 file sorgente (+1194 / −589 righe)
+- Versione bumped da 1.1.0 a 1.1.1
+
+### Metriche
+
+- **Test**: 842 passing (62 baseline + 780 probe), 0 failing
+- **Typecheck**: clean · **Lint**: 0/0 · **Format**: clean · **Build**: 28 precache entries (165 KiB)
+
+### Compatibilità dati
+
+Nessuna migrazione necessaria. Lo schema `ploppytv_data_v1` in localStorage è invariato e retrocompatibile.
+
 ## [1.1.0] — 2026-07-09
 
 ### Aggiunto

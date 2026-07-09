@@ -53,7 +53,7 @@ export function initHeader(): void {
         '</ul>' +
         '<p><strong>Dati:</strong> API TVMaze (gratuita, senza chiave)</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
-        '<p style="font-size:13px;"><strong>Versione 1.1</strong> — fondamenta & igiene del progetto</p>' +
+        '<p style="font-size:13px;"><strong>Versione 1.1.1</strong> — stress-test bug-fix release</p>' +
         '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">' +
         'Build pipeline moderna: <strong>Vite + TypeScript</strong>, ' +
         'codice suddiviso in moduli, <strong>Web Worker</strong> per statistiche e calendario (UI non si blocca), ' +
@@ -73,7 +73,7 @@ export function initHeader(): void {
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribuire</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>' +
         '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.1.0 · Luglio 2026</p>',
+        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.1.1 · Luglio 2026</p>',
       [{ label: 'Chiudi' }],
     );
   });
