@@ -22,6 +22,24 @@
 // BUG-16-03 (FIXED): `computeCalendar` (in `./compute.ts`) applica
 // internamente `safeWeekOffset`, quindi il fallback gestisce NaN/Infinity
 // weekOffset esattamente come il worker.
+//
+// BUG-A9-05 (FIXED): `worker.postMessage(req)` può lanciare DataCloneError
+// se `shows` contiene dati non-cloneable (funzioni, riferimenti circolari,
+// Symbol, WeakMap, ecc.). Prima, il throw propagava fuori dal Promise
+// executor (auto-reject), MA il listener e il timeout erano già registrati
+// → leak (il listener restava attivo per sempre, il timeout scattava a
+// 3s e faceva doppio compute). Ora `postMessage` è wrappato in try/catch:
+// su throw, cleanup + fallback main-thread.
+//
+// BUG-A9-06 (FIXED): il fallback `computeStats(shows)` / `computeCalendar(...)`
+// può lanciare (es. se `shows` contiene entry con getter che throwano, o
+// se una futura modifica a compute.ts introduce un crash). Prima, il throw
+// avveniva dentro un event handler o setTimeout callback → NON catturato
+// dal Promise constructor → la promise HANGAVA per sempre (mai risolta né
+// rejected) → la UI mostrava il loader "Calcolando..." all'infinito. Ora
+// ogni fallback è wrappato in try/catch: su throw, la promise viene
+// rejected, e la view (renderStats/renderCalendar) mostra "Errore
+// caricamento" tramite il proprio catch.
 
 import type { Show, StatsResult, CalendarEpisode, WorkerResponse, WorkerRequest } from '../types';
 import { computeStats, computeCalendar } from './compute';
@@ -55,15 +73,37 @@ function getWorker(): Worker | null {
 }
 
 /**
+ * BUG-A9-06 (FIXED): helper per eseguire il fallback main-thread in modo
+ * sicuro. Se il compute lancia (es. dati corrotti con getter che throwano,
+ * o un bug futuro in compute.ts), la promise viene rejected invece di
+ * rimanere pending. La view (renderStats/renderCalendar) ha un try/catch
+ * che mostra "Errore caricamento" sulle promise rejected.
+ */
+function runFallbackOrReject<T>(
+  fn: () => T,
+  resolve: (v: T) => void,
+  reject: (e: unknown) => void,
+): void {
+  try {
+    resolve(fn());
+  } catch (e) {
+    reject(e);
+  }
+}
+
+/**
  * Stats via worker. Usa correlation ID per scartare risposte stale.
  * Su errore worker → reject (invece di pendere fino al timeout).
  * Su timeout → fallback main-thread E rimuove il listener (no leak).
  */
 export function computeStatsAsync(shows: Show[]): Promise<StatsResult> {
-  return new Promise((resolve) => {
+  // BUG-A9-06: aggiunto `reject` — prima il constructor prendeva solo
+  // `resolve`, quindi nessun path poteva rejectare la promise. Ora i
+  // fallback che lanciano rejectano invece di hangare.
+  return new Promise((resolve, reject) => {
     const worker = getWorker();
     if (!worker) {
-      resolve(computeStats(shows));
+      runFallbackOrReject(() => computeStats(shows), resolve, reject);
       return;
     }
     const myId = ++_requestIdCounter;
@@ -84,7 +124,8 @@ export function computeStatsAsync(shows: Show[]): Promise<StatsResult> {
         clearTimeout(timeout);
         worker.removeEventListener('message', handler);
         console.warn('[worker] stats error:', data.message, '— using fallback');
-        resolve(computeStats(shows));
+        // BUG-A9-06: se il fallback lancia, reject invece di hangare.
+        runFallbackOrReject(() => computeStats(shows), resolve, reject);
       }
       // Risposte calendar per altri id vengono scartate da `data.id !== myId`
     };
@@ -94,12 +135,29 @@ export function computeStatsAsync(shows: Show[]): Promise<StatsResult> {
       settled = true;
       worker.removeEventListener('message', handler); // CRITICAL: no leak
       console.warn('[worker] stats timeout, fallback main-thread');
-      resolve(computeStats(shows));
+      // BUG-A9-06: se il fallback lancia, reject invece di hangare.
+      runFallbackOrReject(() => computeStats(shows), resolve, reject);
     }, WORKER_TIMEOUT_MS);
 
     worker.addEventListener('message', handler);
     const req: WorkerRequest = { type: 'stats', id: myId, shows };
-    worker.postMessage(req);
+    // BUG-A9-05 (FIXED): postMessage può lanciare DataCloneError se `shows`
+    // contiene dati non-cloneable (funzioni, riferimenti circolari, Symbol,
+    // ecc.). Senza questo try/catch, il throw propagava fuori dal Promise
+    // executor (auto-reject della promise), MA listener e timeout erano
+    // già registrati → leak (listener restava attivo, timeout scattava a
+    // 3s con doppio compute). Ora: cleanup + fallback main-thread.
+    try {
+      worker.postMessage(req);
+    } catch (e) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        worker.removeEventListener('message', handler);
+        console.warn('[worker] postMessage failed (non-cloneable data?), fallback main-thread:', e);
+        runFallbackOrReject(() => computeStats(shows), resolve, reject);
+      }
+    }
   });
 }
 
@@ -107,10 +165,11 @@ export function computeCalendarAsync(
   shows: Show[],
   weekOffset: number,
 ): Promise<{ week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string }> {
-  return new Promise((resolve) => {
+  // BUG-A9-06: aggiunto `reject` per consistenza con computeStatsAsync.
+  return new Promise((resolve, reject) => {
     const worker = getWorker();
     if (!worker) {
-      resolve(computeCalendar(shows, weekOffset));
+      runFallbackOrReject(() => computeCalendar(shows, weekOffset), resolve, reject);
       return;
     }
     const myId = ++_requestIdCounter;
@@ -130,7 +189,8 @@ export function computeCalendarAsync(
         clearTimeout(timeout);
         worker.removeEventListener('message', handler);
         console.warn('[worker] calendar error:', data.message, '— using fallback');
-        resolve(computeCalendar(shows, weekOffset));
+        // BUG-A9-06: se il fallback lancia, reject invece di hangare.
+        runFallbackOrReject(() => computeCalendar(shows, weekOffset), resolve, reject);
       }
     };
 
@@ -139,11 +199,24 @@ export function computeCalendarAsync(
       settled = true;
       worker.removeEventListener('message', handler); // CRITICAL: no leak
       console.warn('[worker] calendar timeout, fallback main-thread');
-      resolve(computeCalendar(shows, weekOffset));
+      // BUG-A9-06: se il fallback lancia, reject invece di hangare.
+      runFallbackOrReject(() => computeCalendar(shows, weekOffset), resolve, reject);
     }, WORKER_TIMEOUT_MS);
 
     worker.addEventListener('message', handler);
     const req: WorkerRequest = { type: 'calendar', id: myId, shows, weekOffset };
-    worker.postMessage(req);
+    // BUG-A9-05 (FIXED): vedi computeStatsAsync. Stessa guardia per
+    // DataCloneError su `shows` non-cloneable.
+    try {
+      worker.postMessage(req);
+    } catch (e) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        worker.removeEventListener('message', handler);
+        console.warn('[worker] postMessage failed (non-cloneable data?), fallback main-thread:', e);
+        runFallbackOrReject(() => computeCalendar(shows, weekOffset), resolve, reject);
+      }
+    }
   });
 }

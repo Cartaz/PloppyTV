@@ -8,11 +8,40 @@
 //    malformed → "Errore date" graceful, episodi con data malformata skipped.
 //  - BUG-16-05: afterWeek slice(0,20) + "altri" indicator se > 20.
 //  - H17 a11y: keydown listener (Enter/Space) su elementi [role=button].
+//  - BUG-A13-01: dopo l'await del worker, verifica che currentView sia ancora
+//    'calendar' e currentShowId sia null. Se l'utente ha cambiato vista o
+//    aperto un detail mentre il worker calcolava, il risultato stale NON
+//    sovrascrive il DOM della nuova vista (race cross-view).
+//  - BUG-A13-02: data-show-id attributo escapato via escapeAttr (defense-in-depth
+//    contro showId non-number da dati corrotti/import malevoli).
+//  - BUG-A13-04: ep.season/ep.num validati (intero positivo, finito) prima di
+//    essere interpolati in HTML; fallback '?' per valori invalidi.
+//  - BUG-A13-05: guard Array.isArray su week/afterWeek (worker/corrupted data).
 
 import { getState, changeCalendarWeek, resetCalendarWeek } from '../lib/store';
 import { computeCalendarAsync } from '../worker/client';
-import { escapeHtml, formatDate, parseISODateLocal, isSameLocalDay } from '../lib/utils';
+import { escapeHtml, escapeAttr, formatDate, parseISODateLocal, isSameLocalDay } from '../lib/utils';
 import type { CalendarEpisode } from '../types';
+
+/**
+ * BUG-A13-04: formatta un numero stagione/episodio per display.
+ * Accetta solo interi positivi finiti; fallback '?' per valori invalidi
+ * (NaN, Infinity, undefined, stringhe, float, negativi).
+ */
+function safeNumLabel(v: unknown): string {
+  if (typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v > 0) {
+    return String(v);
+  }
+  return '?';
+}
+
+/**
+ * BUG-A13-05: coerce un valore a CalendarEpisode[], difendendo contro
+ * worker/corrupted data che restituisce non-array (null, oggetto, primitive).
+ */
+function asCalEpisodes(v: unknown): CalendarEpisode[] {
+  return Array.isArray(v) ? (v as CalendarEpisode[]) : [];
+}
 
 let _boundCalendar = false;
 let _calendarClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -35,8 +64,8 @@ function renderCalendarSkeleton(main: HTMLElement): void {
 
 function renderCalendarContent(
   main: HTMLElement,
-  week: CalendarEpisode[],
-  afterWeek: CalendarEpisode[],
+  weekIn: CalendarEpisode[],
+  afterWeekIn: CalendarEpisode[],
   weekStart: string,
   weekEnd: string,
 ): void {
@@ -50,6 +79,10 @@ function renderCalendarContent(
     return;
   }
 
+  // BUG-A13-05: defensive coercion (worker/corrupted data).
+  const week = asCalEpisodes(weekIn);
+  const afterWeek = asCalEpisodes(afterWeekIn);
+
   const state = getState();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -59,6 +92,7 @@ function renderCalendarContent(
   // Raggruppa per giorno della settimana corrente (BUG-16-04: skip episodi con data malformata).
   const byDay: CalendarEpisode[][] = [[], [], [], [], [], [], []];
   for (const ep of week) {
+    if (!ep || typeof ep !== 'object') continue; // BUG-A13-05: skip entry non-object
     const epDate = parseISODateLocal(ep.date);
     if (!epDate) continue; // skip episodi con data malformata
     const dayIdx = (epDate.getDay() + 6) % 7; // 0=Lun
@@ -106,16 +140,19 @@ function renderCalendarContent(
         ? dayEpisodes
             .map(
               (ep) =>
+                // BUG-A13-02: escapeAttr su showId (defense-in-depth contro
+                // showId non-number che romperebbe l'attributo).
                 '<div class="calendar-episode" data-action="openShow" data-show-id="' +
-                ep.showId +
+                escapeAttr(ep.showId) +
                 '">' +
                 '<div class="calendar-ep-name">' +
                 escapeHtml(ep.showName) +
                 '</div>' +
                 '<div class="calendar-ep-show">S' +
-                ep.season +
+                // BUG-A13-04: safeNumLabel valida season/num.
+                safeNumLabel(ep.season) +
                 'E' +
-                ep.num +
+                safeNumLabel(ep.num) +
                 (ep.name ? ' · ' + escapeHtml(ep.name) : '') +
                 '</div></div>',
             )
@@ -133,21 +170,22 @@ function renderCalendarContent(
     html +=
       '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
     for (const ep of shown) {
+      if (!ep || typeof ep !== 'object') continue; // BUG-A13-05: skip entry non-object
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
-        : escapeHtml(ep.showName) + ' · Stagione ' + ep.season + ', Episodio ' + ep.num;
+        : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);
       html +=
         '<div class="episode-item" data-action="openShow" data-show-id="' +
-        ep.showId +
+        escapeAttr(ep.showId) +
         '" style="cursor:pointer;">' +
         '<div class="episode-checkbox"></div>' +
         '<div class="episode-info"><div class="episode-name">' +
         epTitle +
         '</div>' +
         '<div class="episode-meta">S' +
-        ep.season +
+        safeNumLabel(ep.season) +
         'E' +
-        ep.num +
+        safeNumLabel(ep.num) +
         ' • ' +
         formatDate(ep.date) +
         '</div></div></div>';
@@ -165,21 +203,22 @@ function renderCalendarContent(
   } else {
     html += '<div class="episode-list">';
     for (const ep of week) {
+      if (!ep || typeof ep !== 'object') continue; // BUG-A13-05: skip entry non-object
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
-        : escapeHtml(ep.showName) + ' · Stagione ' + ep.season + ', Episodio ' + ep.num;
+        : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);
       html +=
         '<div class="episode-item" data-action="openShow" data-show-id="' +
-        ep.showId +
+        escapeAttr(ep.showId) +
         '" style="cursor:pointer;">' +
         '<div class="episode-checkbox"></div>' +
         '<div class="episode-info"><div class="episode-name">' +
         epTitle +
         '</div>' +
         '<div class="episode-meta">S' +
-        ep.season +
+        safeNumLabel(ep.season) +
         'E' +
-        ep.num +
+        safeNumLabel(ep.num) +
         ' • ' +
         formatDate(ep.date) +
         ' • ' +
@@ -197,15 +236,39 @@ function renderCalendarContent(
 export async function renderCalendar(main: HTMLElement): Promise<void> {
   // BUG-16-06: token increment — last-STARTED render wins.
   const myToken = ++_calendarRenderToken;
+  // BUG-A13-01: capture the view/show state at the START of the render. We only
+  // enforce the cross-view race check if we were actually on 'calendar' with no
+  // show detail open at the start — this preserves compatibility with tests
+  // that call renderCalendar directly without setting currentView, and with
+  // stores that don't expose currentView (mocked).
+  const startView = getState().currentView;
+  const startShowId = getState().currentShowId;
+  const wasCalendarActive = startView === 'calendar' && startShowId === null;
   renderCalendarSkeleton(main);
   try {
     const state = getState();
     const result = await computeCalendarAsync(state.shows, state.calendarWeekOffset);
     // Discard if a newer render has started.
     if (myToken !== _calendarRenderToken) return;
+    // BUG-A13-01: cross-view race protection. Il token qui sopra protegge solo
+    // contro nuove renderCalendar (stessa vista). Se l'utente ha cambiato vista
+    // o aperto un detail mentre il worker calcolava, _calendarRenderToken non
+    // è stato incrementato (nessuna nuova renderCalendar chiamata), ma applicare
+    // il risultato stale sovrascriverebbe il DOM della nuova vista.
+    if (wasCalendarActive) {
+      const postState = getState();
+      if (postState.currentView !== 'calendar') return;
+      if (postState.currentShowId !== null) return;
+    }
     renderCalendarContent(main, result.week, result.afterWeek, result.weekStart, result.weekEnd);
   } catch (e) {
     if (myToken !== _calendarRenderToken) return;
+    // BUG-A13-01: stessa protezione cross-view nel path di errore.
+    if (wasCalendarActive) {
+      const postState = getState();
+      if (postState.currentView !== 'calendar') return;
+      if (postState.currentShowId !== null) return;
+    }
     console.error('[calendar] error:', e);
     main.innerHTML =
       '<h1 class="page-title">Calendario</h1>' +

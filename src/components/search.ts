@@ -207,6 +207,13 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     return;
   }
   // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
+  // BUG-A16-01: catturiamo searchSeq PRIMA che invalidateCurrentSearch lo
+  // incrementi. Dopo l'await, se searchSeq è cambiato (l'utente ha digitato
+  // durante l'await di addShowToList), NON dobbiamo clearare l'input —
+  // l'utente ha iniziato una nuova ricerca e clearing cancellerebbe la sua
+  // query mentre i nuovi risultati verrebbero renderizzati su un input
+  // (erroneamente) vuoto. Vedere test BUG-A16-01 in probe_a16.test.ts.
+  const seqBefore = searchSeq;
   invalidateCurrentSearch();
   // BUG-10-05: NON clearare l'input qui — aspetta il risultato di addShowToList.
   // Se addShowToList fallisce (es. già in lista), l'utente può riprovare.
@@ -217,10 +224,22 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   lastSearchResults = [];
   searchSelectedIdx = -1;
   setExpanded(false);
-  const result = await addShowToList(show, list);
-  // BUG-10-05: clear input solo se addShowToList ha avuto successo (truthy).
-  if (result && _searchInput) {
-    _searchInput.value = '';
+  try {
+    // BUG-A16-03: defense-in-depth — addShowToList ha il suo try/catch e
+    // non dovrebbe mai lanciare, ma se lo fa (bug futuro o input anomalo)
+    // non vogliamo un unhandled rejection. Mostriamo un toast e bail.
+    const result = await addShowToList(show, list);
+    // BUG-10-05: clear input solo se addShowToList ha avuto successo (truthy).
+    // BUG-A16-01: AND solo se l'utente non ha digitato durante l'await
+    // (searchSeq deve essere ancora seqBefore + 1, ovvero solo l'incremento
+    // di invalidateCurrentSearch — nessun input handler ha incrementato
+    // ulteriormente, nessun doSearch è partito).
+    if (result && _searchInput && searchSeq === seqBefore + 1) {
+      _searchInput.value = '';
+    }
+  } catch (e) {
+    console.error('[search] selectSearchResult error:', e);
+    showToast('Errore aggiunta serie', 'error');
   }
 }
 
@@ -317,12 +336,31 @@ export function initSearch(): void {
     }
   });
 
-  document.addEventListener('click', (e) => {
+  // BUG-A16-04: il listener su `document` è globale e NON viene rimosso
+  // quando il DOM viene re-renderizzato (a differenza dei listener su
+  // _searchInput/_searchResults, che sono su elementi figli e vengono
+  // GC'd insieme all'elemento). Su re-init (SPA navigation, HMR, test con
+  // vi.resetModules), i vecchi listener accumulerebbero su `document`,
+  // ognuno referenziando il vecchio stato del modulo (detached DOM, stale
+  // controllers) — leak di memoria + CPU sprecata su ogni click.
+  // Soluzione: memorizziamo l'handler su `document` e rimuoviamo il
+  // vecchio prima di aggiungere il nuovo, garantendo un solo listener.
+  const DOC_CLICK_KEY = '__ploppytvSearchDocClickHandler';
+  const docAny = document as unknown as {
+    [key: string]: ((e: MouseEvent) => void) | undefined;
+  };
+  const prevDocClickHandler = docAny[DOC_CLICK_KEY];
+  if (prevDocClickHandler) {
+    document.removeEventListener('click', prevDocClickHandler);
+  }
+  const docClickHandler = (e: MouseEvent): void => {
     if (!(e.target as HTMLElement).closest('.search-wrap')) {
       // BUG-10-03: clear completo anche su click outside.
       clearSearchState();
     }
-  });
+  };
+  docAny[DOC_CLICK_KEY] = docClickHandler;
+  document.addEventListener('click', docClickHandler);
 }
 
 export { ApiError };

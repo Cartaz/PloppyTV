@@ -1,12 +1,12 @@
 // Azioni sulle serie: add, remove, move, toggle episode, mark season
 
-import type { ListName, Show, TvmazeShow } from '../types';
+import type { Episode, ListName, Show, TvmazeShow } from '../types';
 import { ALLOWED_LISTS } from '../types';
 import { getState, setState, emitChange, replaceShow, removeShowFromState, updateShowListStatus } from './store';
 import { saveData } from './storage';
 import { buildShowFromTvmaze } from './normalize';
 import { getShowEpisodes, ApiError } from './api';
-import { safeId } from './utils';
+import { safeId, stripHtml, parseISODateLocal } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { updateBadges } from '../components/header';
@@ -22,6 +22,14 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
   const showId = safeId(tvmazeShow.id);
   if (!showId) {
     showToast('ID serie non valido', 'error');
+    return null;
+  }
+  // BUG-A6-10: valida `list` — un valore non in ALLOWED_LISTS causerebbe
+  // `buildShowFromTvmaze` a fare fallback a 'towatch', ma poi la riga
+  // `if (list !== 'towatch') show.manualList = true` imposterebbe manualList=true,
+  // lasciando lo stato inconsistente (list='towatch', manualList=true).
+  if (!ALLOWED_LISTS.includes(list)) {
+    showToast('Lista non valida', 'error');
     return null;
   }
   const state = getState();
@@ -142,8 +150,12 @@ export function moveShowToList(showId: number, list: ListName): void {
 export function toggleEpisode(showId: number, seasonNum: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  if (!show || !show.seasons[seasonNum]) return;
-  const ep = show.seasons[seasonNum].find((e) => e.num === epNum);
+  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  // Prima, `!show.seasons[seasonNum]` lanciava TypeError se show.seasons era undefined.
+  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
+  const seasonArr = show.seasons[seasonNum];
+  if (!Array.isArray(seasonArr)) return;
+  const ep = seasonArr.find((e) => e && e.num === epNum);
   if (!ep) return;
   const prevWatched = ep.watched;
   const prevList = show.list;
@@ -165,11 +177,14 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
 export function markSeasonWatched(showId: number, seasonNum: number, watched: boolean): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  if (!show || !show.seasons[seasonNum]) return;
-  const prevEps = show.seasons[seasonNum].map((e) => ({ ...e }));
+  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
+  const seasonArr = show.seasons[seasonNum];
+  if (!Array.isArray(seasonArr)) return;
+  const prevEps = seasonArr.map((e) => ({ ...e }));
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
-  show.seasons[seasonNum].forEach((ep) => {
+  seasonArr.forEach((ep) => {
     ep.watched = watched;
   });
   updateShowListStatus(show);
@@ -198,7 +213,9 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
 
   const state = getState();
   const show = state.shows.find((s) => s.id === id);
-  if (!show) {
+  // BUG-A6-06: guard show.seasons — su dati corrotti potrebbe essere null/array.
+  // Prima, `JSON.parse(JSON.stringify(show.seasons))` su undefined lanciava SyntaxError.
+  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) {
     _refreshInFlight.delete(id);
     return false;
   }
@@ -212,20 +229,42 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
 
   try {
     const episodes = await getShowEpisodes(id);
+    // BUG-A6-05: defensive — se la risposta API non è un array, abort (non crashare).
+    if (!Array.isArray(episodes)) {
+      if (!opts?.silent) showToast('Risposta API non valida', 'error');
+      return false;
+    }
+    // BUG-A6-04: se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
+    // i dati utente (potrebbe essere un glitch temporaneo dell'API o un 200 OK vuoto).
+    if (episodes.length === 0 && Object.keys(show.seasons).length > 0) {
+      if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
+      return false;
+    }
     // Mantiene watched state esistente, aggiorna name/airdate/runtime
     // BUG-06-04: matched by TVMaze id (più stabile di num quando TVMaze renumber).
     const newSeasons: Show['seasons'] = {};
     let totalEpisodes = 0;
+    // BUG-A6-03: dedup per num dentro ogni stagione (allineato a buildShowFromTvmaze).
+    const seenNumsPerSeason: Record<number, Set<number>> = {};
     for (const ep of episodes) {
       if (ep.season == null || ep.season === 0) continue;
       if (ep.number == null) continue;
       const sn = safeId(ep.season);
       if (!sn) continue;
-      if (!newSeasons[sn]) newSeasons[sn] = [];
       const epId = safeId(ep.id);
       const epNum = safeId(ep.number);
+      // BUG-A6-02: skip episodi con num=0 (allineato a buildShowFromTvmaze/normalizeShow).
+      // Prima venivano aggiunti con num:0, gonfiando totalEpisodes e rompendo la UI.
+      if (!epNum) continue;
+      if (!newSeasons[sn]) {
+        newSeasons[sn] = [];
+        seenNumsPerSeason[sn] = new Set();
+      }
+      // BUG-A6-03: dedup — primo tenuto, duplicati saltati (allineato a buildShowFromTvmaze).
+      if (seenNumsPerSeason[sn].has(epNum)) continue;
+      seenNumsPerSeason[sn].add(epNum);
       // BUG-06-04: prima prova match by id (stable TVMaze id).
-      let existingEp: { watched?: boolean } | undefined;
+      let existingEp: Episode | undefined;
       for (const seasonArr of Object.values(show.seasons)) {
         if (!Array.isArray(seasonArr)) continue;
         const found = seasonArr.find((e) => e && e.id === epId);
@@ -236,16 +275,41 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       }
       // Fallback: match by num nella stessa stagione (backward compat).
       if (!existingEp) {
-        existingEp = show.seasons[sn]?.find((e) => e.num === epNum);
+        const arr = show.seasons[sn];
+        if (Array.isArray(arr)) existingEp = arr.find((e) => e && e.num === epNum);
       }
-      newSeasons[sn].push({
+      // BUG-A6-01: preserva rating e note dall'episodio esistente.
+      // Prima, il nuovo episodio copiava solo watched/airdate/name/runtime,
+      // perdendo rating e note personali dell'utente ad ogni refresh.
+      // BUG-A19-01: valida airdate con parseISODateLocal (strict) invece della
+      // regex loose /^\d{4}-\d{2}-\d{2}$/ che accettava date inesistenti come
+      // '2024-13-40' o '2024-02-30' (rollover). Allineato a normalize.ts.
+      // BUG-A19-02: stripHtml su ep.name (defense-in-depth, allineato a
+      // normalize.ts safeEpisodeName) — ep.name arriva dall'API TVMaze e potrebbe
+      // contenere HTML; senza strip, un renderer distratto genererebbe XSS.
+      const epName =
+        typeof ep.name === 'string' && stripHtml(ep.name).trim().length > 0
+          ? stripHtml(ep.name).trim().slice(0, 300)
+          : null;
+      const newEp: Episode = {
         num: epNum,
         id: epId,
         watched: existingEp?.watched ?? false,
-        airdate: typeof ep.airdate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ep.airdate) ? ep.airdate : null,
-        name: typeof ep.name === 'string' ? ep.name.slice(0, 300) : null,
+        airdate:
+          typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null
+            ? ep.airdate
+            : null,
+        name: epName,
         runtime: typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : null,
-      });
+      };
+      if (existingEp && typeof existingEp.rating === 'number' && Number.isFinite(existingEp.rating)) {
+        const r = Math.round(existingEp.rating);
+        if (r >= 1 && r <= MAX_EPISODE_RATING) newEp.rating = r;
+      }
+      if (existingEp && typeof existingEp.note === 'string' && existingEp.note.length > 0) {
+        newEp.note = existingEp.note.slice(0, MAX_EPISODE_NOTE_LENGTH);
+      }
+      newSeasons[sn].push(newEp);
       totalEpisodes++;
     }
 
@@ -304,8 +368,11 @@ export function showNeedsEpisodeNames(show: Show): boolean {
 export function setEpisodeRating(showId: number, seasonNum: number, epNum: number, rating: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  if (!show || !show.seasons[seasonNum]) return;
-  const ep = show.seasons[seasonNum].find((e) => e.num === epNum);
+  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
+  const seasonArr = show.seasons[seasonNum];
+  if (!Array.isArray(seasonArr)) return;
+  const ep = seasonArr.find((e) => e && e.num === epNum);
   if (!ep) return;
 
   // Valida rating: 0 = rimuovi, 1..MAX = valido.
@@ -339,8 +406,11 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
 export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  if (!show || !show.seasons[seasonNum]) return;
-  const ep = show.seasons[seasonNum].find((e) => e.num === epNum);
+  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
+  const seasonArr = show.seasons[seasonNum];
+  if (!Array.isArray(seasonArr)) return;
+  const ep = seasonArr.find((e) => e && e.num === epNum);
   if (!ep) return;
 
   const trimmed = typeof note === 'string' ? note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim() : '';
@@ -369,10 +439,11 @@ export function addShowTag(showId: number, tag: string): boolean {
   const trimmed = typeof tag === 'string' ? tag.trim().slice(0, MAX_TAG_LENGTH) : '';
   if (trimmed.length === 0) return false;
 
-  const tags = show.tags ?? [];
+  // BUG-A6-09: defensive — show.tags potrebbe non essere un array su dati corrotti.
+  const tags = Array.isArray(show.tags) ? show.tags : [];
   // Dedup case-insensitive: se "Estate" esiste, "estate" non viene aggiunto.
   const lower = trimmed.toLowerCase();
-  if (tags.some((t) => t.toLowerCase() === lower)) {
+  if (tags.some((t) => typeof t === 'string' && t.toLowerCase() === lower)) {
     showToast('Tag già presente', 'warning');
     return false;
   }
@@ -399,10 +470,13 @@ export function addShowTag(showId: number, tag: string): boolean {
 export function removeShowTag(showId: number, tag: string): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  if (!show || !show.tags || show.tags.length === 0) return;
+  // BUG-A6-08: tag non-string causerebbe TypeError su toLowerCase().
+  // BUG-A6-09: show.tags non-array causerebbe TypeError su filter()/length.
+  if (!show || !Array.isArray(show.tags) || show.tags.length === 0) return;
+  if (typeof tag !== 'string') return;
   const lower = tag.toLowerCase();
   const prevTags = show.tags;
-  show.tags = show.tags.filter((t) => t.toLowerCase() !== lower);
+  show.tags = show.tags.filter((t) => typeof t === 'string' && t.toLowerCase() !== lower);
 
   if (show.tags.length === prevTags.length) return; // nessun cambiamento
 
@@ -463,7 +537,8 @@ export function getAllUserTags(): string[] {
   const state = getState();
   const set = new Set<string>();
   for (const show of state.shows) {
-    if (show.tags) for (const t of show.tags) set.add(t);
+    // BUG-A6-09: defensive — show.tags potrebbe non essere un array su dati corrotti.
+    if (Array.isArray(show.tags)) for (const t of show.tags) if (typeof t === 'string') set.add(t);
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

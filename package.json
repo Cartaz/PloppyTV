@@ -1,6 +1,6 @@
 {
   "name": "ploppytv",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "PloppyTV - Tracker personale per serie TV (PWA)",
   "type": "module",
   "scripts": {

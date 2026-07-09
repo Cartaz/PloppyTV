@@ -4,20 +4,28 @@ import { getState, openShow, closeShow, switchView } from '../lib/store';
 import { initImageFallback } from './imageFallback';
 import { updateBadges } from './header';
 import { showToast } from './toast';
+import { safeId } from '../lib/utils';
 
 let _mainEl: HTMLElement | null = null;
 let _boundDelegated = false;
 
-function getMain(): HTMLElement {
-  if (!_mainEl) _mainEl = document.getElementById('mainContent') as HTMLElement;
+/**
+ * BUG-A17-05 (FIXED): getMain ritorna HTMLElement | null (prima castava a
+ * HTMLElement senza null-check). Se mainContent non esiste (test/DOM parziale),
+ * il cast mentiva e .addEventListener crashava con TypeError.
+ */
+function getMain(): HTMLElement | null {
+  if (!_mainEl) _mainEl = document.getElementById('mainContent');
   return _mainEl;
 }
 
 // Delegazione globale eventi click su [data-action] (un solo handler per tutto il main)
 function bindDelegatedEvents(): void {
   if (_boundDelegated) return;
-  _boundDelegated = true;
   const main = getMain();
+  // BUG-A17-05: null-check — se main non esiste, esci senza crashare.
+  if (!main) return;
+  _boundDelegated = true;
   initImageFallback();
 
   main.addEventListener('click', (e) => {
@@ -27,7 +35,11 @@ function bindDelegatedEvents(): void {
     const action = actionEl.dataset.action;
 
     if (action === 'openShow') {
-      const id = Number(actionEl.dataset.showId);
+      // BUG-A17-06 (FIXED): usa safeId invece di Number() per validare
+      // l'ID. Number() accetta "0x10" (hex→16), "1e3" (sci→1000),
+      // "123.5" (float→123.5 truthy), "  123  " (whitespace). safeId
+      // rifiuta tutti questi casi (solo interi decimali positivi).
+      const id = safeId(actionEl.dataset.showId);
       if (id) openShow(id);
       return;
     }
@@ -38,6 +50,14 @@ function bindDelegatedEvents(): void {
     if (action === 'switchView') {
       const view = actionEl.dataset.view;
       if (view) switchView(view);
+      return;
+    }
+    // BUG-A17-07 (FIXED): action reloadPage per evitare inline onclick
+    // (CSP-safe). Il fallback di safeImport usava onclick="location.reload()"
+    // che viola CSP strict (no inline event handlers). Ora il button usa
+    // data-action e viene gestito qui.
+    if (action === 'reloadPage') {
+      location.reload();
       return;
     }
     // Azioni specifiche vista sono gestite nei rispettivi bindXxxEvents
@@ -67,11 +87,12 @@ async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promi
     return await chunkPromise;
   } catch (e) {
     console.error('[renderer] chunk load failed:', e);
+    // BUG-A17-07: usa data-action invece di inline onclick (CSP-safe).
     main.innerHTML =
       '<div class="empty-state">' +
       '<div class="empty-state-title">Errore caricamento vista</div>' +
       '<div class="empty-state-text">Ricarica la pagina per riprovare. Se il problema persiste, svuota la cache del browser.</div>' +
-      '<button class="btn btn-primary" style="margin-top:12px;" onclick="location.reload()">Ricarica</button>' +
+      '<button class="btn btn-primary" data-action="reloadPage" style="margin-top:12px;">Ricarica</button>' +
       '</div>';
     showToast('Errore caricamento modulo — ricarica la pagina', 'error');
     return null;
@@ -81,6 +102,8 @@ async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promi
 async function _doRender(): Promise<void> {
   const myToken = ++_renderToken;
   const main = getMain();
+  // BUG-A17-05: null-check — se main non esiste, esci senza crashare.
+  if (!main) return;
   const state = getState();
 
   // Aggiorna nav active
@@ -97,6 +120,12 @@ async function _doRender(): Promise<void> {
     // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
     mod.resetBoundGuard();
     mod.renderShowDetail(main);
+    // BUG-A17-08 (FIXED): se renderShowDetail ha bailato (closeShow ha nullato
+    // currentShowId perché il show non esiste), NON chiamare bindShowDetailEvents.
+    // Prima il renderer bindava incondizionatamente, legando listener al DOM
+    // della vista precedente (renderShowDetail ritorna senza modificare
+    // main.innerHTML quando il show non esiste → listener su DOM stale).
+    if (!getState().currentShowId) return;
     mod.bindShowDetailEvents(main);
     return;
   }

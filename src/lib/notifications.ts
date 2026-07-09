@@ -16,7 +16,7 @@
 
 import { getState } from './store';
 import { findNextEpisode, parseISODateLocal } from './utils';
-import { PREFS_KEY, NOTIF_LEAD_TIME_MS, NOTIF_RESCHEDULE_INTERVAL_MS } from './constants';
+import { PREFS_KEY, NOTIF_LEAD_TIME_MS, NOTIF_RESCHEDULE_INTERVAL_MS, NOTIF_MAX_DELAY_MS } from './constants';
 import { t } from './i18n';
 
 interface Prefs {
@@ -26,6 +26,11 @@ interface Prefs {
 let _scheduledTimers: ReturnType<typeof setTimeout>[] = [];
 let _rescheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let _initialized = false;
+// BUG-A8-09 (FIXED): salviamo il riferimento al listener per poterlo
+// rimuovere in _resetNotificationsForTesting (e in futuro in un eventuale
+// destroyNotifications per HMR). Prima il listener era anonimo e accumulava
+// in test con module reload.
+let _rescheduleListener: (() => void) | null = null;
 
 function loadPrefs(): Prefs {
   try {
@@ -157,13 +162,21 @@ export function scheduleNotifications(): void {
     // Salta se la notifica dovrebbe già essere passata (con un margine di 1 minuto)
     if (notifTime <= now + 60000) continue;
 
-    // Salta se la notifica è troppo lontana nel futuro (oltre 30 giorni)
-    // — evita di accumulare troppi timer. Il re-schedule periodico li riprenderà.
-    if (notifTime > now + 30 * 24 * 60 * 60 * 1000) continue;
+    // BUG-A8-04 (FIXED): salta se la notifica eccede il delay massimo sicuro
+    // per setTimeout (2^31-1 ms ~ 24.85 giorni). Prima il guard era 30 giorni
+    // (2.59B ms > 2^31-1), causando overflow int32 e fire immediato del timer.
+    // Ora usiamo NOTIF_MAX_DELAY_MS (24 giorni) — il re-schedule periodico
+    // ogni 6h riprendera' le notifiche quando rientrano in finestra.
+    if (notifTime > now + NOTIF_MAX_DELAY_MS) continue;
 
     const showName = show.name;
     const season = nextEp.season;
     const epNum = nextEp.num;
+
+    // BUG-A8-11 (FIXED): defense-in-depth — se season/epNum non sono finiti
+    // (non dovrebbe succedere dopo BUG-A3-07, ma per sicurezza), salta la
+    // notifica invece di creare un body/tag malformato ("SNaNEInfinity").
+    if (!Number.isFinite(season) || !Number.isFinite(epNum)) continue;
 
     const timer = setTimeout(() => {
       try {
@@ -213,11 +226,31 @@ export function initNotifications(): void {
 
   // Re-schedula quando lo stato cambia (es. aggiunta/rimozione serie, toggle episodio)
   // Usiamo un evento custom per evitare import circolari con store.ts
-  window.addEventListener('ploppytv:reschedule-notifications', () => {
+  // BUG-A8-09 (FIXED): salviamo il riferimento per poterlo rimuovere.
+  _rescheduleListener = () => {
     if (notificationsEnabled()) {
       scheduleNotifications();
     }
-  });
+  };
+  window.addEventListener('ploppytv:reschedule-notifications', _rescheduleListener);
+}
+
+/**
+ * Resetta lo stato delle notifiche (solo per testing). Rimuove il listener
+ * window, cancella tutti i timer e resetta il flag _initialized.
+ * NON usare in produzione.
+ */
+export function _resetNotificationsForTesting(): void {
+  clearScheduledNotifications();
+  if (_rescheduleListener) {
+    try {
+      window.removeEventListener('ploppytv:reschedule-notifications', _rescheduleListener);
+    } catch {
+      // ignore — window non disponibile o listener già rimosso
+    }
+    _rescheduleListener = null;
+  }
+  _initialized = false;
 }
 
 /**

@@ -98,16 +98,32 @@ async function fetchAllCandidates(
     }
   }
 
+  // BUG-A7-02 (FIXED): cancel any pending progress RAF so onProgress is not
+  // invoked after the fetch has settled. The RAF was scheduled in the last
+  // page's `finally` and would fire on the next animation frame, leaking a
+  // final callback to the caller who already received the resolved data.
+  if (progressRAF !== null) {
+    cancelAnimationFrame(progressRAF);
+    progressRAF = null;
+  }
+
   const all: TvmazeShow[] = [];
   for (const pageShows of results) {
     for (const show of pageShows) {
       // BUG-07-03: weight=0 is INCLUDED (valid TVMaze value). Missing/negative excluded.
       if (!show || !show.image || !show.name) continue;
-      if (show.weight === undefined || show.weight === null || show.weight < 0) continue;
+      // BUG-A7-04 (FIXED): non-numeric weight (string "abc", null, undefined) and
+      // non-finite (NaN/Infinity) are now excluded via typeof + isFinite check.
+      // Old code: `weight < 0` is false for NaN (NaN < 0 === false), so a string
+      // weight would slip through and poison the sort comparator with NaN.
+      if (typeof show.weight !== 'number' || !Number.isFinite(show.weight) || show.weight < 0) continue;
       if (recentOnly) {
         if (!show.premiered) continue;
         const d = parseISODateLocal(show.premiered);
-        if (!d || d < sixMonthsAgo!) continue;
+        // BUG-A7-01 (FIXED): exclude shows premiered in the FUTURE. "Recent" means
+        // "aired in the last 6 months", not "will air eventually". A show with
+        // premiered='2099-01-01' would otherwise pass `d >= sixMonthsAgo`.
+        if (!d || d < sixMonthsAgo! || d.getTime() > Date.now()) continue;
       }
       all.push(show);
     }
@@ -116,8 +132,11 @@ async function fetchAllCandidates(
   all.sort((a, b) => {
     const wDiff = (b.weight || 0) - (a.weight || 0);
     if (wDiff !== 0) return wDiff;
-    const rA = a.rating?.average ?? 0;
-    const rB = b.rating?.average ?? 0;
+    // BUG-A7-05 (FIXED): coerce rating.average to a finite number. A non-numeric
+    // value (string "abc") would otherwise yield NaN in the comparator, leaving
+    // the sort order undefined. `Number(x) || 0` maps NaN/null/undefined to 0.
+    const rA = Number(a.rating?.average) || 0;
+    const rB = Number(b.rating?.average) || 0;
     return rB - rA;
   });
   return { shows: all, failedPages };
@@ -129,24 +148,35 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
   groups._other = [];
   const assignedIds = new Set<number>();
 
+  // Helper: find the first matching carousel genre that STILL HAS SPACE.
+  // BUG-A7-06 (FIXED): the old code picked the first matching genre regardless
+  // of whether that carousel was full, then redirected to _other. A show with
+  // genres ['Drama','Comedy'] where Comedy was at cap would go to _other even
+  // if Drama still had space. Now we try every matching genre in carousel
+  // order and pick the first with room.
+  const findGenreWithSpace = (genres: string[]): string | null => {
+    for (const targetGenre of GENRE_CAROUSELS) {
+      if (genres.includes(targetGenre) && groups[targetGenre].length < DISCOVER_TARGET_PER_GENRE) {
+        return targetGenre;
+      }
+    }
+    return null;
+  };
+
   // FASE 1
   for (const show of candidates) {
     if (assignedIds.has(show.id)) continue;
     const genres = Array.isArray(show.genres) ? show.genres : [];
-    let assigned: string | null = null;
-    for (const targetGenre of GENRE_CAROUSELS) {
-      if (genres.includes(targetGenre)) {
-        assigned = targetGenre;
-        break;
-      }
-    }
+    const assigned = findGenreWithSpace(genres);
     if (assigned) {
-      if (groups[assigned].length < DISCOVER_TARGET_PER_GENRE) {
-        groups[assigned].push(show);
-        assignedIds.add(show.id);
-      }
+      groups[assigned].push(show);
+      assignedIds.add(show.id);
     } else {
-      if (groups._other.length < DISCOVER_TARGET_OTHER) {
+      // Only route to _other in FASE 1 if the show has NO matching carousel
+      // genre at all. If it has a matching genre but all are at cap, leave it
+      // for FASE 2 (which may spill it to _other).
+      const hasAnyCarouselGenre = genres.some((g) => GENRE_CAROUSELS.includes(g));
+      if (!hasAnyCarouselGenre && groups._other.length < DISCOVER_TARGET_OTHER) {
         groups._other.push(show);
         assignedIds.add(show.id);
       }
@@ -154,6 +184,8 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
   }
 
   // FASE 2: ridistribuzione deficit — BUG-07-01/02: rispetta i cap per-genre e _other.
+  // BUG-A7-06 (FIXED): uses findGenreWithSpace so multi-genre shows fill any
+  // carousel with room before falling back to _other.
   let total = 0;
   for (const g of GENRE_CAROUSELS) total += groups[g].length;
   total += groups._other.length;
@@ -165,32 +197,17 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
       if (added >= deficit) break;
       if (assignedIds.has(show.id)) continue;
       const genres = Array.isArray(show.genres) ? show.genres : [];
-      let assigned: string | null = null;
-      for (const targetGenre of GENRE_CAROUSELS) {
-        if (genres.includes(targetGenre)) {
-          assigned = targetGenre;
-          break;
-        }
-      }
+      const assigned = findGenreWithSpace(genres);
       if (assigned) {
-        // BUG-07-01: non superare il cap per-genre.
-        if (groups[assigned].length < DISCOVER_TARGET_PER_GENRE) {
-          groups[assigned].push(show);
-          assignedIds.add(show.id);
-          added++;
-        } else if (groups._other.length < DISCOVER_TARGET_OTHER) {
-          // Spillover: genre at cap → redirect to _other (BUG-07-02 cap enforced).
-          groups._other.push(show);
-          assignedIds.add(show.id);
-          added++;
-        }
-      } else {
-        // BUG-07-02: non superare il cap _other.
-        if (groups._other.length < DISCOVER_TARGET_OTHER) {
-          groups._other.push(show);
-          assignedIds.add(show.id);
-          added++;
-        }
+        groups[assigned].push(show);
+        assignedIds.add(show.id);
+        added++;
+      } else if (groups._other.length < DISCOVER_TARGET_OTHER) {
+        // No matching genre with space (either no carousel genre, or all at
+        // cap). Spillover to _other, respecting its cap (BUG-07-02).
+        groups._other.push(show);
+        assignedIds.add(show.id);
+        added++;
       }
     }
   }
@@ -225,6 +242,18 @@ function readCache(key: string): DiscoverGroups | null {
     // BUG-07-05: groups deve essere un oggetto non-null con chiavi array.
     if (!cached.groups || typeof cached.groups !== 'object' || Array.isArray(cached.groups)) {
       return null;
+    }
+    // BUG-A7-03 (FIXED): validate that each expected genre key (and _other),
+    // if present, is an array. A corrupted cache like `{ Drama: "not-an-array" }`
+    // would otherwise be returned as-is, crashing the view's `for (const show
+    // of shows)` loop (iterating characters of the string). Reject the cache
+    // and fall back to a fresh fetch.
+    const groupsRecord = cached.groups as Record<string, unknown>;
+    for (const key of [...GENRE_CAROUSELS, '_other']) {
+      const v = groupsRecord[key];
+      if (v !== undefined && !Array.isArray(v)) {
+        return null;
+      }
     }
     return cached.groups;
   } catch {

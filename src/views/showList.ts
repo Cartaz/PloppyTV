@@ -1,15 +1,49 @@
 // Vista generica lista serie (watching / towatch / completed)
 // P2.3: filtro per tag personalizzabili
+//
+// FIXES applicati:
+//  - BUG-A10-02 [MEDIUM]: _activeTag era state module-level che persisteva
+//    across list switches. Se l'utente filtrava per tag "drama" nella
+//    lista "watching" e poi switchava a "completed" (che non contiene
+//    quel tag), la tag-filter-bar spariva (tagsInList vuoto), l'empty-state
+//    mostrava "Nessuna serie con il tag drama" e l'utente era intrappolato
+//    senza UI per clearare il filtro. Fix: (a) reset _activeTag quando
+//    `list` cambia; (b) renderizza sempre il chip "Tutti" quando c'è un
+//    _activeTag set (anche se tagsInList è vuoto), così l'utente può
+//    sempre clearare.
+//  - BUG-A10-03 [MEDIUM]: la navigazione via tastiera (Enter/Space su
+//    role="button") era rotta se l'utente atterrava su una lista senza
+//    prima renderizzare la dashboard (es. currentView restaurato da
+//    storage). Root cause: bindKeydown era chiamato solo da renderDashboard.
+//    Fix: importato bindKeydown da dashboard.ts e richiamato qui.
 
 import { getState } from '../lib/store';
 import { escapeHtml, escapeAttr } from '../lib/utils';
-import { showCardHtml } from './dashboard';
+import { showCardHtml, bindKeydown } from './dashboard';
 import { getAllUserTags } from '../lib/shows';
 
-// Stato filtro tag (persiste durante la sessione)
+// Stato filtro tag (persiste durante la sessione, ma resetta al cambio lista)
 let _activeTag: string = '';
+// BUG-A10-02: traccia la lista precedente per resettare _activeTag al cambio.
+let _previousList: 'watching' | 'towatch' | 'completed' | '' = '';
+
+/**
+ * Resetta lo stato interno della vista (solo per testing). NON usare in prod.
+ */
+export function _resetShowListStateForTesting(): void {
+  _activeTag = '';
+  _previousList = '';
+}
 
 export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' | 'completed', title: string): void {
+  // BUG-A10-02: reset _activeTag quando l'utente cambia lista. Prima il
+  // filter persisteva across le liste, intrappolando l'utente se il tag
+  // non esisteva nella nuova lista (nessun chip "Tutti" renderizzato).
+  if (_previousList !== list) {
+    _activeTag = '';
+    _previousList = list;
+  }
+
   let shows = getState().shows.filter((s) => s.list === list);
 
   // Se c'è un tag attivo, filtra
@@ -25,7 +59,11 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
     getState().shows.some((s) => s.list === list && (s.tags || []).some((t) => t.toLowerCase() === tag.toLowerCase())),
   );
 
-  if (tagsInList.length > 0) {
+  // BUG-A10-02: mostra la tag-filter-bar se ci sono tag nella lista OPPURE
+  // se c'è un _activeTag set (così l'utente può sempre clearare via "Tutti",
+  // anche se il tag attivo non esiste più in nessuna serie — es. rimosso
+  // dall'utente o serie eliminata).
+  if (tagsInList.length > 0 || _activeTag !== '') {
     html += '<div class="tag-filter-bar">';
     html += '<button class="tag-filter-chip' + (_activeTag === '' ? ' active' : '') + '" data-tag="">Tutti</button>';
     for (const tag of tagsInList) {
@@ -60,4 +98,10 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
       renderShowList(main, list, title);
     });
   });
+
+  // BUG-A10-03: bind keydown (Enter/Space su role="button") — deferred a
+  // bindKeydown della dashboard, che è idempotente (WeakSet). Così la
+  // tastiera funziona anche se l'utente atterra qui senza prima passare
+  // dalla dashboard.
+  bindKeydown(main);
 }

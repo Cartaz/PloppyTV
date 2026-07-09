@@ -31,15 +31,48 @@ export function safeWeekOffset(weekOffset: number): number {
   return Number.isFinite(weekOffset) ? Math.floor(weekOffset) : 0;
 }
 
-export function computeStats(shows: Show[]): StatsResult {
-  const totalShows = shows.length;
-  const totalWatched = shows.reduce((sum, s) => sum + getWatchedCount(s), 0);
-  const totalEpisodes = shows.reduce((sum, s) => sum + safeNum(s.totalEpisodes), 0);
-  const completedShows = shows.filter((s) => s.list === 'completed').length;
-  const watchingShows = shows.filter((s) => s.list === 'watching').length;
-  const towatchShows = shows.filter((s) => s.list === 'towatch').length;
+/**
+ * BUG-A9-01 / BUG-A9-02 / BUG-A9-03 (FIXED): defensive `shows` array guard.
+ *
+ * Both `computeStats` and `computeCalendar` are invoked with
+ * `getState().shows` (the LIVE state reference, NOT the filtered
+ * `getStateSnapshot()`). `getStateSnapshot()` filters null/non-object
+ * entries, but `getState().shows` does not. `setShows` (store.ts) only
+ * validates `Array.isArray(shows)` — it does NOT filter individual entries.
+ *
+ * A corrupt import / storage recovery / multi-tab race could leave
+ * null/undefined/non-object entries in `state.shows`. Without this guard:
+ *   - `computeStats`: `s.totalEpisodes` / `s.list` / `s.genres` access on
+ *     null throws TypeError → worker emits `{type:'error'}` → client
+ *     fallback calls `computeStats(shows)` AGAIN on the main thread →
+ *     same crash. Because the crash happens inside an event handler
+ *     (or setTimeout callback), it is NOT caught by the Promise
+ *     constructor → the promise HANGS FOREVER (BUG-A9-06).
+ *   - `computeCalendar`: `show.list !== 'watching'` on null throws
+ *     TypeError → same hang cascade.
+ *
+ * This helper filters to valid Show-shaped entries so the compute functions
+ * never crash on corrupt array elements. Non-array input (defense-in-depth
+ * for a malformed worker message with `msg.shows` missing/non-array)
+ * collapses to an empty array.
+ */
+function safeShows(shows: unknown): Show[] {
+  if (!Array.isArray(shows)) return [];
+  return shows.filter((s): s is Show => s != null && typeof s === 'object');
+}
 
-  const totalMinutes = shows.reduce((sum, s) => sum + getWatchedCount(s) * (safeNum(s.runtime) || 45), 0);
+export function computeStats(shows: Show[]): StatsResult {
+  // BUG-A9-01 / BUG-A9-03: filter null/non-object entries and guard against
+  // non-array input. See `safeShows` doc for the full rationale.
+  const validShows = safeShows(shows);
+  const totalShows = validShows.length;
+  const totalWatched = validShows.reduce((sum, s) => sum + getWatchedCount(s), 0);
+  const totalEpisodes = validShows.reduce((sum, s) => sum + safeNum(s.totalEpisodes), 0);
+  const completedShows = validShows.filter((s) => s.list === 'completed').length;
+  const watchingShows = validShows.filter((s) => s.list === 'watching').length;
+  const towatchShows = validShows.filter((s) => s.list === 'towatch').length;
+
+  const totalMinutes = validShows.reduce((sum, s) => sum + getWatchedCount(s) * (safeNum(s.runtime) || 45), 0);
   const totalDays = Math.floor(totalMinutes / 1440);
   const remHours = Math.floor((totalMinutes % 1440) / 60);
   // timeLabel migliorato: include minuti residui se < 1h
@@ -57,9 +90,19 @@ export function computeStats(shows: Show[]): StatsResult {
 
   // Generi
   const genreStats: Record<string, { episodes: number; shows: Set<number> }> = {};
-  for (const s of shows) {
+  for (const s of validShows) {
     const watched = getWatchedCount(s);
-    const genres = Array.isArray(s.genres) && s.genres.length ? s.genres : ['Senza genere'];
+    // BUG-A9-04 (FIXED): dedupe genres within a show AND filter to strings.
+    //   - Duplicate genres (e.g. `['Drama', 'Drama']`) double-counted
+    //     `episodes` (Set dedups `shows` by id, but `episodes += watched`
+    //     ran per-iteration). Corrupt imports or TVMaze glitches could
+    //     list the same genre twice.
+    //   - Non-string elements (numbers, objects, null) would crash
+    //     `a[0].localeCompare(b[0])` during the sort (numbers don't have
+    //     `localeCompare`). Now filtered out before they enter genreStats.
+    const rawGenres = Array.isArray(s.genres) ? s.genres.filter((g): g is string => typeof g === 'string') : [];
+    const dedupedGenres = Array.from(new Set(rawGenres));
+    const genres = dedupedGenres.length ? dedupedGenres : ['Senza genere'];
     for (const g of genres) {
       if (!genreStats[g]) genreStats[g] = { episodes: 0, shows: new Set() };
       genreStats[g].episodes += watched;
@@ -74,7 +117,7 @@ export function computeStats(shows: Show[]): StatsResult {
   // Top serie — clamp pct a [0, 100] per gestire stato inconsistente
   // (watched > totalEpisodes non dovrebbe accadere ma potrebbe a causa di
   // dati corrotti o import malformati).
-  const topShows = shows
+  const topShows = validShows
     .map((s) => {
       const watched = getWatchedCount(s);
       const rawPct = s.totalEpisodes > 0 ? (watched / s.totalEpisodes) * 100 : 0;
@@ -112,6 +155,8 @@ export function computeCalendar(
   // BUG-16-03: guard applied here (shared with worker) so non-finite / non-integer
   // offsets don't produce Invalid Date when the worker is unavailable.
   const offset = safeWeekOffset(weekOffset);
+  // BUG-A9-02: filter null/non-object entries (same rationale as computeStats).
+  const validShows = safeShows(shows);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -124,7 +169,7 @@ export function computeCalendar(
   const week: CalendarEpisode[] = [];
   const afterWeek: CalendarEpisode[] = [];
 
-  for (const show of shows) {
+  for (const show of validShows) {
     if (show.list !== 'watching') continue;
     const nextEp = findNextEpisode(show);
     if (!nextEp || !nextEp.airdate) continue;

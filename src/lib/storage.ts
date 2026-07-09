@@ -14,6 +14,13 @@
 //  - BUG-04-03: storage event con newValue=null NON wipe se ci sono shows locali.
 //  - BUG-04-04: storage event con modal-open o _localDirty NON avanza _lastSavedAt.
 //  - BUG-04-05: QuotaExceeded recovery re-check CAS prima del stripped write.
+//  - BUG-A4-01: loadData() wrap di localStorage.getItem in try/catch (SecurityError).
+//  - BUG-A4-02: backup write valida che `prev` sia JSON valido (non corrotto).
+//  - BUG-A4-03: loadData() + storage event validano parsed.version (future/past).
+//  - BUG-A4-04: CAS check rifiuta anche quando _lastSavedAt=null ma storage ha dati.
+//  - BUG-A4-05: QuotaExceeded recovery CAS check allineato a BUG-A4-04.
+//  - BUG-A4-06: backup recovery valida tipo di backup.savedAt (number + finite).
+//  - BUG-A4-07: savedAt letto con Number.isFinite (NaN rompe CAS: NaN !== NaN).
 
 import type { SavedData, Show } from '../types';
 import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
@@ -48,12 +55,39 @@ let _saveTimer: ReturnType<typeof setTimeout> | null = null;
  */
 let _lastSavedAt: number | null = null;
 
+/**
+ * BUG-A4-07: valida che `savedAt` (o `version`) sia un numero finito.
+ * NaN rompe il CAS perché `NaN !== NaN` è sempre true → ogni save sarebbe
+ * rifiutato. Infinity può causare confronti non significativi.
+ */
+function _validSavedAt(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * BUG-A19-04: dedup show per id (keep first).
+ * localStorage corrotto o race multi-tab può produrre show duplicati per id;
+ * senza dedup, toggleEpisode/stats/calendar ne risentono (conteggi doppi,
+ * show orfani, toggle ambiguo). Allineato al behaviour di exportImport.
+ */
+function _dedupShowsById(shows: Show[]): Show[] {
+  const seen = new Set<number>();
+  const out: Show[] = [];
+  for (const s of shows) {
+    if (!s || typeof s.id !== 'number' || !Number.isFinite(s.id)) continue;
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    out.push(s);
+  }
+  return out;
+}
+
 function _readSavedAtFromStorage(): number | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SavedData;
-    return typeof parsed.savedAt === 'number' ? parsed.savedAt : null;
+    return _validSavedAt(parsed.savedAt);
   } catch {
     return null;
   }
@@ -84,7 +118,11 @@ function _saveDataNow(): boolean {
   // CAS multi-tab: rileggi savedAt da storage. Se diverso da _lastSavedAt,
   // un altro tab ha scritto. Rifiuta la nostra scrittura.
   const currentSavedAt = _readSavedAtFromStorage();
-  if (_lastSavedAt !== null && currentSavedAt !== null && currentSavedAt !== _lastSavedAt) {
+  // BUG-A4-04: rifiuta ANCHE quando _lastSavedAt=null ma storage ha dati.
+  // Scenario: questo tab ha caricato storage vuoto (_lastSavedAt=null), poi un
+  // altro tab ha scritto dati (currentSavedAt≠null). Senza questo fix, il save
+  // procederebbe e sovrascriverebbe silenziosamente i dati dell'altro tab.
+  if (currentSavedAt !== null && currentSavedAt !== _lastSavedAt) {
     showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
     return false;
   }
@@ -117,10 +155,17 @@ function _saveDataNow(): boolean {
   try {
     const prev = localStorage.getItem(STORAGE_KEY);
     if (prev) {
+      // BUG-A4-02: valida che `prev` sia JSON valido prima di backarlo up.
+      // Altrimenti, dopo un corruption-recovery path in loadData (dove
+      // STORAGE_KEY contiene ancora il raw corrotto quando saveData viene
+      // chiamato), BACKUP_KEY verrebbe sovrascritto con JSON corrotto,
+      // distruggendo la safety net per le future corruzioni.
       try {
+        JSON.parse(prev);
         localStorage.setItem(BACKUP_KEY, prev);
       } catch {
-        // ignore
+        // prev è corrotto (o setItem fallito) — skip backup, non clobberare
+        // il backup valido eventualmente già presente in BACKUP_KEY.
       }
     }
     localStorage.setItem(STORAGE_KEY, serialized);
@@ -133,7 +178,9 @@ function _saveDataNow(): boolean {
       // BUG-04-05: re-check CAS prima del stripped write — se un altro tab ha
       // scritto tra il nostro CAS read e il write fallito, abort recovery.
       const recoverSavedAt = _readSavedAtFromStorage();
-      if (prevLastSavedAt !== null && recoverSavedAt !== null && recoverSavedAt !== prevLastSavedAt) {
+      // BUG-A4-05: allineato a BUG-A4-04 — rifiuta anche se prevLastSavedAt
+      // è null (tab non aveva baseline) ma storage ha dati da altro tab.
+      if (recoverSavedAt !== null && recoverSavedAt !== prevLastSavedAt) {
         showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
         return false;
       }
@@ -202,7 +249,19 @@ export function loadData(): void {
     setStorageDisabled(true);
     return;
   }
-  const raw = localStorage.getItem(STORAGE_KEY);
+  // BUG-A4-01: localStorage.getItem può lanciare SecurityError in modalità
+  // privata (Safari) o dopo revoca mid-session dei permessi storage. Senza
+  // questo wrap, loadData crasherebbe e il caller (main.ts) non recupererebbe.
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    _storageOK = false;
+    setShows([]);
+    setStorageDisabled(true);
+    showToast('Archiviazione non disponibile.', 'error');
+    return;
+  }
   if (!raw) {
     _lastSavedAt = null;
     setShows([]);
@@ -223,7 +282,10 @@ export function loadData(): void {
     if (backup && Array.isArray(backup.shows) && backup.shows.length > 0) {
       const shows = backup.shows.map(normalizeShow).filter((s): s is Show => s !== null);
       reconcileAllLists(shows);
-      _lastSavedAt = backup.savedAt ?? null;
+      // BUG-A4-06: valida tipo di backup.savedAt — non trustare stringhe/NaN
+      // (un backup vecchio o malevolo con savedAt="abc" romperebbe il CAS
+      // perché "abc" !== <numero> è sempre true → ogni save futuro rifiutato).
+      _lastSavedAt = _validSavedAt(backup.savedAt);
       setShows(shows);
       showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
       saveData({ immediate: true });
@@ -240,14 +302,59 @@ export function loadData(): void {
     setShows([]);
     return;
   }
+  // BUG-A4-03: valida schema version.
+  // - `version` presente ma non numero finito → dato inatteso/malevolo → scarta.
+  // - `version > SCHEMA_VERSION` (futura) → non sappiamo interpretare il formato
+  //   → tratta come corruption, prova backup, fallback empty.
+  // - `version < SCHEMA_VERSION` (passata) → prosegui con warning (normalizeShow
+  //   è defensive e gestisce formati vecchi con defaults sensati).
+  // - `version` mancante (undefined) → dato molto vecchio, prosegui lenient.
+  if (parsed.version !== undefined) {
+    if (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version)) {
+      _lastSavedAt = null;
+      setShows([]);
+      return;
+    }
+    if (parsed.version > SCHEMA_VERSION) {
+      console.warn(
+        '[PloppyTV] Schema version futura:', parsed.version, '— atteso', SCHEMA_VERSION,
+      );
+      const backup = _loadFromBackup();
+      if (backup && Array.isArray(backup.shows) && backup.shows.length > 0) {
+        const rawShows = backup.shows.map(normalizeShow).filter((s): s is Show => s !== null);
+        // BUG-A19-04: dedup by id anche sul path backup recovery.
+        const shows = _dedupShowsById(rawShows);
+        reconcileAllLists(shows);
+        _lastSavedAt = _validSavedAt(backup.savedAt);
+        setShows(shows);
+        showToast('Versione dati non supportata. Ripristinato backup.', 'warning');
+        saveData({ immediate: true });
+        return;
+      }
+      _lastSavedAt = null;
+      setShows([]);
+      showToast('Versione dati non supportata. Usa Importa per ripristinare.', 'error');
+      return;
+    }
+    if (parsed.version < SCHEMA_VERSION) {
+      console.warn(
+        '[PloppyTV] Schema version passata:', parsed.version, '— atteso', SCHEMA_VERSION,
+      );
+      // Prosegui — normalizeShow gestisce formati vecchi con defaults.
+    }
+  }
   if (!Array.isArray(parsed.shows)) {
     _lastSavedAt = null;
     setShows([]);
     return;
   }
-  const shows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
+  const rawShows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
+  // BUG-A19-04: dedup by id (keep first) — localStorage corrotto o race
+  // multi-tab può contenere show duplicati per id.
+  const shows = _dedupShowsById(rawShows);
   reconcileAllLists(shows);
-  _lastSavedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : null;
+  // BUG-A4-07: Number.isFinite respinge NaN/Infinity che romperebbero il CAS.
+  _lastSavedAt = _validSavedAt(parsed.savedAt);
   setShows(shows);
   // BUG-04-08: pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
   _cleanupCorruptedKeys();
@@ -277,9 +384,31 @@ if (typeof window !== 'undefined') {
 
       const parsed = JSON.parse(ev.newValue) as SavedData;
       if (!parsed || !Array.isArray(parsed.shows)) return;
-      const newShows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
+      // BUG-A19-05b: rigetta version non-numerica (consistente con loadData).
+      // Prima un event con version='bad' (stringa) era silenziosamente accettato
+      // e sovrascriveva lo stato locale con dati potenzialmente malformati.
+      if (parsed.version !== undefined && (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version))) {
+        console.warn('[PloppyTV] storage event con version non valida:', parsed.version);
+        return;
+      }
+      // BUG-A4-03: ignora eventi con versione futura non supportata (il formato
+      // potrebbe non essere interpretabile da questa versione dell'app).
+      if (typeof parsed.version === 'number' && parsed.version > SCHEMA_VERSION) {
+        console.warn('[PloppyTV] storage event con version futura:', parsed.version);
+        return;
+      }
+      // BUG-A19-05a: avverte su version passata (consistente con loadData,
+      // che logga un warning). Il dato è comunque accettato (normalizeShow è
+      // defensive sui formati vecchi).
+      if (typeof parsed.version === 'number' && parsed.version < SCHEMA_VERSION) {
+        console.warn('[PloppyTV] storage event con version passata:', parsed.version);
+      }
+      const rawNewShows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
+      // BUG-A19-04: dedup by id (keep first) — consistente con loadData.
+      const newShows = _dedupShowsById(rawNewShows);
       reconcileAllLists(newShows);
-      const newSavedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : null;
+      // BUG-A4-07: valida savedAt con Number.isFinite (NaN rompe CAS).
+      const newSavedAt = _validSavedAt(parsed.savedAt);
 
       // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
       // sovrascrivere lo stato. Mostra toast e lascia _lastSavedAt al valore

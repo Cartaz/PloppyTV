@@ -5,6 +5,7 @@ import { switchView } from '../lib/store';
 import { showModal } from './modal';
 import { showToast } from './toast';
 import { getLocale, setLocale, getAvailableLocales, t } from '../lib/i18n';
+import { escapeHtml, escapeAttr } from '../lib/utils';
 import {
   notificationsSupported,
   notificationsEnabled,
@@ -14,14 +15,20 @@ import {
   getNextNotifiableEpisode,
 } from '../lib/notifications';
 
+let _headerInitialized = false;
+
 export function updateBadges(): void {
   const state = getState();
   const w = document.getElementById('badge-watching');
   const tw = document.getElementById('badge-towatch');
   const c = document.getElementById('badge-completed');
-  const wCount = state.shows.filter((s) => s.list === 'watching').length;
-  const twCount = state.shows.filter((s) => s.list === 'towatch').length;
-  const cCount = state.shows.filter((s) => s.list === 'completed').length;
+  // BUG-A17-09 (FIXED): defensive guard — se state.shows è corrotto (non-array),
+  // filter crashava con TypeError. Ora si conta 0 (consistente con store.setShows
+  // che resetta a [] su input invalido, ma defense-in-depth).
+  const shows = Array.isArray(state.shows) ? state.shows : [];
+  const wCount = shows.filter((s) => s && s.list === 'watching').length;
+  const twCount = shows.filter((s) => s && s.list === 'towatch').length;
+  const cCount = shows.filter((s) => s && s.list === 'completed').length;
   if (w) {
     w.textContent = String(wCount);
     // BUG-20-10: aria-label dinamico per screen reader.
@@ -37,7 +44,29 @@ export function updateBadges(): void {
   }
 }
 
+/**
+ * Chiude la sidebar mobile: rimuove classi 'open'/'active' e ripristina
+ * lo scroll del body. Centralizza la logica di chiusura per evitare
+ * che un path dimentichi di ripristinare overflow (BUG-A17-11).
+ */
+function closeSidebar(): void {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebarOverlay')?.classList.remove('active');
+  // BUG-A17-11 (FIXED): ripristina body.overflow alla chiusura.
+  // Prima il menuToggle impostava overflow='hidden' all'apertura ma nessuno
+  // lo ripristinava alla chiusura via overlay-click o nav-item click.
+  document.body.style.overflow = '';
+}
+
 export function initHeader(): void {
+  // BUG-A17-10 (FIXED): idempotency guard. Prima initHeader non aveva guard
+  // e aggiungeva listener duplicati ad ogni chiamata (nav-items, menuToggle,
+  // aboutBtn, notifBtn, langBtn, overlay, window). In production era chiamata
+  // una sola volta, ma in test/HMR o se main.ts venisse re-eseguito, i
+  // listener si accumulavano → click multipli per azione singola.
+  if (_headerInitialized) return;
+  _headerInitialized = true;
+
   // Nav items
   document.querySelectorAll<HTMLElement>('.nav-item[data-view]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -45,8 +74,7 @@ export function initHeader(): void {
       if (!view) return;
       switchView(view);
       if (window.matchMedia('(max-width: 900px)').matches) {
-        document.getElementById('sidebar')?.classList.remove('open');
-        document.getElementById('sidebarOverlay')?.classList.remove('active');
+        closeSidebar();
       }
     });
   });
@@ -95,16 +123,32 @@ export function initHeader(): void {
     const ov = document.getElementById('sidebarOverlay');
     if (!sb || !ov) return;
     if (sb.classList.contains('open')) {
-      sb.classList.remove('open');
-      ov.classList.remove('active');
+      closeSidebar();
     } else {
       sb.classList.add('open');
       ov.classList.add('active');
+      // BUG-A17-11 (FIXED): blocca scroll del body quando la sidebar è aperta
+      // (mobile). Prima il body scorreva dietro l'overlay, peggiorando UX.
+      document.body.style.overflow = 'hidden';
     }
   });
   document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
-    document.getElementById('sidebar')?.classList.remove('open');
-    document.getElementById('sidebarOverlay')?.classList.remove('active');
+    // BUG-A17-11: usa closeSidebar per ripristinare overflow.
+    closeSidebar();
+  });
+
+  // BUG-A17-12 (FIXED): ESC chiude la sidebar mobile. Prima non c'era handler
+  // ESC per la sidebar — solo l'overlay click la chiudeva. Accessibilità WAI-ARIA
+  // richiede ESC per dismissable overlays. Non interferisce con modali (controlla
+  // aria-hidden del modal overlay prima di agire).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const sb = document.getElementById('sidebar');
+    if (!sb || !sb.classList.contains('open')) return;
+    // Non chiudere la sidebar se un modale è aperto (il modale gestisce ESC).
+    const modal = document.getElementById('modal');
+    if (modal && modal.getAttribute('aria-hidden') === 'false') return;
+    closeSidebar();
   });
 
   // Multi-tab badge sync
@@ -137,11 +181,31 @@ export function initHeader(): void {
     }
   });
 
+  // BUG-A17-13 (FIXED): delegated click handler per [data-lang] su document.
+  // Prima il binding era via setTimeout(50) dopo showModal — fragile (race
+  // con rendering modale, querySelectorAll poteva beccare bottoni di modali
+  // precedenti, listener duplicati ad apertura ripetuta). Ora un singolo
+  // listener delegato gestisce tutti i click [data-lang] correnti e futuri.
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const langEl = target.closest('[data-lang]') as HTMLElement | null;
+    if (!langEl) return;
+    const lang = langEl.dataset.lang;
+    if (lang === 'it' || lang === 'en') {
+      setLocale(lang);
+      // Il re-render è triggerato da subscribeI18n nel main.ts
+    }
+  });
+
   // P2.7: Language switcher
   document.getElementById('langBtn')?.addEventListener('click', () => {
     const current = getLocale();
     const locales = getAvailableLocales();
     const labels: Record<string, string> = { it: 'Italiano', en: 'English' };
+    // BUG-A17-14 (FIXED): escapa il codice lingua e la label nell'HTML.
+    // Prima `l` era interpolato raw in data-lang — se getAvailableLocales
+    // restituisse un locale con `"` o `<`, si aveva breakout attributo/HTML.
+    // Defense-in-depth (i locale sono controllati, ma l'escape è gratuito).
     const bodyHtml =
       '<div style="display:flex;flex-direction:column;gap:8px;">' +
       locales
@@ -150,26 +214,14 @@ export function initHeader(): void {
             '<button class="btn ' +
             (l === current ? 'btn-primary' : 'btn-secondary') +
             '" data-lang="' +
-            l +
+            escapeAttr(l) +
             '" style="text-align:left;">' +
             (l === current ? '✓ ' : '') +
-            labels[l] +
+            escapeHtml(labels[l] ?? l) +
             '</button>',
         )
         .join('') +
       '</div>';
     showModal(t('nav.menu') + ' — Lingua', bodyHtml, [{ label: t('actions.close') }]);
-    // Bind click sui pulsanti lingua
-    setTimeout(() => {
-      document.querySelectorAll('[data-lang]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const lang = (btn as HTMLElement).dataset.lang;
-          if (lang === 'it' || lang === 'en') {
-            setLocale(lang);
-            // Il re-render è triggerato da subscribeI18n nel main.ts
-          }
-        });
-      });
-    }, 50);
   });
 }

@@ -63,7 +63,7 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
     const isAdded = getState().shows.find((s) => s.id === show.id);
     html +=
       '<div class="carousel-card" data-action="previewDiscover" data-show-id="' +
-      show.id +
+      escapeAttr(show.id) +
       '" role="button" tabindex="0" aria-label="Anteprima ' +
       escapeAttr(show.name) +
       '">';
@@ -331,7 +331,16 @@ function previewDiscover(showId: number): void {
       : 'N/D'
     : 'N/D';
   const network = (found.network && found.network.name) || (found.webChannel && found.webChannel.name) || 'N/D';
-  const rating = found.rating && found.rating.average ? found.rating.average + '/10' : 'N/D';
+  // BUG-A12-01 (FIXED): rating.average was interpolated RAW in the modal HTML body.
+  // The TS type says `number | null`, but the cache comes from JSON.parse(localStorage)
+  // and could hold a string with HTML (e.g. "<img src=x onerror=alert(1)>"). Setting
+  // innerHTML on the modal body would execute the payload. Coerce to a finite number;
+  // reject anything else as 'N/D'.
+  // BUG-A12-04 (FIXED): the old truthy check `found.rating.average` excluded the
+  // valid value 0 — a show with average rating 0 displayed "N/D" instead of "0/10".
+  const ratingAvgRaw = found.rating ? found.rating.average : null;
+  const rating =
+    typeof ratingAvgRaw === 'number' && Number.isFinite(ratingAvgRaw) ? ratingAvgRaw + '/10' : 'N/D';
   const img = getPosterUrl(found);
   const summary = stripHtml(found.summary);
 
@@ -362,10 +371,15 @@ function previewDiscover(showId: number): void {
       '</div>';
   }
   if (found.status) {
+    // BUG-A12-02 (FIXED): found.runtime was interpolated RAW in the modal HTML body.
+    // A corrupted cache holding a non-numeric string (e.g. "<img src=x onerror=...>")
+    // would execute when set via innerHTML. Coerce to a finite number; omit otherwise.
+    const runtimeNum =
+      typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
     body +=
       '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' +
       escapeHtml(found.status) +
-      (found.runtime ? ' • ' + found.runtime + ' min/ep' : '') +
+      (runtimeNum != null ? ' • ' + runtimeNum + ' min/ep' : '') +
       '</div>';
   }
 

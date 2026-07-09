@@ -9,6 +9,27 @@
 //  - BUG-09-04: focus trap query su tutta la modal card (body + actions).
 //  - BUG-09-05: _modalTitle ha tabindex=-1 → .focus() entra nel dialog.
 //  - BUG-09-08: showModal warn (non silent) quando ensureRefs fallisce.
+//  - BUG-A15-01: initModal guarded contro double-init (HMR, ri-chiamata
+//    accidentale) — prima i listener ESC/Tab/click venivano aggiunti ogni
+//    volta, causando double-pop su ESC (due pop per keypress) e focus trap
+//    duplicato.
+//  - BUG-A15-02: onClick reentrancy — il check è ora identity-based (top
+//    dello stack prima/dopo). Prima era depth-based e gestiva solo il push;
+//    pop (onClick chiama closeModal) e swap (close + reopen) causavano
+//    double-pop o chiusura della modale sbagliata.
+//  - BUG-A15-03: focus trap selector espanso — ora include textarea, select,
+//    summary (prima solo button, [href], input). La textarea dell'editor note
+//    e la select del language picker non erano incluse nel ciclo di wrap.
+//  - BUG-A15-04: focus trap quando non ci sono focusable (modale solo testo)
+//    o quando activeElement è dentro il dialog ma non focusable (es. titolo
+//    con tabindex=-1) — Tab veniva lasciato passare, focus usciva dal dialog.
+//  - BUG-A15-05: body e actions vengono puliti (innerHTML='') quando lo stack
+//    si svuota — prima il contenuto dell'ultima modale restava nel DOM nascosto
+//    (info leak minore + stato stale).
+//  - BUG-A15-06: aria-labelledby rimosso quando il titolo è vuoto (non c'è
+//    nulla da annunciare allo screen reader) e quando lo stack si svuota.
+//  - BUG-A15-08: showModal fa guard difensivo su actions null/undefined
+//    (il for-of avrebbe throwato TypeError).
 
 export interface ModalAction {
   label: string;
@@ -29,6 +50,8 @@ let _modalTitle: HTMLElement | null = null;
 let _modalBody: HTMLElement | null = null;
 let _modalActions: HTMLElement | null = null;
 let _modalElement: HTMLElement | null = null; // la card interna
+// BUG-A15-01: guard contro initModal chiamato più volte (HMR, doppio init).
+let _modalInitialized = false;
 
 function ensureRefs(): boolean {
   if (!_modalOverlay) _modalOverlay = document.getElementById('modal');
@@ -56,6 +79,12 @@ function renderTop(): void {
   if (!top) {
     _modalOverlay!.classList.remove('active');
     _modalOverlay!.setAttribute('aria-hidden', 'true');
+    // BUG-A15-05: pulisce body/actions quando nessuna modale è visibile.
+    // Prima il contenuto dell'ultima modale restava nel DOM nascosto.
+    _modalBody!.innerHTML = '';
+    _modalActions!.innerHTML = '';
+    // BUG-A15-06: nessun titolo da annunciare → rimuovi aria-labelledby.
+    _modalOverlay!.removeAttribute('aria-labelledby');
     return;
   }
   _modalTitle!.textContent = top.title;
@@ -66,13 +95,14 @@ function renderTop(): void {
     btn.className = 'btn ' + (a.style || 'btn-secondary');
     btn.textContent = a.label;
     btn.onclick = () => {
-      const depthBefore = _stack.length;
+      // BUG-A15-02: identity-based check. Cattura il riferimento al top
+      // dello stack PRIMA di onClick; dopo, se il top è cambiato (push di
+      // un figlio, pop esplicito, o swap close+reopen), skip l'auto-close.
+      // Il check depth-based precedente gestiva solo il push: pop e swap
+      // causavano double-pop o chiusura della modale sbagliata.
+      const topBefore = _stack[_stack.length - 1];
       if (a.onClick) a.onClick();
-      const depthAfter = _stack.length;
-      // BUG-09-01: se l'onClick ha pushato una nuova modale (depth aumentata),
-      // NON chiamare closeModal — il figlio deve restare aperto.
-      // keepOpen=true è ancora rispettato come override esplicito.
-      if (depthAfter > depthBefore) return; // nested push — skip auto-close
+      if (_stack[_stack.length - 1] !== topBefore) return; // stack changed
       if (!a.keepOpen) closeModal();
     };
     _modalActions!.appendChild(btn);
@@ -82,7 +112,12 @@ function renderTop(): void {
   // ARIA: annuncia il dialog
   _modalOverlay!.setAttribute('role', 'dialog');
   _modalOverlay!.setAttribute('aria-modal', 'true');
-  _modalOverlay!.setAttribute('aria-labelledby', 'modalTitle');
+  // BUG-A15-06: aria-labelledby solo se c'è un titolo da annunciare.
+  if (top.title) {
+    _modalOverlay!.setAttribute('aria-labelledby', 'modalTitle');
+  } else {
+    _modalOverlay!.removeAttribute('aria-labelledby');
+  }
   // Focus al primo bottone (o al titolo) per screen reader + keyboard nav
   // BUG-09-05: con tabindex=-1, anche il titolo può ricevere focus.
   const firstBtn = _modalActions!.querySelector('button');
@@ -105,7 +140,9 @@ export function showModal(title: string, bodyHtml: string, actions: ModalAction[
   _stack.push({
     title,
     bodyHtml,
-    actions,
+    // BUG-A15-08: guard difensivo — actions null/undefined non crashano
+    // il for-of in renderTop (TypeError: top.actions is not iterable).
+    actions: Array.isArray(actions) ? actions : [],
     previouslyFocused: document.activeElement as HTMLElement | null,
   });
   renderTop();
@@ -154,7 +191,12 @@ export function closeAllModals(): void {
 }
 
 export function initModal(): void {
+  // BUG-A15-01: guard contro double-init. Senza questo, i listener ESC/Tab/click
+  // verrebbero aggiunti ogni volta (HMR, ri-chiamata accidentale), causando
+  // double-pop su ESC (due entry poppate per keypress) e focus trap duplicato.
+  if (_modalInitialized) return;
   if (!ensureRefs()) return;
+  _modalInitialized = true;
   // Click sull'overlay (ma non sulla card interna) → close
   _modalOverlay!.addEventListener('click', (e) => {
     if ((e.target as HTMLElement).id === 'modal') closeModal();
@@ -170,22 +212,36 @@ export function initModal(): void {
   });
   // Focus trap: Tab sull'ultimo/primo elemento resta dentro il dialog
   // BUG-09-04: query su tutta la modal card (body + actions), non solo actions.
+  // BUG-A15-03: selector espanso con textarea, select, summary.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
     if (_stack.length === 0) return;
     if (!_modalElement) return;
     const focusables = _modalElement.querySelectorAll<HTMLElement>(
-      'button, [href], input, [tabindex]:not([tabindex="-1"])',
+      'button, [href], input, textarea, select, summary, [tabindex]:not([tabindex="-1"])',
     );
-    if (focusables.length === 0) return;
+    if (focusables.length === 0) {
+      // BUG-A15-04: nessun focusable nel dialog — previeni Tab per non
+      // far uscire il focus (il titolo con tabindex=-1 è già focusato).
+      e.preventDefault();
+      return;
+    }
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
+    const active = document.activeElement as HTMLElement | null;
+    if (e.shiftKey && active === first) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
+    } else if (!e.shiftKey && active === last) {
       e.preventDefault();
       first.focus();
+    } else if (active && _modalElement.contains(active) && !Array.from(focusables).includes(active)) {
+      // BUG-A15-04: activeElement è dentro il dialog ma non è focusable
+      // (es. il titolo con tabindex=-1, o un <p>). Wrap per mantenere il
+      // focus dentro il dialog invece di farlo uscire con Tab naturale.
+      e.preventDefault();
+      if (e.shiftKey) last.focus();
+      else first.focus();
     }
   });
 }

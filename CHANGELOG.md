@@ -2,7 +2,59 @@
 
 Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il formato si ispira a [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e il progetto segue [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — P2 Quality of life quotidiana
+## [Unreleased]
+
+Nessuna modifica.
+
+## [1.2.1] — Stress-test bug-fix release (luglio 2026)
+
+**Tag:** `v1.2.1`
+**Data compatibility:** 100% con v1.2.0 (nessuna migrazione necessaria, schema invariato v2).
+
+Release di sola affidabilità. **Nessuna nuova feature**: ogni cambiamento corregge un bug trovato da uno stress test automatico. Uno sciame di **20 sub-agent** ha esercitato ogni modulo e ogni edge case, portando alla luce ~170 bug (più di 100 fixati in questo rilascio). I probe test scritti durante lo stress test sono mantenuti come **suite di regressione di 1124 test** (da 870 a 1994 test totali).
+
+### Sicurezza
+
+- **XSS defense-in-depth**: `stripHtml` applicato a `ep.name`, `note`, `tags` in `normalize.ts` e `shows.ts` (i dati utente/importati ora sono sanitizzati a monte, non solo a render). `imgTag` valida `src` con `safeImageUrl` (rifiuta `javascript:`/`data:`). Escape di `cls`/`extraStyle` in tutti gli attributi del placeholder. `data-show-id` escapato in tutte le viste. Verifica end-to-end: nessun tag `<script>` o event handler sopravvive nel DOM dopo il render.
+
+### Corretto (High)
+
+- **`notifications.ts`**: `NOTIF_MAX_DELAY_MS` superava il limite di 2³¹−1 ms di `setTimeout` → overflow int32 → notifiche sparate immediatamente. Ridotto a 24 giorni (safe).
+- **`store.ts`**: `setShows(null/non-array)` corrompeva lo state; reference array condivise con il caller; snapshot non deep-clonava `tags`/`genres`; `emitChange` con reentrancy (listener iscritto durante emit poteva fireare nello stesso flush).
+- **`storage.ts`**: `loadData` crashava se `getItem` lanciava `SecurityError` (private mode Safari); CAS inattivo quando `_lastSavedAt=null` (race multi-tab); recovery da corruzione scriveva raw corrotto nel backup; `savedAt=NaN` rompeva CAS (`NaN !== NaN` sempre true → ogni save rifiutato).
+- **`worker/client.ts`**: `postMessage` su dati non-cloneable (funzioni, ref circolari) lanciava `DataCloneError` → leak di listener/timeout + nessun fallback. Fallback main-thread che lanciava dentro callback → promise hang infinito (loader eterno).
+- **`compute.ts`**: `computeStats`/`computeCalendar` crashavano su `shows` con entry `null`/non-object; `topGenres` faceva double-count di generi duplicati nello stesso show.
+- **`imageFallback.ts`**: loop infinito con `fallbackSrc` relativo (confronto stringa falliva). Ora usa flag `data-fallback-src-tried`.
+- **`keyboard.ts`**: `Ctrl`/`Cmd`/`Alt` non erano ignorati per gli shortcut lettera → `Ctrl+g` poi `Ctrl+d` navigava sovrascrivendo i bookmark del browser.
+- **`yearReview.ts`**: `canvas.toBlob` non in try/catch → `SecurityError` su tainted canvas (CORS poster TVMaze) propagato come uncaught. `URL.revokeObjectURL` non chiamata se `a.click()` lanciava (leak blob URL).
+- **`shows.ts`**: `refreshShowEpisodes` perdeva `rating` e `note` dell'utente ad ogni refresh API; wipava tutti gli episodi se l'API ritornava array vuoto (glitch temporaneo).
+- **`modal.ts`**: `initModal` non idempotente → listener duplicati su re-init/HMR (ESC poppava 2 entry per keypress). Focus trap non includeva `textarea`/`select`/`summary` (Tab usciva dal dialog).
+
+### Corretto (Medium/Low)
+
+- **`utils.ts`**: `localISODate(Date(NaN))` restituiva `"NaN-NaN-NaN"`; `stripHtml` leaka testo in `title="a>b"`; `parseISODateLocal` accettava rollover (`2024-02-30` → `2024-03-01`); `safeNum` accettava hex/octal/scientific; `findNextEpisode` non validava `num`.
+- **`normalize.ts`**: `buildShowFromTvmaze` usava regex loose per date (accettava `2024-13-40`); `Infinity` runtime passava il check `> 0`; `watched` truthy contava `"false"` come visto.
+- **`api.ts`**: race tra timeout interno e external abort (propagava `AbortError` invece di `TimeoutError`); wrapper `?? []` lasciava passare risposte JSON non-array.
+- **`discover.ts`**: `recentOnly` includeva show con `premiered` futuro; `cancelAnimationFrame` non chiamato a fine fetch (callback post-resolve); `weight` non-numerico avvelenava il sort.
+- **`dashboard.ts`/`showList.ts`**: bottone "Sorprendimi" inerte dopo re-render; filtro tag intrappolava l'utente al cambio lista (chip-bar spariva, nessun modo per clearare); XSS su `ep.num` non coerced.
+- **`showDetail.ts`**: `seasonAvgRating` NaN/Infinity; guard su `tags`/`genres`/`seasons` non-array mancanti.
+- **`yearReview.ts`**: `watched` truthy; `airdate` non-stringa crashava; `runtime` stringa concatenava (`0+"30"="30"`, poi `"30"+30="3030"`); filename `ploppytv-NaN.png` se anno NaN.
+- **`toast.ts`**: `showToast(null/undefined)` mostrava `"null"`/`"undefined"`; nessuna API per dismiss manuale.
+- **`header.ts`**: `initHeader` non idempotente; sidebar mobile senza scroll-lock né ESC chiusura; `updateBadges` crashava su `shows` non-array.
+- **`i18n.ts`**: `t()` crashava su chiavi con metacaratteri regex; lang salvata case-sensitive (`EN` rifiutato); param `null` → letterale `"null"`.
+- **`storage.ts`** (post-stress): `loadData` + storage event ora deduplicano show per id (keep first); storage event avverte su version passata e rigetta version non-numerica (consistente con `loadData`).
+
+### Test
+
+- **+1124 test di regressione** (870 → 1994 totali, 0 falliti) in 20 nuovi file `tests/probe_a*.test.ts`, uno per componente. Coprono: date invalide, NaN/Infinity, type confusion, prototype pollution, XSS end-to-end, race condition worker/search, multi-tab CAS, storage quota/corruzione, import enormi, edge case keyboard/modal.
+
+### Modifiche ai file
+
+- 33 file sorgenti modificati in `src/` + `index.html`
+- 20 nuovi file `tests/probe_a*.test.ts`
+- `package.json`/`package-lock.json` bumped a 1.2.1
+
+## [1.2.0] — P2 Quality of life quotidiana
 
 ### Aggiunto
 

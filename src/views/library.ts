@@ -43,6 +43,16 @@ let _filters: FilterState = {
 };
 
 /**
+ * Reset module-level filter state (testing only).
+ * Exported so tests can guarantee a clean `_filters` between cases without
+ * relying solely on `vi.resetModules()` (which may not re-evaluate the
+ * module if a hoisted `vi.mock` factory caches the original).
+ */
+export function _resetLibraryFiltersForTesting(): void {
+  _filters = { text: '', genre: '', status: '', minRating: 0, network: '', year: '', tag: '' };
+}
+
+/**
  * Calcola il rating medio di una serie (media di tutti gli episodi rated).
  */
 function showAvgRating(show: { seasons?: Record<number, Array<{ rating?: number }>> }): number {
@@ -98,10 +108,14 @@ function collectYears(shows: Array<{ premiered: string | null }>): string[] {
 
 function applyFilters(shows: Show[]): Show[] {
   return shows.filter((s) => {
+    // BUG-A12-06 (FIXED): s.name is typed `string`, but corrupted storage may
+    // hold a non-string (null/number/object). `.toLowerCase()` would crash the
+    // filter and the whole renderLibrary. Coerce to string defensively.
+    const nameStr = typeof s.name === 'string' ? s.name : '';
     // Text search
     if (_filters.text) {
       const q = _filters.text.toLowerCase();
-      if (!s.name.toLowerCase().includes(q)) return false;
+      if (!nameStr.toLowerCase().includes(q)) return false;
     }
     // Genre
     if (_filters.genre && !(s.genres || []).includes(_filters.genre)) return false;
@@ -119,7 +133,15 @@ function applyFilters(shows: Show[]): Show[] {
       if (!s.premiered || !s.premiered.startsWith(_filters.year)) return false;
     }
     // Tag
-    if (_filters.tag && !(s.tags || []).some((tg) => tg.toLowerCase() === _filters.tag.toLowerCase())) return false;
+    // BUG-A12-05 (FIXED): `tg` may be a non-string in a corrupted `tags` array
+    // (storage tampering or upstream bug). Calling `.toLowerCase()` on a
+    // non-string throws TypeError, crashing the whole renderLibrary. Guard
+    // with `typeof tg === 'string'`.
+    if (
+      _filters.tag &&
+      !(s.tags || []).some((tg) => typeof tg === 'string' && tg.toLowerCase() === _filters.tag.toLowerCase())
+    )
+      return false;
     return true;
   });
 }
@@ -204,35 +226,55 @@ export function renderLibrary(main: HTMLElement): void {
   html += '</select></div>';
 
   // Network dropdown
-  if (networks.length > 0) {
+  // BUG-A12-07 (FIXED): render the dropdown if there are options OR a filter is
+  // currently set. Previously, if the user filtered by network X then deleted
+  // every show with network X, the dropdown disappeared but the filter still
+  // applied, leaving 0 results with no visible way to reset it (only
+  // "Cancella filtri" worked). Now we always render the select when a filter
+  // is active and include the stale value as an extra option.
+  const renderNetworkFilter = networks.length > 0 || _filters.network !== '';
+  if (renderNetworkFilter) {
     html +=
       '<div class="filter-group"><label>' +
       escapeHtml(t('library.filter.network')) +
       '</label><select id="libNetworkFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.network);
     for (const n of networks) html += optionHtml(n, n, _filters.network);
+    if (_filters.network && !networks.includes(_filters.network)) {
+      html += optionHtml(_filters.network, _filters.network, _filters.network);
+    }
     html += '</select></div>';
   }
 
   // Year dropdown
-  if (years.length > 0) {
+  // BUG-A12-07 (FIXED): same as network — render if options exist OR filter is set.
+  const renderYearFilter = years.length > 0 || _filters.year !== '';
+  if (renderYearFilter) {
     html +=
       '<div class="filter-group"><label>' +
       escapeHtml(t('library.filter.year')) +
       '</label><select id="libYearFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.year);
     for (const y of years) html += optionHtml(y, y, _filters.year);
+    if (_filters.year && !years.includes(_filters.year)) {
+      html += optionHtml(_filters.year, _filters.year, _filters.year);
+    }
     html += '</select></div>';
   }
 
   // Tag dropdown
-  if (tags.length > 0) {
+  // BUG-A12-07 (FIXED): same as network — render if options exist OR filter is set.
+  const renderTagFilter = tags.length > 0 || _filters.tag !== '';
+  if (renderTagFilter) {
     html +=
       '<div class="filter-group"><label>' +
       escapeHtml(t('library.filter.tag')) +
       '</label><select id="libTagFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.tag);
     for (const tg of tags) html += optionHtml(tg, tg, _filters.tag);
+    if (_filters.tag && !tags.includes(_filters.tag)) {
+      html += optionHtml(_filters.tag, _filters.tag, _filters.tag);
+    }
     html += '</select></div>';
   }
 

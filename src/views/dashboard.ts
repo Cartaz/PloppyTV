@@ -7,6 +7,20 @@
 //  - BUG-13-05: a11y — show-card/continue-card/section-link hanno role=button,
 //    tabindex=0, e keydown listener (Enter/Space) che triggera click.
 //    Il keydown listener è bound una sola volta per main (no accumulation).
+//  - BUG-A10-01 [HIGH]: il click handler di #randomGoldBtn era registrato
+//    dentro il guard WeakSet di bindKeydown, quindi solo al primo render.
+//    Re-render successivi (navigazione via e ritorno, o comparsa tardiva
+//    di episodi 5★) lasciavano il bottone "Sorprendimi" totalmente
+//    inerte. Fix: il binding del goldBtn avviene SEMPRE fuori dal guard.
+//  - BUG-A10-03 [MEDIUM]: bindKeydown è ora esportato e richiamato da
+//    showList.ts, così la navigazione via tastiera (Enter/Space su
+//    role="button") funziona anche se l'utente atterra direttamente su
+//    una lista (currentView restaurato da storage) senza prima passare
+//    dalla dashboard.
+//  - BUG-A10-04 [MEDIUM]: goldEp.ep.num non è validato da
+//    getRandomGoldEpisode (che filtra solo rating/watched). Su stato
+//    corrotto (es. backup con ep.num stringa malevola), l'interpolazione
+//    raw in random-gold-hint era XSS. Fix: coercizione Number()||0.
 
 import type { Show } from '../types';
 import { getState } from '../lib/store';
@@ -49,21 +63,37 @@ function showCardHtml(show: Show): string {
 // Bound keydown listener su main — singleton per evitare accumulation.
 const _dashboardKeydownBound = new WeakSet<HTMLElement>();
 
-function bindKeydown(main: HTMLElement): void {
-  if (_dashboardKeydownBound.has(main)) return;
-  _dashboardKeydownBound.add(main);
-  main.addEventListener('keydown', (ev: KeyboardEvent) => {
-    if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    const target = ev.target as HTMLElement | null;
-    if (!target) return;
-    // Triggera click solo su elementi con role=button (show-card, continue-card, section-link).
-    if (target.getAttribute('role') === 'button') {
-      ev.preventDefault();
-      target.click();
-    }
-  });
+/**
+ * Registra il keydown listener (Enter/Space → click) per gli elementi
+ * con role="button" all'interno di main, + il click listener del
+ * #randomGoldBtn (se presente). Idempotente per il keydown (WeakSet),
+ * ma il goldBtn viene (re)boundato ad ogni chiamata: l'elemento è
+ * ricreato dal nuovo innerHTML ad ogni render, quindi il vecchio
+ * listener è GC'd con il vecchio nodo — nessuna accumulation.
+ *
+ * BUG-A10-01: in precedenza il goldBtn binding era dentro il guard
+ * WeakSet, quindi saltato sui re-render → bottone inerte.
+ * BUG-A10-03: esportata per essere richiamata da showList.ts, così
+ * la tastiera funziona anche senza un render preventivo della dashboard.
+ */
+export function bindKeydown(main: HTMLElement): void {
+  if (!_dashboardKeydownBound.has(main)) {
+    _dashboardKeydownBound.add(main);
+    main.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      // Triggera click solo su elementi con role=button (show-card, continue-card, section-link).
+      if (target.getAttribute('role') === 'button') {
+        ev.preventDefault();
+        target.click();
+      }
+    });
+  }
 
-  // P2.5: Random gold episode button click handler
+  // BUG-A10-01: il goldBtn va (re)boundato ad ogni render — è un nuovo
+  // elemento ogni volta (innerHTML wipe). Il guard WeakSet protegge solo
+  // il keydown listener (che è su main, persistente).
   const goldBtn = main.querySelector('#randomGoldBtn') as HTMLElement | null;
   if (goldBtn) {
     goldBtn.addEventListener('click', () => {
@@ -74,8 +104,13 @@ function bindKeydown(main: HTMLElement): void {
       }
       // Apri il dettaglio della serie per far rivedere l'episodio
       openShow(ep.show.id);
+      // BUG-A10-04: ep.ep.num non è validato da getRandomGoldEpisode
+      // (filtra solo rating/watched). Su stato corrotto potrebbe essere
+      // una stringa malevola → interpolazione raw in toast era safe
+      // (textContent), ma coerciamo a number per consistenza col hint HTML.
+      const epNum = Number(ep.ep.num) || 0;
       showToast(
-        'Episodio oro: ' + ep.show.name + ' S' + ep.season + 'E' + ep.ep.num + (ep.ep.name ? ' — ' + ep.ep.name : ''),
+        'Episodio oro: ' + ep.show.name + ' S' + ep.season + 'E' + epNum + (ep.ep.name ? ' — ' + ep.ep.name : ''),
         'success',
       );
     });
@@ -151,6 +186,10 @@ export function renderDashboard(main: HTMLElement): void {
   // P2.5: Random gold episode button (solo se ci sono episodi 5★)
   const goldEp = getRandomGoldEpisode();
   if (goldEp) {
+    // BUG-A10-04: ep.ep.num non è validato da getRandomGoldEpisode; su stato
+    // corrotto potrebbe essere una stringa malevola. Coerciamo a number
+    // prima di interpolare in HTML (XSS defense-in-depth).
+    const goldEpNum = Number(goldEp.ep.num) || 0;
     html +=
       '<div class="section random-gold-section">' +
       '<div class="random-gold-card" id="randomGoldBtn" role="button" tabindex="0">' +
@@ -163,7 +202,7 @@ export function renderDashboard(main: HTMLElement): void {
       ' — S' +
       goldEp.season +
       'E' +
-      goldEp.ep.num +
+      goldEpNum +
       '</div>' +
       '</div>' +
       '<div class="random-gold-action">Sorprendimi</div>' +
