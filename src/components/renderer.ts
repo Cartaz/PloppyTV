@@ -97,6 +97,12 @@ async function _doRender(): Promise<void> {
     // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
     mod.resetBoundGuard();
     mod.renderShowDetail(main);
+    // BUG-12-02 (Medium): renderShowDetail può chiamare closeShow() internamente
+    // (show non trovato in state), che a sua volta emette emitChange() e
+    // nullifica state.currentShowId. In quel caso il main è ancora sul DOM
+    // precedente (dashboard) e non dobbiamo bindare il listener di detail
+    // (sarebbe un orphan listener che aspetta di accumularsi al prossimo openShow).
+    if (!getState().currentShowId) return;
     mod.bindShowDetailEvents(main);
     return;
   }

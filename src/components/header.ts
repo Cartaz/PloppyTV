@@ -9,9 +9,21 @@ export function updateBadges(): void {
   const w = document.getElementById('badge-watching');
   const tw = document.getElementById('badge-towatch');
   const c = document.getElementById('badge-completed');
-  if (w) w.textContent = String(state.shows.filter((s) => s.list === 'watching').length);
-  if (tw) tw.textContent = String(state.shows.filter((s) => s.list === 'towatch').length);
-  if (c) c.textContent = String(state.shows.filter((s) => s.list === 'completed').length);
+  const watchingCount = state.shows.filter((s) => s.list === 'watching').length;
+  const towatchCount = state.shows.filter((s) => s.list === 'towatch').length;
+  const completedCount = state.shows.filter((s) => s.list === 'completed').length;
+  if (w) {
+    w.textContent = String(watchingCount);
+    w.setAttribute('aria-label', watchingCount + ' serie in corso');
+  }
+  if (tw) {
+    tw.textContent = String(towatchCount);
+    tw.setAttribute('aria-label', towatchCount + ' serie da vedere');
+  }
+  if (c) {
+    c.textContent = String(completedCount);
+    c.setAttribute('aria-label', completedCount + ' serie completate');
+  }
 }
 
 export function initHeader(): void {
@@ -86,4 +98,17 @@ export function initHeader(): void {
 
   // Multi-tab badge sync
   window.addEventListener('ploppytv:badges', updateBadges);
+
+  // Keyboard accessibility for nav items (divs with role="button").
+  // Enter/Space on a focused [role="button"] inside the sidebar should fire a click.
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const target = e.target as HTMLElement | null;
+      if (!target || target.getAttribute('role') !== 'button') return;
+      e.preventDefault();
+      target.click();
+    });
+  }
 }

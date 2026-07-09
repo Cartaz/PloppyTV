@@ -69,7 +69,11 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:12px;">';
     for (const { genre, episodes, shows } of stats.topGenres) {
-      const pct = maxCount > 0 ? (episodes / maxCount) * 100 : 0;
+      // BUG-17-04 + BUG-17-05: round to integer (consistency with topShows.pct)
+      // AND clamp to [0, 100] (defense-in-depth — if the sort invariant is
+      // violated, maxCount could be `0 || 1 = 1` and the bar would get
+      // width:500% without the clamp).
+      const pct = Math.max(0, Math.min(100, Math.round(maxCount > 0 ? (episodes / maxCount) * 100 : 0)));
       html +=
         '<div><div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">' +
         '<span>' +
@@ -124,12 +128,25 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   main.innerHTML = html;
 }
 
+let _statsRenderToken = 0;
+
 export async function renderStats(main: HTMLElement): Promise<void> {
+  // BUG-17-02 (Medium): invalidation token. The renderer (renderer.ts) checks
+  // its own _renderToken *before* invoking mod.renderStats(main), but not
+  // *after* the awaited renderStats resolves. So once renderStats starts, the
+  // renderer cannot cancel it — if the user navigates away during the worker
+  // compute (up to 500 ms in the timeout path), the late renderStatsContent
+  // would clobber whatever view is now mounted in main. The per-render token
+  // below makes a superseded render a no-op: only the most recent call writes
+  // to main.
+  const myToken = ++_statsRenderToken;
   renderStatsSkeleton(main);
   try {
     const stats = await computeStatsAsync(getState().shows);
+    if (_statsRenderToken !== myToken) return;
     renderStatsContent(main, stats);
   } catch (e) {
+    if (_statsRenderToken !== myToken) return;
     console.error('[stats] error:', e);
     main.innerHTML =
       '<h1 class="page-title">Statistiche</h1>' +

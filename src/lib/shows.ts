@@ -45,7 +45,13 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     // così reconcileList/updateShowListStatus non la retrocederanno.
     if (list !== 'towatch') show.manualList = true;
     replaceShow(show);
-    if (!saveData({ immediate: true })) {
+    // H2 (BUG-04-01): mark local edits as in-flight so the multi-tab storage
+    // event handler won't overwrite our shows during the save window. Cleared
+    // right after saveData returns (success or rollback — both leave no pending edit).
+    getState()._localDirty = true;
+    const saved = saveData({ immediate: true });
+    getState()._localDirty = false;
+    if (!saved) {
       // rollback
       removeShowFromState(show.id);
       showToast('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
@@ -87,7 +93,11 @@ export function removeShow(showId: number, showName: string): void {
         onClick: () => {
           const snapshot = getState().shows.map((s) => ({ ...s }));
           removeShowFromState(showId);
-          if (!saveData({ immediate: true })) {
+          // H2 (BUG-04-01): guard in-flight edits from multi-tab storage events.
+          getState()._localDirty = true;
+          const saved = saveData({ immediate: true });
+          getState()._localDirty = false;
+          if (!saved) {
             // Rollback: ripristina lo snapshot E ri-triggera il render
             setState({ shows: snapshot });
             emitChange();
@@ -106,8 +116,10 @@ export function removeShow(showId: number, showName: string): void {
 
 /**
  * Sposta manualmente una serie in un'altra lista. Imposta `manualList=true`
- * così le azioni successive (toggleEpisode, markSeason) non retrocedono
- * la serie a meno che l'utente non raggiunga naturalmente `completed`.
+ * solo per 'watching'/'completed' così le azioni successive (toggleEpisode,
+ * markSeason) non retrocedono la serie. Per 'towatch' lascia `manualList=false`
+ * per consentire la promozione naturale a 'watching' quando l'utente segna
+ * un episodio come visto (consistente con addShowToList).
  */
 export function moveShowToList(showId: number, list: ListName): void {
   const state = getState();
@@ -118,8 +130,14 @@ export function moveShowToList(showId: number, list: ListName): void {
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
   show.list = list;
-  show.manualList = true;
-  if (!saveData({ immediate: true })) {
+  // BUG-06-01: only block demotion (watching/completed); allow natural
+  // promotion from 'towatch' when the user marks an episode watched.
+  show.manualList = list !== 'towatch';
+  // H2 (BUG-04-01): guard in-flight edits.
+  getState()._localDirty = true;
+  const saved = saveData({ immediate: true });
+  getState()._localDirty = false;
+  if (!saved) {
     show.list = prevList;
     show.manualList = prevManual;
     showToast('Spostamento non salvato (modifiche in altro tab?)', 'error');
@@ -147,7 +165,11 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
   const prevManual = show.manualList ?? false;
   ep.watched = !ep.watched;
   updateShowListStatus(show);
-  if (!saveData({ immediate: true })) {
+  // H2 (BUG-04-01): guard in-flight edits.
+  getState()._localDirty = true;
+  const saved = saveData({ immediate: true });
+  getState()._localDirty = false;
+  if (!saved) {
     // Rollback reale (saveData immediate ritorna false su failure)
     ep.watched = prevWatched;
     show.list = prevList;
@@ -170,7 +192,11 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
     ep.watched = watched;
   });
   updateShowListStatus(show);
-  if (!saveData({ immediate: true })) {
+  // H2 (BUG-04-01): guard in-flight edits.
+  getState()._localDirty = true;
+  const saved = saveData({ immediate: true });
+  getState()._localDirty = false;
+  if (!saved) {
     show.seasons[seasonNum] = prevEps;
     show.list = prevList;
     show.manualList = prevManual;
@@ -218,7 +244,11 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       const sn = safeId(ep.season);
       if (!sn) continue;
       if (!newSeasons[sn]) newSeasons[sn] = [];
-      const existingEp = show.seasons[sn]?.find((e) => e.num === safeId(ep.number));
+      // BUG-06-02: match by stable TVMaze `id` first (survives renumbering),
+      // fall back to `num` for backward compat / shows without ids.
+      const existingEp =
+        show.seasons[sn]?.find((e) => e.id === safeId(ep.id)) ??
+        show.seasons[sn]?.find((e) => e.num === safeId(ep.number));
       newSeasons[sn].push({
         num: safeId(ep.number),
         id: safeId(ep.id),
@@ -235,7 +265,11 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     show.totalSeasons = Object.keys(newSeasons).length;
     updateShowListStatus(show);
 
-    if (!saveData({ immediate: true })) {
+    // H2 (BUG-04-01): guard in-flight edits.
+    getState()._localDirty = true;
+    const saved = saveData({ immediate: true });
+    getState()._localDirty = false;
+    if (!saved) {
       // Rollback
       show.seasons = prevSeasons;
       show.totalEpisodes = prevTotalEpisodes;
@@ -270,7 +304,10 @@ export function showNeedsEpisodeNames(show: Show): boolean {
   for (const eps of Object.values(show.seasons)) {
     if (!Array.isArray(eps)) continue;
     for (const ep of eps) {
-      if (ep && (ep.name === undefined || ep.name === null)) return true;
+      // BUG-06-03: treat empty string as missing too — normalizeShow and
+      // buildShowFromTvmaze both produce `name: ''` when TVMaze returns an
+      // empty string, which is functionally "missing" but wasn't detected.
+      if (ep && (ep.name == null || ep.name === '')) return true;
     }
   }
   return false;

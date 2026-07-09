@@ -50,11 +50,20 @@ export function getState(): AppState {
  * Ritorna una deep-copy dello stato. Da usare quando si vuole inviare i dati
  * a un worker, persistere, o esporre a consumer esterni senza rischiare
  * mutazioni esterne dell'oggetto ritornato.
+ *
+ * Nota: cloniamo anche gli array di episodi dentro `seasons` (2 livelli di
+ * deep-clone). Una shallow copy qui condividerebbe i riferimenti agli array
+ * `Episode[]` e una mutazione della snapshot muterebbe anche lo stato live.
  */
 export function getStateSnapshot(): AppState {
   return {
     ...state,
-    shows: state.shows.map((s) => ({ ...s, seasons: { ...s.seasons } })),
+    shows: state.shows.map((s) => ({
+      ...s,
+      seasons: Object.fromEntries(
+        Object.entries(s.seasons).map(([k, eps]) => [k, eps.map((e) => ({ ...e }))]),
+      ),
+    })),
   };
 }
 
@@ -71,7 +80,7 @@ let _rafScheduled = false;
 export function emitChange(): void {
   if (_rafScheduled) return;
   _rafScheduled = true;
-  requestAnimationFrame(() => {
+  const flush = (): void => {
     _rafScheduled = false;
     listeners.forEach((l) => {
       try {
@@ -80,7 +89,15 @@ export function emitChange(): void {
         console.error('[store] listener error:', e);
       }
     });
-  });
+  };
+  // Guard: in ambienti senza `requestAnimationFrame` (SSR, jsdom non-visual,
+  // worker) il fallback a `setTimeout(...,0)` evita che `_rafScheduled` resti
+  // `true` per sempre trasformando emitChange in un no-op silente.
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(flush);
+  } else {
+    setTimeout(flush, 0);
+  }
 }
 
 // ===== Mutators =====
@@ -95,7 +112,11 @@ export function openShow(showId: number): void {
   state.currentShowId = showId;
   state.currentSeason = 1;
   emitChange();
-  window.scrollTo(0, 0);
+  // Guard: in ambienti senza `window` (SSR/Node) o senza `scrollTo` (alcuni
+  // jsdom minimi) la chiamata non-effettuata è preferibile a un ReferenceError.
+  if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+    window.scrollTo(0, 0);
+  }
 }
 
 export function closeShow(): void {
@@ -150,28 +171,15 @@ export function setQuotaWarned(v: boolean): void {
 
 /**
  * Riconcilia il `list` di una serie basandosi sul conteggio episodi watched.
- * Rispetta `manualList`: se l'utente ha spostato manualmente la serie,
- * non retrocede MAI (non fa towatch→watching→completed nel senso inverso).
- * Può ancora promuovere a `completed` quando tutti gli episodi sono visti,
- * perché quello è un fatto oggettivo (e in quel caso resetta manualList).
- */
-export function reconcileList(show: Show): void {
-  const watched = getWatchedCount(show);
-  if (show.totalEpisodes > 0 && watched === show.totalEpisodes) {
-    show.list = 'completed';
-    show.manualList = false; // auto-promotion clears manual override
-  } else if (watched > 0 && show.list === 'towatch') {
-    show.list = 'watching';
-  } else if (show.totalEpisodes === 0 && show.list === 'completed') {
-    show.list = 'towatch';
-  }
-  // Nota: non retrocediamo mai una serie con manualList=true
-}
-
-/**
- * Come `reconcileList` ma usato dopo azioni utente (toggle, mark season).
- * Rispetta `manualList`: una serie spostata manualmente a `completed`
- * non viene retrocessa a `watching` se l'utente segna un episodio come non visto.
+ * Usato dopo azioni utente (toggle, mark season).
+ *
+ * Semantica `manualList`:
+ *  - L'auto-promozione a `completed` (tutti gli episodi visti) è un fatto
+ *    oggettivo: scatta sempre, e resetta `manualList=false`.
+ *  - Se `manualList=true` la serie NON viene mai retrocessa (l'utente ha
+ *    spostato manualmente la serie e la sua scelta va rispettata).
+ *  - Se `manualList=false`, una serie con `watched===0` viene retrocessa a
+ *    `towatch` (qualsiasi fosse la lista precedente).
  */
 export function updateShowListStatus(show: Show): void {
   const watchedCount = getWatchedCount(show);

@@ -12,13 +12,24 @@ import {
 } from '../lib/shows';
 
 let _boundShowDetail = false;
+let _clickHandler: ((e: MouseEvent) => void) | null = null;
+let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
+let _mainEl: HTMLElement | null = null;
 
 /**
- * Resetta la guardia di idempotenza. Deve essere chiamato dal renderer
- * PRIMA di bindShowDetailEvents per evitare accumulo di listener ad ogni
- * re-render. Vedi bug C5/T1.
+ * Resetta la guardia di idempotenta E rimuove il listener precedentemente
+ * aggiunto su `main`. FIX H1/BUG-12-01/BUG-14-01: il vecchio implementation
+ * resettava solo il flag `_boundShowDetail` lasciando il listener click
+ * accumularsi ad ogni re-render. Ora tracciamo handler + main e li
+ * rimuoviamo qui, così bindShowDetailEvents può aggiungere un listener
+ * pulito senza duplicati.
  */
 export function resetBoundGuard(): void {
+  if (_clickHandler && _mainEl) _mainEl.removeEventListener('click', _clickHandler);
+  if (_keyHandler && _mainEl) _mainEl.removeEventListener('keydown', _keyHandler);
+  _clickHandler = null;
+  _keyHandler = null;
+  _mainEl = null;
   _boundShowDetail = false;
 }
 
@@ -34,8 +45,13 @@ export function renderShowDetail(main: HTMLElement): void {
   }
   if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
 
+  // BUG-14-04 (Low): allinea il filter a normalize.ts — accetta solo chiavi
+  // intere positive (regex /^\d+$/). Il vecchio `!isNaN(parseInt(k,10))`
+  // accettava "1.5" (parseInt=1) → tab "Stagione 1.5" con lista episodi
+  // vuota. Defense-in-depth: normalize.ts pulisce già le chiavi, ma questo
+  // protegge da stato mutato direttamente o import non-normalizzato.
   const seasons = Object.keys(show.seasons)
-    .filter((k) => !isNaN(parseInt(k, 10)))
+    .filter((k) => /^\d+$/.test(k) && Number(k) > 0)
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 
   if (seasons.length === 0) {
@@ -45,7 +61,9 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 
   const watched = getWatchedCount(show);
-  const progress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
+  // BUG-14-02 (Medium): clampa progress a [0,100] per evitare width>100% e
+  // label "167%" quando watched > totalEpisodes (stale state dopo refresh).
+  const progress = show.totalEpisodes > 0 ? Math.max(0, Math.min(100, (watched / show.totalEpisodes) * 100)) : 0;
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
   const statusClass =
@@ -59,7 +77,12 @@ export function renderShowDetail(main: HTMLElement): void {
   html += '<div class="detail-header">';
   // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
   // show.image è già la versione medium (vedi getPosterUrl); bigImg è la original.
-  const bigImg = show.image ? show.image.replace('medium', 'original') : null;
+  // BUG-14-03 (Medium): regex mirata al path-segment TVMaze (`/medium_portrait/`
+  // o `/medium_landscape/`) invece di `replace('medium','original')` che
+  // sostituiva solo la prima occorrenza — corruption di URL non-standard o
+  // con "medium" nel filename. Se la regex non matcha, bigImg === show.image
+  // e cadiamo nel branch "solo medium disponibile".
+  const bigImg = show.image ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/') : null;
   if (bigImg && show.image && bigImg !== show.image) {
     // Catena: original -> medium -> placeholder
     html +=
@@ -167,11 +190,16 @@ export function renderShowDetail(main: HTMLElement): void {
     return;
   }
 
-  html += '<div class="season-tabs">';
+  html += '<div class="season-tabs" role="tablist">';
   for (const s of seasons) {
+    // H17 a11y: season-tab è un div clickable — aggiungiamo role="tab" e
+    // tabindex="0" per renderlo focusable da tastiera. Il keydown handler
+    // in bindShowDetailEvents converte Enter/Space in click.
     html +=
       '<div class="season-tab ' +
       (parseInt(s, 10) === state.currentSeason ? 'active' : '') +
+      '" role="tab" tabindex="0" aria-selected="' +
+      (parseInt(s, 10) === state.currentSeason ? 'true' : 'false') +
       '" data-action="switchSeason" data-season="' +
       parseInt(s, 10) +
       '">Stagione ' +
@@ -203,9 +231,12 @@ export function renderShowDetail(main: HTMLElement): void {
         : '<span style="color:var(--text-muted);font-style:italic;">Episodio ' + ep.num + '</span>';
       const epNumberLabel = 'S' + state.currentSeason + 'E' + ep.num;
       const runtimeLabel = ep.runtime ? ' • ' + ep.runtime + ' min' : '';
+      // H17 a11y: episode-item è un div clickable — role="button" + tabindex="0".
       html +=
         '<div class="episode-item ' +
         (ep.watched ? 'watched' : '') +
+        '" role="button" tabindex="0" aria-label="' +
+        escapeAttr(ep.name ? ep.name : 'Episodio ' + ep.num + ' — non visto') +
         '" data-action="toggleEpisode" data-show-id="' +
         show.id +
         '" data-season="' +
@@ -238,14 +269,18 @@ export function renderShowDetail(main: HTMLElement): void {
 }
 
 // Bind eventi via event delegation sul main content.
-// CRITICAL FIX (C5/T1): guardia _boundShowDetail evita di aggiungere un
-// nuovo listener ad ogni re-render. Il renderer chiama resetBoundGuard()
-// prima del bind, così ad ogni cambio vista la guardia è false e il listener
-// viene aggiunto una sola volta per quella vista.
+// FIX H1/BUG-12-01/BUG-14-01: tracciamo l'handler click + keydown + main El.
+// resetBoundGuard li rimuove prima del re-bind, evitando accumulo di listener
+// ad ogni re-render. Il flag `_boundShowDetail` previene doppi bind senza reset.
+// H17 a11y: aggiungiamo anche un keydown handler che converte Enter/Space su
+// elementi [data-action] focusable (role=button/tab, tabindex=0) in click,
+// rendendo le div interattive accessibili da tastiera.
 export function bindShowDetailEvents(main: HTMLElement): void {
   if (_boundShowDetail) return;
   _boundShowDetail = true;
-  main.addEventListener('click', (e) => {
+  _mainEl = main;
+
+  _clickHandler = (e: MouseEvent): void => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
@@ -266,5 +301,21 @@ export function bindShowDetailEvents(main: HTMLElement): void {
     } else if (action === 'refreshShow') {
       void refreshShowEpisodes(showId);
     }
-  });
+  };
+
+  _keyHandler = (e: KeyboardEvent): void => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement;
+    const actionEl = target.closest('[data-action]') as HTMLElement | null;
+    if (!actionEl) return;
+    // Only convert when the focused element itself has the data-action (or
+    // is the action element). closest() always returns target-or-ancestor,
+    // so this is a safety net against nested interactive children.
+    if (actionEl !== target && !actionEl.contains(target)) return;
+    e.preventDefault();
+    actionEl.click();
+  };
+
+  main.addEventListener('click', _clickHandler);
+  main.addEventListener('keydown', _keyHandler);
 }

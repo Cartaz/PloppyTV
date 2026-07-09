@@ -56,19 +56,24 @@ function _readSavedAtFromStorage(): number | null {
  * Salva lo stato corrente su localStorage.
  * - `{ immediate: true }`: scrive sincronamente, ritorna `false` se la
  *   scrittura fallisce (quota, serializzazione, conflitto multi-tab).
- * - senza `immediate`: schedula un debounce di 300ms e ritorna `true`.
- *   ATTENZIONE: il ritorno `true` non garantisce che il salvataggio debounced
- *   andrà a buon fine. Per azioni critiche usare sempre `{ immediate: true }`.
+ * - senza `immediate`: schedula un debounce di 300ms e ritorna `void`.
+ *   ATTENZIONE: non c'è ritorno booleano per la path debounced — il
+ *   salvataggio avviene in background e può fallire (CAS, quota,
+ *   serializzazione). Per azioni critiche usare sempre `{ immediate: true }`
+ *   e controllare il ritorno booleano.
  *
  * CAS multi-tab: se il `savedAt` in localStorage è diverso da `_lastSavedAt`,
  * la scrittura viene rifiutata (ritorna `false`). Il chiamante deve applicare
  * il rollback dello stato e notificare l'utente.
  */
-export function saveData(opts?: { immediate?: boolean }): boolean {
+export function saveData(opts: { immediate: true }): boolean;
+export function saveData(opts?: { immediate?: boolean }): void;
+export function saveData(opts?: { immediate?: boolean }): boolean | void {
   if (opts && opts.immediate) return _saveDataNow();
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(_saveDataNow, 300);
-  return true;
+  // BUG-04-09: debounced path returns void (scheduled, not succeeded).
+  // Callers needing success/failure feedback must use { immediate: true }.
 }
 
 function _saveDataNow(): boolean {
@@ -86,22 +91,27 @@ function _saveDataNow(): boolean {
   }
 
   let serialized: string;
+  let savedAt: number;
   try {
-    const savedAt = Date.now();
+    // H3 (BUG-04-02): _lastSavedAt is advanced ONLY after a successful write
+    // (below). Advancing it here would leave it stale-high on write failure,
+    // falsely failing CAS on the next save attempt.
+    savedAt = Date.now();
     serialized = JSON.stringify({
       version: SCHEMA_VERSION,
       shows: state.shows,
       savedAt,
     } satisfies SavedData);
-    // Aggiorna il nostro baseline subito dopo la serializzazione OK
-    _lastSavedAt = savedAt;
   } catch (e) {
     console.error('Serializzazione fallita:', e);
     showToast('Errore: dati non serializzabili', 'error');
     return false;
   }
 
-  const sizeKB = Math.round(serialized.length / 1024);
+  // BUG-04-07: use UTF-8 byte length (TextEncoder) instead of char count.
+  // Italian accented chars and emoji are multibyte in UTF-8 — char count
+  // underestimates actual storage size and the quota warning fires too late.
+  const sizeKB = Math.round(new TextEncoder().encode(serialized).length / 1024);
   if (sizeKB > 4500 && !state._quotaWarned) {
     showToast('Attenzione: dati vicini al limite (' + sizeKB + 'KB). Usa Esporta per backup.', 'warning');
     setQuotaWarned(true);
@@ -113,20 +123,49 @@ function _saveDataNow(): boolean {
       try {
         localStorage.setItem(BACKUP_KEY, prev);
       } catch {
-        // ignore
+        // ignore — best-effort backup
       }
     }
     localStorage.setItem(STORAGE_KEY, serialized);
+    // H3 (BUG-04-02): advance _lastSavedAt only AFTER the successful write.
+    _lastSavedAt = savedAt;
+    // BUG-04-06: best-effort TOCTOU detection. localStorage has no atomic
+    // CAS, so another tab could have written between our CAS read (above)
+    // and this write. Re-read savedAt; if it doesn't match what we just
+    // wrote, a race occurred — warn the user (can't fully fix without Web
+    // Locks; this only surfaces the loss, doesn't prevent it).
+    try {
+      const postWriteSavedAt = _readSavedAtFromStorage();
+      if (postWriteSavedAt !== null && postWriteSavedAt !== savedAt) {
+        showToast('Conflitto multi-tab rilevato, ricarica', 'warning');
+      }
+    } catch {
+      // ignore — best-effort detection
+    }
     return true;
   } catch (e: unknown) {
     const err = e as { name?: string; code?: number; message?: string };
     if (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014) {
+      // BUG-04-05: re-check CAS before the stripped recovery write. Another
+      // tab may have written between our CAS read (above) and this failing
+      // write. If so, abort recovery to avoid overwriting their newer data.
+      const recoverySavedAt = _readSavedAtFromStorage();
+      if (
+        _lastSavedAt !== null &&
+        recoverySavedAt !== null &&
+        recoverySavedAt !== _lastSavedAt
+      ) {
+        showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
+        return false;
+      }
       const stripped: Show[] = state.shows.map((s) => ({ ...s, image: null }));
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ version: SCHEMA_VERSION, shows: stripped, savedAt: _lastSavedAt } satisfies SavedData),
+          JSON.stringify({ version: SCHEMA_VERSION, shows: stripped, savedAt } satisfies SavedData),
         );
+        // H3: advance _lastSavedAt only after the successful stripped write.
+        _lastSavedAt = savedAt;
         showToast('Salvato senza immagini (spazio limitato).', 'warning');
         return true;
       } catch {
@@ -205,6 +244,20 @@ export function loadData(): void {
   reconcileAllLists(shows);
   _lastSavedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : null;
   setShows(shows);
+
+  // BUG-04-08: on successful load, clean up accumulated `ploppytv_corrupted_*`
+  // forensic keys. Repeated corruption could otherwise spam localStorage and
+  // contribute to quota exhaustion. Forensic value is low; cleanliness matters.
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('ploppytv_corrupted_')) keysToRemove.push(k);
+    }
+    for (const k of keysToRemove) localStorage.removeItem(k);
+  } catch {
+    // ignore — best-effort cleanup
+  }
 }
 
 // Multi-tab sync via storage event
@@ -215,6 +268,16 @@ if (typeof window !== 'undefined') {
       let newShows: Show[];
       let newSavedAt: number | null = null;
       if (ev.newValue === null) {
+        // H4 (BUG-04-03): storage was cleared elsewhere (devtools, "clear site
+        // data", another PWA instance, browser extension). Do NOT silently wipe
+        // this tab's in-memory shows — that would lose unsaved edits and
+        // existing loaded data. Only wipe if we have nothing locally.
+        if (getState().shows.length > 0) {
+          showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
+          const evBadges = new CustomEvent('ploppytv:badges');
+          window.dispatchEvent(evBadges);
+          return;
+        }
         newShows = [];
       } else {
         const parsed = JSON.parse(ev.newValue) as SavedData;
@@ -224,14 +287,19 @@ if (typeof window !== 'undefined') {
         newSavedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : null;
       }
 
-      // H5: se c'è una modale aperta o modifiche locali non salvate,
-      // NON sovrascrivere lo stato (sarebbe disastroso per l'UX).
-      // Mostriamo invece un toast che invita a ricaricare a modale chiusa.
-      if (isModalOpen()) {
-        showToast('Aggiornamento da altro tab — chiusa la finestra ricarica la pagina', 'warning');
-        // Aggiorna comunque _lastSavedAt così i salvataggi successivi falliscono per CAS
-        _lastSavedAt = newSavedAt;
-        // Aggiorna solo i badge
+      // H2 (BUG-04-01) + H5 (BUG-04-04): if a modal is open OR there are
+      // unsaved local edits, do NOT overwrite in-memory shows — that would
+      // lose the user's in-progress work or silently corrupt the other tab's
+      // newer write via a stale-overwrite on the next save.
+      //
+      // H5: do NOT advance _lastSavedAt to newSavedAt here. Leaving it at the
+      // pre-event value ensures the next saveData CAS check mismatches
+      // (storage has newSavedAt, _lastSavedAt has the older pre-event value)
+      // → CAS fails → user is forced to reload rather than overwrite the
+      // other tab's data. (Advancing _lastSavedAt to newSavedAt would make
+      // CAS pass and silently corrupt the other tab's write — the original bug.)
+      if (isModalOpen() || getState()._localDirty) {
+        showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
         const evBadges = new CustomEvent('ploppytv:badges');
         window.dispatchEvent(evBadges);
         return;

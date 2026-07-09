@@ -19,7 +19,6 @@
   <link rel="dns-prefetch" href="https://api.tvmaze.com">
   <link rel="dns-prefetch" href="https://static.tvmaze.com">
 
-  <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
@@ -58,41 +57,41 @@
     <nav class="sidebar" id="sidebar">
       <div class="nav-section">
         <div class="nav-section-title">Menu</div>
-        <div class="nav-item active" data-view="dashboard">
+        <div class="nav-item active" data-view="dashboard" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           <span>Dashboard</span>
         </div>
-        <div class="nav-item" data-view="watching">
+        <div class="nav-item" data-view="watching" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span>In corso</span>
           <span class="nav-badge" id="badge-watching">0</span>
         </div>
-        <div class="nav-item" data-view="towatch">
+        <div class="nav-item" data-view="towatch" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
           <span>Da vedere</span>
           <span class="nav-badge" id="badge-towatch">0</span>
         </div>
-        <div class="nav-item" data-view="completed">
+        <div class="nav-item" data-view="completed" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
           <span>Completate</span>
           <span class="nav-badge" id="badge-completed">0</span>
         </div>
-        <div class="nav-item" data-view="discover">
+        <div class="nav-item" data-view="discover" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
           <span>Scopri</span>
         </div>
-        <div class="nav-item" data-view="calendar">
+        <div class="nav-item" data-view="calendar" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>Calendario</span>
         </div>
-        <div class="nav-item" data-view="stats">
+        <div class="nav-item" data-view="stats" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span>Statistiche</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-title">Info</div>
-        <div class="nav-item" id="aboutBtn">
+        <div class="nav-item" id="aboutBtn" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <span>Informazioni</span>
         </div>
@@ -111,6 +110,12 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
+
+  <noscript>
+    <div style="padding:2rem;text-align:center;font-family:system-ui,sans-serif;color:#ff6b35;">
+      PloppyTV richiede JavaScript abilitato per funzionare.
+    </div>
+  </noscript>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

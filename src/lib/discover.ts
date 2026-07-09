@@ -37,8 +37,16 @@ async function fetchAllCandidates(
   const sixMonthsAgo = recentOnly
     ? (() => {
         const d = new Date();
-        d.setMonth(d.getMonth() - 6);
         d.setHours(0, 0, 0, 0);
+        // BUG-07-06: setMonth(getMonth() - 6) on a month-end day (e.g., Mar 31)
+        // rolls over to the next month (Oct 1) instead of clamping to the last
+        // day of the target month (Sep 30). Anchor to day 1 first, then clamp
+        // the original day-of-month to the last day of the target month.
+        const dayOfMonth = d.getDate();
+        d.setDate(1);
+        d.setMonth(d.getMonth() - 6);
+        const lastDayOfTargetMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        d.setDate(Math.min(dayOfMonth, lastDayOfTargetMonth));
         return d;
       })()
     : null;
@@ -69,7 +77,8 @@ async function fetchAllCandidates(
   // Concurrency limitato: batch di 3 pagine alla volta
   const CONCURRENCY = 3;
   const failedPages: number[] = [];
-  const results: TvmazeShow[][] = new Array(pages.length).fill([]);
+  // BUG-07-07: avoid `new Array(n).fill([])` (shared reference across indices).
+  const results: TvmazeShow[][] = Array.from({ length: pages.length }, () => [] as TvmazeShow[]);
 
   for (let i = 0; i < pages.length; i += CONCURRENCY) {
     const batch = pages.slice(i, i + CONCURRENCY);
@@ -96,7 +105,9 @@ async function fetchAllCandidates(
   const all: TvmazeShow[] = [];
   for (const pageShows of results) {
     for (const show of pageShows) {
-      if (!show || !show.image || !show.name || !show.weight || show.weight <= 0) continue;
+      // BUG-07-03: weight is a 0–100 popularity score; 0 is a valid TVMaze value
+      // (low but non-zero popularity). Only exclude null/undefined/negative.
+      if (!show || !show.image || !show.name || show.weight == null || show.weight < 0) continue;
       if (recentOnly) {
         if (!show.premiered) continue;
         const d = parseISODateLocal(show.premiered);
@@ -165,11 +176,14 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
           break;
         }
       }
-      if (assigned) {
+      // BUG-07-01 / BUG-07-02: respect per-genre and _other caps during FASE2.
+      // If the assigned genre is full, redirect to _other (capped). If both are
+      // full, skip the candidate entirely (do not increment `added`).
+      if (assigned && groups[assigned].length < DISCOVER_TARGET_PER_GENRE) {
         groups[assigned].push(show);
         assignedIds.add(show.id);
         added++;
-      } else {
+      } else if (groups._other.length < DISCOVER_TARGET_OTHER) {
         groups._other.push(show);
         assignedIds.add(show.id);
         added++;
@@ -194,7 +208,19 @@ function readCache(key: string): DiscoverGroups | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw) as { cachedAt: number; groups: DiscoverGroups };
-    if (cached && cached.cachedAt && Date.now() - cached.cachedAt < DISCOVER_CACHE_TTL && cached.groups) {
+    // BUG-07-04: reject future cachedAt (clock skew / tampering) — otherwise the
+    // TTL check (Date.now() - cachedAt < TTL) is always true for future timestamps.
+    // BUG-07-05: minimal shape validation — groups must be a plain object (not
+    // array/string/number). Downstream Array.isArray guards handle per-key safety.
+    if (
+      cached &&
+      typeof cached.cachedAt === 'number' &&
+      cached.cachedAt <= Date.now() &&
+      Date.now() - cached.cachedAt < DISCOVER_CACHE_TTL &&
+      cached.groups &&
+      typeof cached.groups === 'object' &&
+      !Array.isArray(cached.groups)
+    ) {
       return cached.groups;
     }
   } catch {
