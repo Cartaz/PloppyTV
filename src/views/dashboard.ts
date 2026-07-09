@@ -12,6 +12,9 @@ import type { Show } from '../types';
 import { getState } from '../lib/store';
 import { getWatchedCount, findNextEpisode, escapeHtml, escapeAttr } from '../lib/utils';
 import { imgTag } from '../components/img';
+import { getRandomGoldEpisode } from '../lib/shows';
+import { openShow } from '../lib/store';
+import { showToast } from '../components/toast';
 
 function showCardHtml(show: Show): string {
   const watched = getWatchedCount(show);
@@ -59,6 +62,24 @@ function bindKeydown(main: HTMLElement): void {
       target.click();
     }
   });
+
+  // P2.5: Random gold episode button click handler
+  const goldBtn = main.querySelector('#randomGoldBtn') as HTMLElement | null;
+  if (goldBtn) {
+    goldBtn.addEventListener('click', () => {
+      const ep = getRandomGoldEpisode();
+      if (!ep) {
+        showToast('Non hai ancora episodi con rating 5★. Dai 5 stelle ai tuoi preferiti!', 'warning');
+        return;
+      }
+      // Apri il dettaglio della serie per far rivedere l'episodio
+      openShow(ep.show.id);
+      showToast(
+        'Episodio oro: ' + ep.show.name + ' S' + ep.season + 'E' + ep.ep.num + (ep.ep.name ? ' — ' + ep.ep.name : ''),
+        'success',
+      );
+    });
+  }
 }
 
 export function renderDashboard(main: HTMLElement): void {
@@ -125,6 +146,23 @@ export function renderDashboard(main: HTMLElement): void {
         '</div><div class="continue-card-btn">Continua</div></div></div>';
     }
     html += '</div></div>';
+  }
+
+  // P2.5: Random gold episode button (solo se ci sono episodi 5★)
+  const goldEp = getRandomGoldEpisode();
+  if (goldEp) {
+    html +=
+      '<div class="section random-gold-section">' +
+      '<div class="random-gold-card" id="randomGoldBtn" role="button" tabindex="0">' +
+      '<div class="random-gold-icon">★</div>' +
+      '<div class="random-gold-info">' +
+      '<div class="random-gold-title">Rivedi un episodio oro</div>' +
+      '<div class="random-gold-desc">Un episodio 5★ a caso dalla tua libreria</div>' +
+      '<div class="random-gold-hint">' + escapeHtml(goldEp.show.name) + ' — S' + goldEp.season + 'E' + goldEp.ep.num + '</div>' +
+      '</div>' +
+      '<div class="random-gold-action">Sorprendimi</div>' +
+      '</div>' +
+      '</div>';
   }
 
   if (watching.length > 0) {

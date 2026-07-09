@@ -10,6 +10,12 @@ import { safeId } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { updateBadges } from '../components/header';
+import {
+  MAX_EPISODE_NOTE_LENGTH,
+  MAX_EPISODE_RATING,
+  MAX_TAG_LENGTH,
+  MAX_TAGS_PER_SHOW,
+} from './constants';
 
 const _addShowInFlight = new Set<number>();
 
@@ -292,6 +298,179 @@ export function showNeedsEpisodeNames(show: Show): boolean {
     }
   }
   return false;
+}
+
+// ===== P2.1: Rating 5★ per episodio =====
+
+/**
+ * Imposta il rating (1-5) di un episodio. Passare 0 o undefined per rimuovere.
+ * Salva immediatamente su localStorage con rollback in caso di fallimento.
+ */
+export function setEpisodeRating(showId: number, seasonNum: number, epNum: number, rating: number): void {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show || !show.seasons[seasonNum]) return;
+  const ep = show.seasons[seasonNum].find((e) => e.num === epNum);
+  if (!ep) return;
+
+  // Valida rating: 0 = rimuovi, 1..MAX = valido.
+  let newRating: number | undefined;
+  if (typeof rating === 'number' && Number.isFinite(rating)) {
+    const r = Math.round(rating);
+    if (r >= 1 && r <= MAX_EPISODE_RATING) newRating = r;
+    else if (r === 0) newRating = undefined;
+    else return; // valore fuori range, ignora
+  } else {
+    newRating = undefined;
+  }
+
+  const prevRating = ep.rating;
+  ep.rating = newRating;
+
+  if (!saveData({ immediate: true })) {
+    ep.rating = prevRating;
+    showToast('Rating non salvato (storage error o modifiche in altro tab)', 'error');
+    return;
+  }
+  emitChange();
+}
+
+// ===== P2.2: Note private per episodio =====
+
+/**
+ * Imposta la nota privata di un episodio (max 500 char). Stringa vuota = rimuovi.
+ * Salva immediatamente su localStorage con rollback in caso di fallimento.
+ */
+export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): void {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show || !show.seasons[seasonNum]) return;
+  const ep = show.seasons[seasonNum].find((e) => e.num === epNum);
+  if (!ep) return;
+
+  const trimmed = typeof note === 'string' ? note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim() : '';
+  const newNote = trimmed.length > 0 ? trimmed : undefined;
+  const prevNote = ep.note;
+  ep.note = newNote;
+
+  if (!saveData({ immediate: true })) {
+    ep.note = prevNote;
+    showToast('Nota non salvata (storage error o modifiche in altro tab)', 'error');
+    return;
+  }
+  emitChange();
+}
+
+// ===== P2.3: Tag personalizzabili per serie =====
+
+/**
+ * Aggiunge un tag a una serie. Dedup case-insensitive, tronca a MAX_TAG_LENGTH,
+ * max MAX_TAGS_PER_SHOW tag per serie.
+ */
+export function addShowTag(showId: number, tag: string): boolean {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show) return false;
+  const trimmed = typeof tag === 'string' ? tag.trim().slice(0, MAX_TAG_LENGTH) : '';
+  if (trimmed.length === 0) return false;
+
+  const tags = show.tags ?? [];
+  // Dedup case-insensitive: se "Estate" esiste, "estate" non viene aggiunto.
+  const lower = trimmed.toLowerCase();
+  if (tags.some((t) => t.toLowerCase() === lower)) {
+    showToast('Tag già presente', 'warning');
+    return false;
+  }
+  if (tags.length >= MAX_TAGS_PER_SHOW) {
+    showToast('Massimo ' + MAX_TAGS_PER_SHOW + ' tag per serie', 'warning');
+    return false;
+  }
+
+  const prevTags = show.tags;
+  show.tags = [...tags, trimmed];
+
+  if (!saveData({ immediate: true })) {
+    show.tags = prevTags;
+    showToast('Tag non salvato (storage error o modifiche in altro tab)', 'error');
+    return false;
+  }
+  emitChange();
+  return true;
+}
+
+/**
+ * Rimuove un tag da una serie (match case-insensitive).
+ */
+export function removeShowTag(showId: number, tag: string): void {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show || !show.tags || show.tags.length === 0) return;
+  const lower = tag.toLowerCase();
+  const prevTags = show.tags;
+  show.tags = show.tags.filter((t) => t.toLowerCase() !== lower);
+
+  if (show.tags.length === prevTags.length) return; // nessun cambiamento
+
+  if (!saveData({ immediate: true })) {
+    show.tags = prevTags;
+    showToast('Rimozione tag non salvata (storage error o modifiche in altro tab)', 'error');
+    return;
+  }
+  emitChange();
+}
+
+// ===== P2.5: Rivedi un episodio casuale (gold 5★) =====
+
+/**
+ * Ritorna un episodio casuale con rating 5★ dalla libreria dell'utente.
+ * Usa crypto.getRandomValues se disponibile (better randomness), fallback Math.random.
+ * Ritorna null se non ci sono episodi gold.
+ */
+export function getRandomGoldEpisode(): {
+  show: Show;
+  season: number;
+  ep: Show['seasons'][number][number];
+} | null {
+  const state = getState();
+  const gold: Array<{ show: Show; season: number; ep: Show['seasons'][number][number] }> = [];
+  for (const show of state.shows) {
+    // Guard: seasons potrebbe essere null/undefined su dati malformati.
+    if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) continue;
+    for (const seasonKey of Object.keys(show.seasons)) {
+      const seasonNum = Number(seasonKey);
+      if (!Number.isInteger(seasonNum) || seasonNum <= 0) continue;
+      const eps = show.seasons[seasonNum];
+      if (!Array.isArray(eps)) continue;
+      for (const ep of eps) {
+        if (ep && ep.rating === MAX_EPISODE_RATING && ep.watched) {
+          gold.push({ show, season: seasonNum, ep });
+        }
+      }
+    }
+  }
+  if (gold.length === 0) return null;
+  // crypto-safe random index
+  let idx: number;
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    idx = arr[0] % gold.length;
+  } else {
+    idx = Math.floor(Math.random() * gold.length);
+  }
+  return gold[idx];
+}
+
+/**
+ * Raccoglie tutti i tag usati dall'utente (per autocomplete/suggerimenti filtri).
+ */
+export function getAllUserTags(): string[] {
+  const state = getState();
+  const set = new Set<string>();
+  for (const show of state.shows) {
+    if (show.tags) for (const t of show.tags) set.add(t);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
 // Re-export alias per compatibilità

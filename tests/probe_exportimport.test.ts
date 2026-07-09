@@ -974,7 +974,7 @@ describe('export flow', () => {
     });
     clickSpy.mockRestore();
     const parsed = JSON.parse(text);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(Array.isArray(parsed.shows)).toBe(true);
     expect(parsed.shows).toHaveLength(1);
     expect(parsed.shows[0].name).toBe('X');

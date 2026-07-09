@@ -3,6 +3,16 @@
 import { getState } from '../lib/store';
 import { switchView } from '../lib/store';
 import { showModal } from './modal';
+import { showToast } from './toast';
+import { getLocale, setLocale, getAvailableLocales, t } from '../lib/i18n';
+import {
+  notificationsSupported,
+  notificationsEnabled,
+  enableNotifications,
+  disableNotifications,
+  isPwaStandalone,
+  getNextNotifiableEpisode,
+} from '../lib/notifications';
 
 export function updateBadges(): void {
   const state = getState();
@@ -99,4 +109,67 @@ export function initHeader(): void {
 
   // Multi-tab badge sync
   window.addEventListener('ploppytv:badges', updateBadges);
+
+  // P2.9: Notifications toggle
+  document.getElementById('notifBtn')?.addEventListener('click', async () => {
+    if (!notificationsSupported()) {
+      showToast(t('notifications.pwaRequired'), 'warning');
+      return;
+    }
+    if (notificationsEnabled()) {
+      disableNotifications();
+      showToast(t('notifications.disabled'), 'success');
+      return;
+    }
+    if (!isPwaStandalone()) {
+      // Avvisa ma permetti comunque l'attivazione
+      console.warn('[notifications] Not in standalone mode');
+    }
+    const ok = await enableNotifications();
+    if (ok) {
+      const next = getNextNotifiableEpisode();
+      const msg = next
+        ? t('notifications.scheduled', { count: '1+' }) + ' — ' + next.showName + ' S' + next.season + 'E' + next.num
+        : t('notifications.enabled');
+      showToast(msg, 'success');
+    } else {
+      showToast(t('notifications.denied'), 'warning');
+    }
+  });
+
+  // P2.7: Language switcher
+  document.getElementById('langBtn')?.addEventListener('click', () => {
+    const current = getLocale();
+    const locales = getAvailableLocales();
+    const labels: Record<string, string> = { it: 'Italiano', en: 'English' };
+    const bodyHtml =
+      '<div style="display:flex;flex-direction:column;gap:8px;">' +
+      locales
+        .map(
+          (l) =>
+            '<button class="btn ' +
+            (l === current ? 'btn-primary' : 'btn-secondary') +
+            '" data-lang="' +
+            l +
+            '" style="text-align:left;">' +
+            (l === current ? '✓ ' : '') +
+            labels[l] +
+            '</button>',
+        )
+        .join('') +
+      '</div>';
+    showModal(t('nav.menu') + ' — Lingua', bodyHtml, [{ label: t('actions.close') }]);
+    // Bind click sui pulsanti lingua
+    setTimeout(() => {
+      document.querySelectorAll('[data-lang]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const lang = (btn as HTMLElement).dataset.lang;
+          if (lang === 'it' || lang === 'en') {
+            setLocale(lang);
+            // Il re-render è triggerato da subscribeI18n nel main.ts
+          }
+        });
+      });
+    }, 50);
+  });
 }

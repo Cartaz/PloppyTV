@@ -3,6 +3,7 @@
 import type { ListName, Show, TvmazeShow, Episode, TvmazeEpisode } from '../types';
 import { ALLOWED_LISTS } from '../types';
 import { safeId, safeImageUrl, safeNum, stripHtml, getPosterUrl, getWatchedCount, parseISODateLocal } from './utils';
+import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_PER_SHOW } from './constants';
 
 /**
  * Normalizza uno Show da sorgente non fidata (localStorage, backup JSON).
@@ -46,15 +47,27 @@ export function normalizeShow(raw: unknown): Show | null {
           (ep): ep is Record<string, unknown> =>
             !!ep && typeof ep === 'object' && !Array.isArray(ep) && (ep as { num?: unknown }).num != null,
         )
-        .map((ep) => ({
-          num: safeId(ep.num),
-          id: safeId(ep.id),
-          watched: !!ep.watched,
-          // BUG-02-02: parseISODateLocal valida stretta (rifiuta 2024-13-40, 2024-02-30).
-          airdate: typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null ? ep.airdate : null,
-          name: typeof ep.name === 'string' ? ep.name.slice(0, 300) : null,
-          runtime: typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : null,
-        }))
+        .map((ep) => {
+          const obj: Episode = {
+            num: safeId(ep.num),
+            id: safeId(ep.id),
+            watched: !!ep.watched,
+            // BUG-02-02: parseISODateLocal valida stretta (rifiuta 2024-13-40, 2024-02-30).
+            airdate: typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null ? ep.airdate : null,
+            name: typeof ep.name === 'string' ? ep.name.slice(0, 300) : null,
+            runtime: typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : null,
+          };
+          // P2.1: rating — intero 1..5, altri valori → undefined.
+          if (typeof ep.rating === 'number' && Number.isFinite(ep.rating)) {
+            const r = Math.round(ep.rating);
+            if (r >= 1 && r <= MAX_EPISODE_RATING) obj.rating = r;
+          }
+          // P2.2: note — stringa non vuota dopo trim, troncata a MAX_EPISODE_NOTE_LENGTH.
+          if (typeof ep.note === 'string' && ep.note.trim().length > 0) {
+            obj.note = ep.note.slice(0, MAX_EPISODE_NOTE_LENGTH);
+          }
+          return obj;
+        })
         .filter((ep) => ep.num > 0)
         // BUG-02-10: dedup per num — primo tenuto, duplicati saltati.
         .filter((ep) => {
@@ -94,6 +107,24 @@ export function normalizeShow(raw: unknown): Show | null {
   // BUG-02-09: truthy coercion `!!` (1, "yes", true → true; 0, "", null → false).
   const manualList = !!r.manualList;
 
+  // P2.3: tags — array di stringhe non vuote, dedup case-insensitive, troncate, max MAX_TAGS_PER_SHOW.
+  const tags: string[] = Array.isArray(r.tags)
+    ? (() => {
+        const seen = new Set<string>();
+        const result: string[] = [];
+        for (const t of r.tags) {
+          if (typeof t !== 'string' || t.trim().length === 0) continue;
+          const trimmed = t.trim().slice(0, MAX_TAG_LENGTH);
+          const lower = trimmed.toLowerCase();
+          if (seen.has(lower)) continue; // dedup case-insensitive
+          seen.add(lower);
+          result.push(trimmed);
+          if (result.length >= MAX_TAGS_PER_SHOW) break;
+        }
+        return result;
+      })()
+    : [];
+
   return {
     id,
     name,
@@ -110,6 +141,7 @@ export function normalizeShow(raw: unknown): Show | null {
     totalSeasons,
     totalEpisodes,
     addedAt,
+    tags,
   };
 }
 
@@ -199,6 +231,7 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
     totalSeasons,
     totalEpisodes,
     addedAt: Date.now(),
+    tags: [],
   };
 }
 

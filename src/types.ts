@@ -11,6 +11,10 @@ export interface Episode {
   airdate: string | null;
   name?: string | null;
   runtime?: number | null;
+  /** Rating personale 1-5 (0 = nessun rating). P2.1 */
+  rating?: number;
+  /** Nota privata (max 500 char). P2.2 */
+  note?: string;
 }
 
 export interface Show {
@@ -36,6 +40,8 @@ export interface Show {
   totalSeasons: number;
   totalEpisodes: number;
   addedAt: number;
+  /** Tag personalizzabili dell'utente. P2.3 */
+  tags?: string[];
 }
 
 // Show grezzo da TVMaze (parziale, solo i campi usati)

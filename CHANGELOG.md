@@ -2,6 +2,46 @@
 
 Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il formato si ispira a [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e il progetto segue [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — P2 Quality of life quotidiana
+
+### Aggiunto
+
+**P2 — Quality of life quotidiana (9 item completati)**
+
+Feature che migliorano l'uso quotidiano dell'app, con focus su polish del modello locale esistente (no nuova architettura). Schema bumped a v2 per supportare i nuovi campi.
+
+- **Rating 5★ per episodio** (`src/lib/shows.ts`, `src/views/showDetail.ts`) — stelle 1-5 cliccabili per ogni episodio, toggle (clicca di nuovo la stessa stella per rimuovere), media stagione mostrata sopra la lista episodi. Campo `rating?: number` aggiunto a `Episode`.
+- **Note private per episodio** (`src/views/showDetail.ts`) — editor modale con textarea (max 500 char) e contatore caratteri in tempo reale, anteprima nota sotto l'episodio, indicatore visivo (punto arancione) sulle note esistenti. Campo `note?: string` aggiunto a `Episode`.
+- **Tag personalizzabili per serie** (`src/lib/shows.ts`, `src/views/showDetail.ts`, `src/views/showList.ts`) — aggiunta/rimozione tag dal dettaglio serie con modale + suggerimenti da tag esistenti, filtro tag nelle liste watching/towatch/completed, dedup case-insensitive, max 20 tag per serie. Campo `tags?: string[]` aggiunto a `Show`.
+- **Search avanzata nella libreria** (`src/views/library.ts`) — nuova vista "Libreria" con filter bar completa: ricerca testuale + 6 filtri (genere, status, rating minimo, network, anno premiere, tag). Risultati reattivi in tempo reale, pulsante "Cancella filtri".
+- **Rivedi un episodio casuale** (`src/lib/shows.ts`, `src/views/dashboard.ts`) — card in dashboard con gradient oro che suggerisce un episodio 5★ a caso. Usa `crypto.getRandomValues` per random sicuro, apre il dettaglio serie e mostra toast con info episodio.
+- **Keyboard shortcuts** (`src/lib/keyboard.ts`) — `/` focus search, `g d/c/s/l/y` navigazione viste (dashboard/calendar/stats/library/yearreview), `j/k` naviga episodi, `w` toggle watched, `?` mostra cheat sheet modale. Sequenze `g+lettera` con timeout 800ms. Ignorato quando si scrive in input/textarea.
+- **i18n IT + EN** (`src/lib/i18n.ts`, `src/locales/it.json`, `src/locales/en.json`) — framework i18n custom (zero dipendenze) con 150+ chiavi tradotte. Default da `navigator.language`, persistenza lingua in localStorage (`ploppytv_prefs_v1`), switcher lingua nella sidebar, re-render automatico al cambio lingua via subscribe pattern.
+- **Statistiche Year-in-Review** (`src/views/yearReview.ts`) — nuova vista "Anno in TV" con selettore anno, 4 stat card (episodi totali, ore, genere dominante, stagione più longeva), top 5 serie viste, export PNG 1080×1350 via canvas (gradient background, branding PloppyTV). Stima visioni annuali basata su airdate episodio.
+- **Notifiche push per nuovi episodi** (`src/lib/notifications.ts`) — Notification API (no backend richiesto), scheduling locale con `setTimeout` 1 ora prima dell'airdate delle serie in watching, re-scheduling ogni 6 ore, toggle nella sidebar, opt-in esplicito con `Notification.requestPermission()`. Persiste lo stato in localStorage.
+
+### Modificato
+
+- `SCHEMA_VERSION` bumped da 1 a 2 (`src/lib/constants.ts`) — nuovi campi `rating`, `note` su `Episode` e `tags` su `Show`. Migrazione automatica: `normalizeShow` gestisce i nuovi campi con validazione (rating 1-5, note trim+truncate 500 char, tags dedup case-insensitive + max 20).
+- `src/lib/normalize.ts` — `normalizeShow` ora preserva e valida `rating`, `note`, `tags`. `buildShowFromTvmaze` inizializza `tags: []`.
+- `src/lib/constants.ts` — aggiunte costanti: `MAX_EPISODE_NOTE_LENGTH`, `MAX_EPISODE_RATING`, `MAX_TAG_LENGTH`, `MAX_TAGS_PER_SHOW`, `PREFS_KEY`, `NOTIF_LEAD_TIME_MS`, `NOTIF_RESCHEDULE_INTERVAL_MS`.
+- `src/main.ts` — init di `initI18n()`, `initKeyboard()`, `initNotifications()`, subscribe a `subscribeI18n` per re-render al cambio lingua, dispatch evento `ploppytv:reschedule-notifications` su state change.
+- `src/components/renderer.ts` — aggiunti case `library` e `yearreview` per le nuove viste.
+- `src/components/header.ts` — aggiunti handler per toggle notifiche (`#notifBtn`) e switcher lingua (`#langBtn`).
+- `src/views/dashboard.ts` — aggiunta card "Rivedi un episodio oro" con event handler.
+- `src/views/showDetail.ts` — aggiunte stelle rating, pulsante nota, sezione tag, media stagione, modali editor nota e aggiunta tag.
+- `src/views/showList.ts` — aggiunta tag filter bar.
+- `index.html` — aggiunti nav item per Libreria, Anno in TV, Notifiche, Lingua.
+- `src/styles/main.css` — aggiunti ~450 righe di CSS per tutte le nuove feature P2.
+- `docs/roadmap.html` — tutti i 9 item P2 marcati come ✓ Completata.
+- `README.md` — aggiornata tabella roadmap (P2 ✅), aggiunta sezione P2 dettagliata, aggiunte feature P2 alla lista funzionalità.
+
+### Test
+
+- `tests/p2_features.test.ts` (nuovo) — 26 test per: schema v2 (rating/note/tags normalizzazione), i18n (init, setLocale, t(), interpolazione, fallback), getRandomGoldEpisode (guard null seasons, 5★ filter), getAllUserTags, keyboard module, notifications module.
+- `tests/probe_exportimport.test.ts` — aggiornato assertion `version` da 1 a 2.
+- Suite totale: 870 test passanti (26 nuovi + 844 esistenti), 0 falliti.
+
 ## [1.1.0] — 2026-07-09
 
 ### Aggiunto

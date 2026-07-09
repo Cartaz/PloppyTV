@@ -889,12 +889,12 @@
           <div class="stat-card">
             <div class="stat-value" data-count="5">0</div>
             <div class="stat-label">Fasi roadmap</div>
-            <div class="stat-trend">P1 ✓ · P2-P5 da fare</div>
+            <div class="stat-trend">P1 ✓ · P2 ✓ · P3-P5 da fare</div>
           </div>
           <div class="stat-card">
             <div class="stat-value" data-count="32">0</div>
             <div class="stat-label">Feature/action items</div>
-            <div class="stat-trend">7/32 completate · tutte local-first</div>
+            <div class="stat-trend">16/32 completate · tutte local-first</div>
           </div>
           <div class="stat-card">
             <div class="stat-value" data-count="0">0</div>
@@ -1153,104 +1153,104 @@
             <div class="roadmap-marker">P2</div>
             <div class="roadmap-content">
               <div class="rc-head">
-                <h4>Quality of life quotidiana</h4>
-                <span class="timeline">Mese 1-3 · 8 settimane</span>
-                <span class="focus p1">Alto</span>
+                <h4>Quality of life quotidiana ✓ Completata</h4>
+                <span class="timeline">Mese 1-3 · 8 settimane · Implementata Luglio 2026</span>
+                <span class="focus done">Completata</span>
               </div>
               <p>
                 Feature che migliorano l'uso quotidiano per te e i tuoi conoscenti. Focus su: cose che ti mancano quando
                 usi l'app tutti i giorni, scorciatoie, dati più ricchi, UX più fluida. Niente architettura nuova — solo
-                polish sul modello locale esistente.
+                polish sul modello locale esistente. <strong>Tutti i 9 item P2 sono stati implementati e testati.</strong>
               </p>
               <div class="roadmap-items">
-                <div class="roadmap-item">
-                  <div class="ri-title">Rating 5★ per episodio</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Rating 5★ per episodio ✓</div>
                   <div class="ri-desc">
                     Stelle 1-5 per ogni episodio visto. Mostra media stagione nella vista dettaglio. Privato, niente
-                    condivisione. Ti aiuta a ricordare quali episodi rivedere.
+                    condivisione. Ti aiuta a ricordare quali episodi rivedere. <strong>Implementato:</strong> click sulle stelle per votare, toggle (clicca di nuovo per rimuovere), media stagione mostrata sopra la lista episodi.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>1 settimana</span><span>schema v2</span>
+                    <span class="ri-tag done">done</span><span>schema v2</span><span>shows.ts + showDetail.ts</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Note private per episodio</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Note private per episodio ✓</div>
                   <div class="ri-desc">
                     Campo testo libero per ogni episodio (max 500 char). "Questa scena mi ha commosso", "spoiler di X",
-                    ecc. Solo tuo, mai inviato da nessuna parte.
+                    ecc. Solo tuo, mai inviato da nessuna parte. <strong>Implementato:</strong> editor modale con contatore caratteri, anteprima nota sotto l'episodio, indicatore visivo (punto arancione) sulle note esistenti.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>3 giorni</span><span>editor episodio</span>
+                    <span class="ri-tag done">done</span><span>editor episodio</span><span>modal + textarea</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Tag personalizzabili per serie</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Tag personalizzabili per serie ✓</div>
                   <div class="ri-desc">
                     Crea tag tipo "da rivedere", "con Alice", "estate 2026". Filtra la watchlist per tag. Utile quando
-                    hai 50+ serie in tracking.
+                    hai 50+ serie in tracking. <strong>Implementato:</strong> aggiunta/rimozione tag dal dettaglio serie, suggerimenti da tag esistenti, filtro tag nelle liste (watching/towatch/completed), dedup case-insensitive.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>4 giorni</span><span>multi-select UI</span>
+                    <span class="ri-tag done">done</span><span>multi-select UI</span><span>showDetail + showList</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Search avanzata nella tua libreria</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Search avanzata nella tua libreria ✓</div>
                   <div class="ri-desc">
-                    Filtra per genere, status, rating ≥ N, network, anno premiere. Es: "tutte le serie crime di HBO
-                    rated ≥ 4 viste nel 2025".
+                    Filtra per genere, status, rating ≥ N, network, anno premiere, tag. Es: "tutte le serie crime di HBO
+                    rated ≥ 4 viste nel 2025". <strong>Implementato:</strong> nuova vista "Libreria" con filter bar completa (6 filtri + ricerca testuale), risultati reattivi in tempo reale, pulsante "Cancella filtri".
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>1 settimana</span><span>filter bar</span>
+                    <span class="ri-tag done">done</span><span>filter bar</span><span>views/library.ts</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">"Rivedi un episodio casuale"</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">"Rivedi un episodio casuale" ✓</div>
                   <div class="ri-desc">
                     Bottone che suggerisce un episodio gold (rating 5★) dalla tua libreria, random. Quando non sai cosa
-                    guardare e vuoi qualcosa che sai già che ti piace.
+                    guardare e vuoi qualcosa che sai già che ti piace. <strong>Implementato:</strong> card in dashboard con gradient oro, crypto-safe random (crypto.getRandomValues), apre il dettaglio serie e mostra toast con info episodio.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>2 giorni</span><span>fun feature</span>
+                    <span class="ri-tag done">done</span><span>fun feature</span><span>dashboard + shows.ts</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Keyboard shortcuts</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Keyboard shortcuts ✓</div>
                   <div class="ri-desc">
-                    / focus search, g d vai a dashboard, g c calendario, g s stats, j/k naviga episodi, w toggle
-                    watched. Cheat sheet con ? attivabile.
+                    / focus search, g d vai a dashboard, g c calendario, g s stats, g l libreria, g y anno in TV, j/k naviga episodi, w toggle
+                    watched. Cheat sheet con ? attivabile. <strong>Implementato:</strong> modulo keyboard.ts con sequenze (g+lettera), cheat sheet modale, navigazione episodi j/k, toggle w, ignorato quando si scrive in input.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag a11y">a11y</span><span>3 giorni</span><span>power user</span>
+                    <span class="ri-tag done">done</span><span>power user</span><span>lib/keyboard.ts</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">i18n IT + EN</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">i18n IT + EN ✓</div>
                   <div class="ri-desc">
-                    Framework i18n leggero (es. nanostore + custom). Tutte le stringhe in en.json + it.json. Default da
-                    navigator.language. Permette ai conoscenti non-italiani di usarlo.
+                    Framework i18n leggero (custom, zero dipendenze). Tutte le stringhe in en.json + it.json. Default da
+                    navigator.language. Permette ai conoscenti non-italiani di usarlo. <strong>Implementato:</strong> modulo i18n.ts con 150+ chiavi tradotte, persistenza lingua in localStorage, switcher lingua nella sidebar, re-render automatico al cambio lingua.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag i18n">i18n</span><span>2 settimane</span><span>audience ×3</span>
+                    <span class="ri-tag done">done</span><span>audience ×3</span><span>lib/i18n.ts + locales/</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Statistiche Year-in-Review</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Statistiche Year-in-Review ✓</div>
                   <div class="ri-desc">
                     Pagina "Il tuo 2026 in TV": top 5 serie viste, ore totali, genere dominante, stagione più longeva.
-                    Card condivisibile come immagine (canvas export). Per te e per inviare agli amici a fine anno.
+                    Card condivisibile come immagine (canvas export). <strong>Implementato:</strong> vista yearReview.ts con selettore anno, 4 stat card, top 5 lista, export PNG 1080×1350 via canvas (gradient background, branding PloppyTV).
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>1 settimana</span><span>canvas share</span>
+                    <span class="ri-tag done">done</span><span>canvas share</span><span>views/yearReview.ts</span>
                   </div>
                 </div>
-                <div class="roadmap-item">
-                  <div class="ri-title">Notifiche push per nuovi episodi</div>
+                <div class="roadmap-item done">
+                  <div class="ri-title">Notifiche push per nuovi episodi ✓</div>
                   <div class="ri-desc">
-                    SW registration per push notification 1 ora prima dell'episodio delle serie in watching. Permission
-                    richiesta esplicitamente. Funziona solo se l'app è installata PWA.
+                    SW registration per notifiche 1 ora prima dell'episodio delle serie in watching. Permission
+                    richiesta esplicitamente. Funziona solo se l'app è installata PWA. <strong>Implementato:</strong> modulo notifications.ts con Notification API (no backend), scheduling locale con setTimeout, re-scheduling ogni 6h, toggle nella sidebar, opt-in esplicito.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag new">new</span><span>1 settimana</span><span>Notification API</span>
+                    <span class="ri-tag done">done</span><span>Notification API</span><span>lib/notifications.ts</span>
                   </div>
                 </div>
               </div>
@@ -1505,8 +1505,7 @@
         </div>
 
         <div class="callout success reveal" style="margin-top: var(--space-8)">
-          <strong>Stop condition:</strong> puoi fermarti a P2 ed essere già felice. P3 (sync) è il vero salto di
-          qualità. P4 (AI) è geek e opzionale. P5 è dessert. La regola d'oro è:
+          <strong>P2 completata! ✓</strong> Tutti i 9 item P2 (rating, note, tag, search avanzata, random gold, keyboard shortcuts, i18n IT+EN, Year-in-Review, notifiche push) sono stati implementati, testati (870 test passanti) e la build di produzione è verde. <strong>Stop condition raggiunta:</strong> puoi fermarti a P2 ed essere già felice. P3 (sync) è il vero salto di qualità. P4 (AI) è geek e opzionale. P5 è dessert. La regola d'oro è:
           <strong>se una fase ti stressa, salta alla successiva</strong>. È un progetto tuo, non un lavoro.
         </div>
       </div>

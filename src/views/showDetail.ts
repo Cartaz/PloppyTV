@@ -19,7 +19,14 @@ import {
   markSeasonWatched,
   refreshShowEpisodes,
   showNeedsEpisodeNames,
+  setEpisodeRating,
+  setEpisodeNote,
+  addShowTag,
+  removeShowTag,
 } from '../lib/shows';
+import { showModal, closeModal } from '../components/modal';
+import { showToast } from '../components/toast';
+import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
 
 let _boundShowDetail = false;
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -33,6 +40,87 @@ let _showDetailMain: HTMLElement | null = null;
  */
 export function resetBoundGuard(): void {
   _boundShowDetail = false;
+}
+
+// ===== P2 helper: star rating HTML per episodio =====
+function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
+  let html =
+    '<span class="ep-rating" role="group" aria-label="Rating episodio" ' +
+    'data-action="rateEpisode" data-show-id="' +
+    showId +
+    '" data-season="' +
+    season +
+    '" data-ep="' +
+    epNum +
+    '">';
+  for (let i = 1; i <= MAX_EPISODE_RATING; i++) {
+    const filled = rating !== undefined && i <= rating;
+    html +=
+      '<span class="star' +
+      (filled ? ' filled' : '') +
+      '" data-star="' +
+      i +
+      '" role="button" tabindex="0" aria-label="' +
+      i +
+      ' stelle">★</span>';
+  }
+  html += '</span>';
+  return html;
+}
+
+// ===== P2 helper: nota episodio HTML =====
+function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boolean): string {
+  return (
+    '<button class="ep-note-btn' +
+    (hasNote ? ' has-note' : '') +
+    '" data-action="editNote" data-show-id="' +
+    showId +
+    '" data-season="' +
+    season +
+    '" data-ep="' +
+    epNum +
+    '" title="' +
+    (hasNote ? 'Modifica nota' : 'Aggiungi nota') +
+    '">' +
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+    (hasNote ? '<span class="ep-note-dot"></span>' : '') +
+    '</button>'
+  );
+}
+
+// ===== P2 helper: tag management HTML =====
+function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
+  const tags = show.tags ?? [];
+  let html = '<div class="detail-tags-section">';
+  html += '<div class="detail-tags-label">Tag:</div>';
+  html += '<div class="detail-tags-list">';
+  for (const t of tags) {
+    html +=
+      '<span class="user-tag">' +
+      escapeHtml(t) +
+      '<button class="tag-remove" data-action="removeTag" data-show-id="' +
+      show.id +
+      '" data-tag="' +
+      escapeAttr(t) +
+      '" aria-label="Rimuovi tag ' +
+      escapeAttr(t) +
+      '">×</button></span>';
+  }
+  html +=
+    '<button class="tag-add-btn" data-action="addTag" data-show-id="' +
+    show.id +
+    '">+ Aggiungi tag</button>';
+  html += '</div></div>';
+  return html;
+}
+
+// ===== P2 helper: media rating stagione =====
+function seasonAvgRating(eps: Array<{ rating?: number }>): string {
+  const rated = eps.filter((e) => e && typeof e.rating === 'number');
+  if (rated.length === 0) return '';
+  const sum = rated.reduce((s, e) => s + (e.rating ?? 0), 0);
+  const avg = sum / rated.length;
+  return ' · ⌀ ' + avg.toFixed(1) + '★ (' + rated.length + ')';
 }
 
 export function renderShowDetail(main: HTMLElement): void {
@@ -149,6 +237,9 @@ export function renderShowDetail(main: HTMLElement): void {
       '</div>';
   }
 
+  // P2.3: sezione tag personalizzabili
+  html += tagsSectionHtml(show);
+
   html += '<div class="detail-actions">';
   if (show.list !== 'watching')
     html +=
@@ -214,6 +305,11 @@ export function renderShowDetail(main: HTMLElement): void {
       '" data-watched="0">Segna tutti come non visti</button>' +
       '</div>';
     const eps = show.seasons[state.currentSeason] || [];
+    // P2.1: media rating stagione nella sezione actions
+    const avgLabel = seasonAvgRating(eps);
+    if (avgLabel) {
+      html += '<div class="season-rating-avg">Rating medio stagione' + avgLabel + '</div>';
+    }
     html += '<div class="episode-list">';
     for (const ep of eps) {
       const epTitle = ep.name
@@ -224,6 +320,7 @@ export function renderShowDetail(main: HTMLElement): void {
       const ariaLabel = ep.name
         ? escapeAttr(ep.name + ' (' + epNumberLabel + ')')
         : escapeAttr('Episodio ' + ep.num + ' (' + epNumberLabel + ')');
+      const hasNote = typeof ep.note === 'string' && ep.note.length > 0;
       html +=
         '<div class="episode-item ' +
         (ep.watched ? 'watched' : '') +
@@ -248,6 +345,12 @@ export function renderShowDetail(main: HTMLElement): void {
         (ep.airdate ? ' • ' + formatDate(ep.airdate) : '') +
         runtimeLabel +
         '</div>' +
+        // P2.1: stelle rating + P2.2: pulsante nota
+        '<div class="episode-extras">' +
+        starRatingHtml(show.id, state.currentSeason, ep.num, ep.rating) +
+        noteBtnHtml(show.id, state.currentSeason, ep.num, hasNote) +
+        '</div>' +
+        (hasNote ? '<div class="episode-note-preview">' + escapeHtml(ep.note!) + '</div>' : '') +
         '</div></div>';
     }
     html += '</div>';
@@ -292,11 +395,44 @@ export function bindShowDetailEvents(main: HTMLElement): void {
       const name = actionEl.dataset.showName || '';
       removeShow(showId, name);
     } else if (action === 'toggleEpisode') {
+      // P2: evita il toggle se il click origina da stelle/note/tag (elementi con data-action propri)
+      // — closest() ha già trovato il nearest data-action, quindi se siamo qui
+      //   il click è davvero sull'episode-item (non su un figlio con data-action).
       toggleEpisode(showId, Number(actionEl.dataset.season), Number(actionEl.dataset.ep));
     } else if (action === 'markSeason') {
       markSeasonWatched(showId, Number(actionEl.dataset.season), actionEl.dataset.watched === '1');
     } else if (action === 'refreshShow') {
       void refreshShowEpisodes(showId);
+    } else if (action === 'rateEpisode') {
+      // P2.1: click su una stella → imposta rating
+      e.stopPropagation();
+      const starEl = target.closest('[data-star]') as HTMLElement | null;
+      if (!starEl) return;
+      const starVal = Number(starEl.dataset.star);
+      const season = Number(actionEl.dataset.season);
+      const ep = Number(actionEl.dataset.ep);
+      // Recupera il rating corrente per toggle: se clicchi la stessa stella, rimuovi.
+      const state = getState();
+      const show = state.shows.find((s) => s.id === showId);
+      const currentRating = show?.seasons?.[season]?.find((e2) => e2.num === ep)?.rating;
+      if (currentRating === starVal) {
+        setEpisodeRating(showId, season, ep, 0); // rimuovi
+      } else {
+        setEpisodeRating(showId, season, ep, starVal);
+      }
+    } else if (action === 'editNote') {
+      // P2.2: apri modale editor nota
+      e.stopPropagation();
+      const season = Number(actionEl.dataset.season);
+      const ep = Number(actionEl.dataset.ep);
+      openNoteEditor(showId, season, ep);
+    } else if (action === 'addTag') {
+      // P2.3: apri modale aggiunta tag
+      openAddTagModal(showId);
+    } else if (action === 'removeTag') {
+      // P2.3: rimuovi tag
+      const tag = actionEl.dataset.tag || '';
+      if (tag) removeShowTag(showId, tag);
     }
   };
   // H17 a11y: keydown Enter/Space su elementi con role=button o role=tab.
@@ -314,4 +450,138 @@ export function bindShowDetailEvents(main: HTMLElement): void {
   _showDetailKeydownHandler = keydownHandler;
   main.addEventListener('click', clickHandler);
   main.addEventListener('keydown', keydownHandler);
+}
+
+// ===== P2.2: Modale editor nota episodio =====
+function openNoteEditor(showId: number, season: number, epNum: number): void {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show || !show.seasons[season]) return;
+  const ep = show.seasons[season].find((e) => e.num === epNum);
+  if (!ep) return;
+  const epName = ep.name || 'Episodio ' + epNum;
+  const currentNote = ep.note ?? '';
+
+  const bodyHtml =
+    '<p style="margin-bottom:10px;color:var(--text-secondary);font-size:13px;">' +
+    escapeHtml(show.name) +
+    ' — S' +
+    season +
+    'E' +
+    epNum +
+    ': ' +
+    escapeHtml(epName) +
+    '</p>' +
+    '<textarea id="noteTextarea" class="note-textarea" maxlength="' +
+    MAX_EPISODE_NOTE_LENGTH +
+    '" placeholder="Scrivi una nota privata per questo episodio... (max ' +
+    MAX_EPISODE_NOTE_LENGTH +
+    ' caratteri)">' +
+    escapeHtml(currentNote) +
+    '</textarea>' +
+    '<div id="noteCharCount" style="text-align:right;font-size:12px;color:var(--text-muted);margin-top:4px;">' +
+    currentNote.length +
+    '/' +
+    MAX_EPISODE_NOTE_LENGTH +
+    '</div>';
+
+  showModal('Nota episodio', bodyHtml, [
+    { label: 'Annulla' },
+    {
+      label: 'Salva',
+      style: 'btn-primary',
+      onClick: () => {
+        const ta = document.getElementById('noteTextarea') as HTMLTextAreaElement | null;
+        if (!ta) return;
+        setEpisodeNote(showId, season, epNum, ta.value);
+        showToast('Nota salvata', 'success');
+      },
+    },
+  ]);
+
+  // Aggiorna il contatore caratteri in tempo reale
+  setTimeout(() => {
+    const ta = document.getElementById('noteTextarea') as HTMLTextAreaElement | null;
+    const counter = document.getElementById('noteCharCount');
+    if (ta && counter) {
+      ta.focus();
+      ta.addEventListener('input', () => {
+        counter.textContent = ta.value.length + '/' + MAX_EPISODE_NOTE_LENGTH;
+      });
+    }
+  }, 50);
+}
+
+// ===== P2.3: Modale aggiunta tag =====
+function openAddTagModal(showId: number): void {
+  const state = getState();
+  const show = state.shows.find((s) => s.id === showId);
+  if (!show) return;
+
+  // Suggerisci tag già usati in altre serie (autocomplete visivo)
+  const allTags = new Set<string>();
+  for (const s of state.shows) {
+    if (s.tags && s.id !== showId) for (const t of s.tags) allTags.add(t);
+  }
+  const suggestions = Array.from(allTags).sort((a, b) => a.localeCompare(b)).slice(0, 12);
+
+  let suggestionsHtml = '';
+  if (suggestions.length > 0) {
+    suggestionsHtml =
+      '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">Suggerimenti:</div>' +
+      '<div class="tag-suggestions">' +
+      suggestions.map((t) => '<button class="tag-suggestion" data-tag="' + escapeAttr(t) + '">' + escapeHtml(t) + '</button>').join('') +
+      '</div>';
+  }
+
+  const bodyHtml =
+    '<input type="text" id="tagInput" class="tag-input" maxlength="' +
+    MAX_TAG_LENGTH +
+    '" placeholder="Es. da rivedere, con Alice, estate 2026..." autocomplete="off">' +
+    suggestionsHtml;
+
+  showModal('Aggiungi tag a "' + show.name + '"', bodyHtml, [
+    { label: 'Annulla' },
+    {
+      label: 'Aggiungi',
+      style: 'btn-primary',
+      onClick: () => {
+        const input = document.getElementById('tagInput') as HTMLInputElement | null;
+        if (!input) return;
+        const tag = input.value.trim();
+        if (tag.length === 0) return;
+        if (addShowTag(showId, tag)) {
+          showToast('Tag aggiunto', 'success');
+        }
+      },
+    },
+  ]);
+
+  // Setup: focus + click sui suggerimenti + Enter per confermare
+  setTimeout(() => {
+    const input = document.getElementById('tagInput') as HTMLInputElement | null;
+    if (input) {
+      input.focus();
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const tag = input.value.trim();
+          if (tag.length > 0) {
+            if (addShowTag(showId, tag)) {
+              closeModal();
+              showToast('Tag aggiunto', 'success');
+            }
+          }
+        }
+      });
+    }
+    // Click sui suggerimenti → riempie l'input
+    document.querySelectorAll('.tag-suggestion').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const t = (btn as HTMLElement).dataset.tag || '';
+        if (input) input.value = t;
+        input?.focus();
+      });
+    });
+  }, 50);
 }

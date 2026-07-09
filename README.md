@@ -35,9 +35,18 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 - **Dashboard** con panoramica rapida delle serie in corso e dei prossimi episodi
 - **Liste per stato**: in visione, da guardare, completate
 - **Dettaglio serie** con episodi raggruppati per stagione, avanzamento visione e toggle episodio per episodio
+- **Rating 5★ per episodio** con media stagione (P2)
+- **Note private per episodio** (max 500 caratteri) con editor modale (P2)
+- **Tag personalizzabili per serie** con filtro nelle liste (P2)
 - **Scopri**: serie popolari e recenti raggruppate per genere, con preload in background
+- **Libreria**: search avanzata con filtri (genere, status, rating, network, anno, tag) (P2)
+- **Rivedi un episodio casuale**: suggerimento di un episodio 5★ a caso dalla tua libreria (P2)
 - **Calendario settimanale** con airdate reali (calcolato in un Web Worker dedicato)
 - **Statistiche personali** di visione: episodi visti, ore totali, top generi, top serie
+- **Year-in-Review**: pagina annuale con top 5 serie, ore totali, genere dominante, export PNG condivisibile (P2)
+- **Keyboard shortcuts**: `/` search, `g d/c/s/l/y` navigazione, `j/k` episodi, `w` toggle, `?` cheat sheet (P2)
+- **i18n IT + EN**: framework multilingua con switcher nella sidebar, default da navigator.language (P2)
+- **Notifiche push**: notifica 1 ora prima degli episodi delle serie in watching, opt-in (P2)
 - **Ricerca integrata** su TVMaze con fallback su parole simili
 - **Backup/Import** dei dati in formato JSON (manual o multi-device)
 - **Funzionamento offline** garantito dal Service Worker (Workbox)
@@ -61,7 +70,7 @@ PloppyTV segue una roadmap hobby in 5 fasi (P1 → P5) su ~12 mesi, con un focus
 | Fase | Stato | Tema | Tempistica |
 | --- | --- | --- | --- |
 | **P1** | ✅ Completata in v1.1 | Fondamenta & igiene del progetto | Settimana 1-2 |
-| **P2** | 🚧 Prossima | Quality of life quotidiana | Mese 1-3 |
+| **P2** | ✅ Completata | Quality of life quotidiana | Mese 1-3 |
 | **P3** | ⏳ Pianificata | Sync multi-device senza backend | Mese 4-6 |
 | **P4** | ⏳ Pianificata | AI e discovery intelligente | Mese 7-9 |
 | **P5** | ⏳ Opzionale | Bonus e nice-to-have | Mese 10-12 |
@@ -78,7 +87,21 @@ Tutti i 7 item completati:
 - [x] **README arricchito** — badge, screenshot placeholder, sezioni test/privacy/roadmap
 - [x] **GitHub Release v1.1.0** — changelog e release notes
 
-**Stop condition:** la regola d'oro della roadmap è "se una fase ti stressa, salta alla successiva". P1 è il prerequisito per condividere l'app con conoscenti in buona fede; da P2 in poi è tutto bonus.
+**P2 — Quality of life quotidiana ✅ Completata**
+
+Tutti i 9 item completati (schema v2, 870 test passanti):
+
+- [x] **Rating 5★ per episodio** — stelle 1-5 con media stagione, toggle su click
+- [x] **Note private per episodio** — editor modale (max 500 char) con anteprima
+- [x] **Tag personalizzabili per serie** — add/remove dal dettaglio + filtro nelle liste
+- [x] **Search avanzata nella libreria** — nuova vista con 6 filtri (genere, status, rating, network, anno, tag)
+- [x] **Rivedi un episodio casuale** — card dashboard con crypto-safe random per episodi 5★
+- [x] **Keyboard shortcuts** — `/` search, `g d/c/s/l/y` navigazione, `j/k` episodi, `w` toggle, `?` cheat sheet
+- [x] **i18n IT + EN** — framework custom con 150+ chiavi, switcher nella sidebar, persistenza lingua
+- [x] **Statistiche Year-in-Review** — pagina annuale con top 5, ore, genere dominante, export PNG via canvas
+- [x] **Notifiche push per nuovi episodi** — Notification API (no backend), scheduling 1h prima, opt-in
+
+**Stop condition:** la regola d'oro della roadmap è "se una fase ti stressa, salta alla successiva". P1 è il prerequisito per condividere l'app con conoscenti in buona fede; P2 porta l'app a essere pienamente usabile quotidianamente; da P3 in poi è tutto bonus.
 
 ## Struttura del progetto
 

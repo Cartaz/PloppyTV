@@ -10,6 +10,9 @@ import { initExportImport } from './components/exportImport';
 import { initRenderer, render } from './components/renderer';
 import { preloadDiscover } from './lib/discover';
 import { showToast } from './components/toast';
+import { initI18n, subscribeI18n } from './lib/i18n';
+import { initKeyboard } from './lib/keyboard';
+import { initNotifications } from './lib/notifications';
 import { registerSW } from 'virtual:pwa-register';
 
 // ===== Hash routing minimale per PWA shortcuts e deep link =====
@@ -21,7 +24,7 @@ function applyHash(): void {
   if (!hash) return;
   const state = getState();
   // Mappa hash → view
-  const knownViews = ['dashboard', 'watching', 'towatch', 'completed', 'discover', 'calendar', 'stats'];
+  const knownViews = ['dashboard', 'watching', 'towatch', 'completed', 'discover', 'calendar', 'stats', 'library', 'yearreview'];
   if (knownViews.includes(hash)) {
     if (state.currentView !== hash || state.currentShowId !== null) {
       switchView(hash);
@@ -48,11 +51,17 @@ function setupHashRouting(): void {
 
 // ===== INIT =====
 function init(): void {
+  // P2.7: inizializza i18n PRIMA del render (le viste usano t()).
+  initI18n();
+
   initModal();
   initHeader();
   initSearch();
   initExportImport();
   initRenderer();
+
+  // P2.6: keyboard shortcuts
+  initKeyboard();
 
   // Modalità privata: avvisa l'utente
   if (!isStorageOK()) {
@@ -73,10 +82,20 @@ function init(): void {
   render();
   subscribe(() => {
     render();
+    // P2.9: re-schedula notifiche quando lo stato cambia
+    window.dispatchEvent(new CustomEvent('ploppytv:reschedule-notifications'));
+  });
+
+  // P2.7: re-render al cambio lingua
+  subscribeI18n(() => {
+    render();
   });
 
   // Hash routing per PWA shortcuts e deep link
   setupHashRouting();
+
+  // P2.9: inizializza notifiche (se l'utente le aveva attivate)
+  initNotifications();
 
   // PWA: register service worker (solo in production)
   // CRITICAL FIX (H2/T4): onNeedRefresh mostra un toast che permette

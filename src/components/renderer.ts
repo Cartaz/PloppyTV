@@ -145,6 +145,20 @@ async function _doRender(): Promise<void> {
       await mod.renderStats(main);
       break;
     }
+    case 'library': {
+      const mod = await safeImport(import('../views/library'), main);
+      if (myToken !== _renderToken) return;
+      if (!mod) return;
+      mod.renderLibrary(main);
+      break;
+    }
+    case 'yearreview': {
+      const mod = await safeImport(import('../views/yearReview'), main);
+      if (myToken !== _renderToken) return;
+      if (!mod) return;
+      mod.renderYearReview(main);
+      break;
+    }
     default: {
       const mod = await safeImport(import('../views/dashboard'), main);
       if (myToken !== _renderToken) return;
