@@ -11,9 +11,7 @@ function showCardHtml(show: Show): string {
   // For corrupt/imported data (watched > totalEpisodes), without the clamp we'd
   // emit style="width:166%" — visually clipped by .show-card but semantically
   // misleading.
-  const progress = show.totalEpisodes > 0
-    ? Math.max(0, Math.min(100, (watched / show.totalEpisodes) * 100))
-    : 0;
+  const progress = show.totalEpisodes > 0 ? Math.max(0, Math.min(100, (watched / show.totalEpisodes) * 100)) : 0;
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   return (
     '<div class="show-card" role="button" tabindex="0" aria-label="' +

@@ -101,12 +101,7 @@ export function initExportImport(): void {
         data = JSON.parse(text) as ExportedData;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast(
-          'File JSON non valido: ' +
-            msg +
-            ' (controlla che sia un file JSON valido e non corrotto)',
-          'error',
-        );
+        showToast('File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido e non corrotto)', 'error');
         input.value = '';
         return;
       }

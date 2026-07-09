@@ -2,15 +2,7 @@
 
 import type { ListName, Show, TvmazeShow, Episode, TvmazeEpisode } from '../types';
 import { ALLOWED_LISTS } from '../types';
-import {
-  safeId,
-  safeImageUrl,
-  safeNum,
-  stripHtml,
-  getPosterUrl,
-  getWatchedCount,
-  parseISODateLocal,
-} from './utils';
+import { safeId, safeImageUrl, safeNum, stripHtml, getPosterUrl, getWatchedCount, parseISODateLocal } from './utils';
 
 /**
  * Normalizza uno Show da sorgente non fidata (localStorage, backup JSON).
@@ -79,8 +71,7 @@ export function normalizeShow(raw: unknown): Show | null {
   const image = safeImageUrl(r.image);
   const status = stripHtml(typeof r.status === 'string' ? r.status : 'N/D').slice(0, 50);
   const network = stripHtml(typeof r.network === 'string' ? r.network : 'N/D').slice(0, 100);
-  const premiered =
-    typeof r.premiered === 'string' && parseISODateLocal(r.premiered) !== null ? r.premiered : null;
+  const premiered = typeof r.premiered === 'string' && parseISODateLocal(r.premiered) !== null ? r.premiered : null;
   // summary: stripHtml per neutralizzare eventuale HTML grezzo (XSS latente)
   const summary = stripHtml(r.summary).slice(0, 5000);
   const runtime =
@@ -159,9 +150,7 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
       : [],
     summary: stripHtml(tvmazeShow.summary).slice(0, 5000),
     network: stripHtml(
-      (tvmazeShow.network && tvmazeShow.network.name) ||
-        (tvmazeShow.webChannel && tvmazeShow.webChannel.name) ||
-        'N/D',
+      (tvmazeShow.network && tvmazeShow.network.name) || (tvmazeShow.webChannel && tvmazeShow.webChannel.name) || 'N/D',
     ).slice(0, 100),
     runtime,
     list: ALLOWED_LISTS.includes(list) ? list : 'towatch',

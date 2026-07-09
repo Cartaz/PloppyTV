@@ -128,10 +128,7 @@ function init(): void {
           // click handler). Il messaggio precedente diceva "tocca per
           // aggiornare" ma il toast era inerte. Ora indichiamo all'utente
           // dove si trova il pulsante reale (in basso a destra).
-          showToast(
-            'Nuova versione disponibile (vedi pulsante in basso a destra)',
-            'warning',
-          );
+          showToast('Nuova versione disponibile (vedi pulsante in basso a destra)', 'warning');
           // BUG-18-03 fix: dedup. Se onNeedRefresh fired N volte, mostra
           // un solo pulsante. Il toast viene ri-mostrato ogni volta per
           // ricordare all'utente la disponibilità dell'update.

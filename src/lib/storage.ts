@@ -150,11 +150,7 @@ function _saveDataNow(): boolean {
       // tab may have written between our CAS read (above) and this failing
       // write. If so, abort recovery to avoid overwriting their newer data.
       const recoverySavedAt = _readSavedAtFromStorage();
-      if (
-        _lastSavedAt !== null &&
-        recoverySavedAt !== null &&
-        recoverySavedAt !== _lastSavedAt
-      ) {
+      if (_lastSavedAt !== null && recoverySavedAt !== null && recoverySavedAt !== _lastSavedAt) {
         showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
         return false;
       }

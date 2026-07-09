@@ -60,9 +60,7 @@ export function getStateSnapshot(): AppState {
     ...state,
     shows: state.shows.map((s) => ({
       ...s,
-      seasons: Object.fromEntries(
-        Object.entries(s.seasons).map(([k, eps]) => [k, eps.map((e) => ({ ...e }))]),
-      ),
+      seasons: Object.fromEntries(Object.entries(s.seasons).map(([k, eps]) => [k, eps.map((e) => ({ ...e }))])),
     })),
   };
 }

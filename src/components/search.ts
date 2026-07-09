@@ -250,7 +250,9 @@ export function initSearch(): void {
       // H10: branch > MAX_QUERY_LENGTH deve abortire la search in-flight
       invalidateCurrentSearch();
       _searchResults!.innerHTML =
-        '<div class="search-no-results" role="status">Query troppo lunga (max ' + MAX_QUERY_LENGTH + ' caratteri)</div>';
+        '<div class="search-no-results" role="status">Query troppo lunga (max ' +
+        MAX_QUERY_LENGTH +
+        ' caratteri)</div>';
       _searchResults!.classList.add('active');
       _searchInput!.setAttribute('aria-expanded', 'true');
       return;
