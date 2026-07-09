@@ -27,20 +27,24 @@ export class ApiError extends Error {
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-  let onExternalAbort: (() => void) | null = null;
 
   // Propaga abort dal signal esterno al controller interno.
-  // Importante: rimuoviamo il listener in `finally` (dopo che fetch si è
-  // sistemata) per evitare leak su signal long-lived (es. uno stesso
-  // AbortController usato per N richieste) senza interrompere la
-  // propagazione dell'abort mentre la richiesta è ancora in flight.
+  // Importante: rimuoviamo il listener quando finiamo per evitare leak
+  // su signal long-lived (es. uno stesso AbortController usato per N richieste).
   if (signal) {
     if (signal.aborted) {
       clearTimeout(timeoutId);
       controller.abort();
     } else {
-      onExternalAbort = () => controller.abort();
+      const onExternalAbort = () => controller.abort();
       signal.addEventListener('abort', onExternalAbort, { once: true });
+      // Cleanup del listener esterno alla prima risoluzione
+      const cleanup = () => signal.removeEventListener('abort', onExternalAbort);
+      // Lo agganciamo a microtask+macro per coprire sia fast-resolve che throw
+      Promise.resolve(controller.signal.aborted ? null : undefined)
+        .then(cleanup)
+        .catch(cleanup);
+      setTimeout(cleanup, API_TIMEOUT_MS + 50);
     }
   }
 
@@ -53,9 +57,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     // non tipizzato che il caller non saprebbe gestire.
     const text = await res.text();
     if (!text) {
-      // Body vuoto: ritorniamo null come "no data" (TVMaze fa così su alcuni endpoint).
-      // I wrapper (searchShows/getShowEpisodes/getShowsPage) convertono null → []
-      // per i tipi array, quindi i caller non devono gestire null.
+      // Body vuoto: ritorniamo null come "no data" (TVMaze fa così su alcuni endpoint)
       return null as unknown as T;
     }
     try {
@@ -83,23 +85,17 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     throw e;
   } finally {
     clearTimeout(timeoutId);
-    if (onExternalAbort && signal) {
-      signal.removeEventListener('abort', onExternalAbort);
-    }
   }
 }
 
 export async function searchShows(query: string, signal?: AbortSignal): Promise<TvmazeSearchResult[]> {
-  const r = await apiGet<TvmazeSearchResult[] | null>('/search/shows?q=' + encodeURIComponent(query), signal);
-  return r ?? [];
+  return apiGet<TvmazeSearchResult[]>('/search/shows?q=' + encodeURIComponent(query), signal);
 }
 
 export async function getShowEpisodes(showId: number, signal?: AbortSignal): Promise<TvmazeEpisode[]> {
-  const r = await apiGet<TvmazeEpisode[] | null>('/shows/' + encodeURIComponent(showId) + '/episodes', signal);
-  return r ?? [];
+  return apiGet<TvmazeEpisode[]>('/shows/' + encodeURIComponent(showId) + '/episodes', signal);
 }
 
 export async function getShowsPage(page: number, signal?: AbortSignal): Promise<TvmazeShow[]> {
-  const r = await apiGet<TvmazeShow[] | null>('/shows?page=' + encodeURIComponent(page), signal);
-  return r ?? [];
+  return apiGet<TvmazeShow[]>('/shows?page=' + encodeURIComponent(page), signal);
 }

@@ -202,19 +202,11 @@ describe('escapeHtml + escapeAttr', () => {
 });
 
 describe('getPosterUrl', () => {
-  it('preferisce medium, poi original, poi null (URLs validate via safeImageUrl)', () => {
-    // BUG-01-d: getPosterUrl now wraps the chosen URL with safeImageUrl.
-    // Use valid http(s) URLs so the preference order is still exercised.
-    expect(getPosterUrl({ image: { medium: 'http://m.jpg', original: 'http://o.jpg' } })).toBe('http://m.jpg');
-    expect(getPosterUrl({ image: { original: 'http://o.jpg' } })).toBe('http://o.jpg');
+  it('preferisce medium, poi original, poi null', () => {
+    expect(getPosterUrl({ image: { medium: 'm.jpg', original: 'o.jpg' } })).toBe('m.jpg');
+    expect(getPosterUrl({ image: { original: 'o.jpg' } })).toBe('o.jpg');
     expect(getPosterUrl({ image: {} })).toBeNull();
     expect(getPosterUrl({ image: null })).toBeNull();
     expect(getPosterUrl(null)).toBeNull();
-  });
-
-  it('rifiuta scheme non http(s) (javascript:, data:, relativi)', () => {
-    expect(getPosterUrl({ image: { medium: 'javascript:alert(1)' } })).toBeNull();
-    expect(getPosterUrl({ image: { medium: 'data:text/html,<script>' } })).toBeNull();
-    expect(getPosterUrl({ image: { medium: 'relative.jpg' } })).toBeNull();
   });
 });

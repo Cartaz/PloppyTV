@@ -2,7 +2,7 @@
 
 import type { ExportedData, Show } from '../types';
 import { SCHEMA_VERSION } from '../lib/constants';
-import { getState, setShows, emitChange, updateShowListStatus } from '../lib/store';
+import { getState, setShows, emitChange } from '../lib/store';
 import { saveData, isStorageOK } from '../lib/storage';
 import { normalizeShow } from '../lib/normalize';
 import { reconcileAllLists } from '../lib/normalize';
@@ -15,46 +15,6 @@ import { MAX_IMPORT_SIZE } from '../lib/constants';
 
 const SUPPORTS_EXPORT =
   typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
-
-/**
- * Decode a backup file's raw bytes to a string, detecting BOM and using the
- * correct encoding. Handles UTF-8 (with or without BOM), UTF-16 LE (BOM
- * 0xFF 0xFE), and UTF-16 BE (BOM 0xFE 0xFF). For unknown/missing BOMs we
- * fall back to UTF-8 (the most common encoding for JSON).
- *
- * BUG-11-02: previously the code called `reader.readAsText(file, 'utf-8')`
- * which forced UTF-8 decoding — UTF-16 files were silently mangled into
- * replacement chars and JSON.parse failed with a confusing "UTF-16" toast.
- */
-function decodeBackupBytes(buf: ArrayBuffer): string {
-  let text: string;
-  if (buf.byteLength >= 2) {
-    const view = new Uint8Array(buf);
-    // UTF-16 LE BOM: FF FE
-    if (view[0] === 0xff && view[1] === 0xfe) {
-      text = new TextDecoder('utf-16le').decode(buf);
-    } else if (view[0] === 0xfe && view[1] === 0xff) {
-      // UTF-16 BE BOM: FE FF
-      text = new TextDecoder('utf-16be').decode(buf);
-    } else {
-      text = new TextDecoder('utf-8').decode(buf);
-    }
-  } else {
-    text = new TextDecoder('utf-8').decode(buf);
-  }
-  // Strip a leftover UTF-8 BOM (U+FEFF) if the decoder didn't consume it.
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-  return text;
-}
-
-/**
- * Singular/plural helper for Italian nouns. Returns the singular form when
- * n === 1, otherwise the plural form. (BUG-11-06: previously the code used
- * hardcoded plural nouns even for n=1.)
- */
-function itPlural(n: number, singular: string, plural: string): string {
-  return n === 1 ? singular : plural;
-}
 
 export function initExportImport(): void {
   document.getElementById('exportBtn')?.addEventListener('click', () => {
@@ -94,14 +54,19 @@ export function initExportImport(): void {
       input.value = '';
     };
     reader.onload = (ev) => {
-      const buf = (ev.target?.result as ArrayBuffer) || new ArrayBuffer(0);
-      const text = decodeBackupBytes(buf);
+      let text = (ev.target?.result as string) || '';
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
       let data: ExportedData;
       try {
         data = JSON.parse(text) as ExportedData;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast('File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido e non corrotto)', 'error');
+        showToast(
+          'File JSON non valido: ' +
+            msg +
+            ' (controlla che sia un file JSON valido, non corrotto o in encoding UTF-16)',
+          'error',
+        );
         input.value = '';
         return;
       }
@@ -119,16 +84,6 @@ export function initExportImport(): void {
         );
         input.value = '';
         return;
-      }
-      // BUG-11-03: validate schema version. Best-effort: warn on mismatch but
-      // still let the user import (normalizeShow is forward-compatible-ish).
-      if (typeof data.version !== 'number') {
-        showToast('File senza versione schema: procedo con cautela', 'warning');
-      } else if (data.version > SCHEMA_VERSION) {
-        showToast(
-          'File di versione futura (v' + data.version + '): alcuni campi potrebbero essere ignorati',
-          'warning',
-        );
       }
       const validShows = data.shows.map(normalizeShow).filter((s): s is Show => s !== null);
       const skipped = data.shows.length - validShows.length;
@@ -148,20 +103,15 @@ export function initExportImport(): void {
         input.value = '';
         return;
       }
-      // BUG-11-06: proper singular/plural for Italian skip message.
       const skipMsg =
         skipped > 0
           ? ' (' +
             skipped +
-            ' ' +
-            itPlural(skipped, 'ignorata', 'ignorate') +
-            ' per dati non validi' +
-            (duplicates > 0
-              ? ', ' + duplicates + ' ' + itPlural(duplicates, 'duplicato saltato', 'duplicati saltati')
-              : '') +
+            ' ignorate per dati non validi' +
+            (duplicates > 0 ? ', ' + duplicates + ' duplicati saltati' : '') +
             ')'
           : duplicates > 0
-            ? ' (' + duplicates + ' ' + itPlural(duplicates, 'duplicato saltato', 'duplicati saltati') + ')'
+            ? ' (' + duplicates + ' duplicati saltati)'
             : '';
 
       const mergeAction: ModalAction = {
@@ -181,20 +131,7 @@ export function initExportImport(): void {
               const existingWatched = getWatchedCount(existing);
               const newWatched = getWatchedCount(s);
               if (newWatched > existingWatched) {
-                // H12 / BUG-11-01: field-level merge — adopt the backup's
-                // watched progress (seasons/totalEpisodes/totalSeasons and
-                // its list/manualList intent) but PRESERVE the user's local
-                // metadata (addedAt, image, name, status, premiered, genres,
-                // summary, network, runtime) which is fresher than the
-                // backup's snapshot.
-                existing.seasons = s.seasons;
-                existing.totalEpisodes = s.totalEpisodes;
-                existing.totalSeasons = s.totalSeasons;
-                existing.list = s.list;
-                existing.manualList = s.manualList;
-                // BUG-11-04: reconcile list with the new watched count so
-                // e.g. all-watched-but-towatch is auto-promoted to completed.
-                updateShowListStatus(existing);
+                Object.assign(existing, s);
                 updated++;
               }
             }
@@ -207,20 +144,7 @@ export function initExportImport(): void {
           }
           updateBadges();
           emitChange();
-          // BUG-11-06: proper singular/plural for Italian success toast.
-          showToast(
-            itPlural(added, 'Importata', 'Importate') +
-              ' ' +
-              added +
-              ' ' +
-              itPlural(added, 'nuova', 'nuove') +
-              ', ' +
-              itPlural(updated, 'aggiornata', 'aggiornate') +
-              ' ' +
-              updated +
-              ' serie',
-            'success',
-          );
+          showToast('Importate ' + added + ' nuove, aggiornate ' + updated + ' serie', 'success');
         },
       };
 
@@ -278,9 +202,7 @@ export function initExportImport(): void {
         [{ label: 'Annulla' }, mergeAction, replaceAction],
       );
     };
-    // BUG-11-02: read as ArrayBuffer so we can detect UTF-16 BOMs and decode
-    // with the correct encoding. (Previously: readAsText forced UTF-8.)
-    reader.readAsArrayBuffer(file);
+    reader.readAsText(file, 'utf-8');
     input.value = '';
   });
 }
@@ -293,8 +215,7 @@ function doExport(): void {
       shows: getState().shows,
       exportedAt: new Date().toISOString(),
     };
-    // BUG-11-08: minified JSON for smaller backup files (machine-consumed).
-    data = JSON.stringify(payload);
+    data = JSON.stringify(payload, null, 2);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     showToast('Errore serializzazione: ' + msg, 'error');

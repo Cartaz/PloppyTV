@@ -2,8 +2,8 @@
 
 import type { ListName, TvmazeSearchResult } from '../types';
 import { searchShows, ApiError } from '../lib/api';
-import { MAX_QUERY_LENGTH } from '../lib/constants';
-import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, safeImageUrl } from '../lib/utils';
+import { MAX_QUERY_LENGTH, MIN_SEARCH_INTERVAL_MS } from '../lib/constants';
+import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal } from '../lib/utils';
 import { addShowToList } from '../lib/shows';
 import { showToast } from './toast';
 
@@ -12,6 +12,7 @@ let lastSearchResults: TvmazeSearchResult[] = [];
 let searchSeq = 0;
 let searchAbortController: AbortController | null = null;
 let searchSelectedIdx = -1;
+let lastSearchTime = 0;
 
 let _searchInput: HTMLInputElement | null = null;
 let _searchResults: HTMLElement | null = null;
@@ -31,11 +32,7 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
     .slice(0, 10)
     .map((r, idx) => {
       const show = r.show;
-      // BUG-20-03: sanitize the poster URL via safeImageUrl so that a malicious
-      // or malformed value (javascript:/data:) returned by the API can never
-      // reach <img src>. getPosterUrl already extracts from show.image, but it
-      // does not validate the scheme.
-      const img = safeImageUrl(getPosterUrl(show));
+      const img = getPosterUrl(show);
       const year = show.premiered
         ? parseISODateLocal(show.premiered)
           ? parseISODateLocal(show.premiered)!.getFullYear()
@@ -43,7 +40,7 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         : 'N/D';
       const network = (show.network && show.network.name) || (show.webChannel && show.webChannel.name) || 'N/D';
       return (
-        '<div class="search-result-item" role="option" aria-selected="false" data-idx="' +
+        '<div class="search-result-item" data-idx="' +
         idx +
         '">' +
         (img
@@ -94,9 +91,12 @@ function invalidateCurrentSearch(): void {
 }
 
 async function doSearch(query: string): Promise<void> {
-  // BUG-10-06: the throttle branch (`now - lastSearchTime < MIN_SEARCH_INTERVAL_MS`)
-  // was dead code under the 350ms debounce (gap always ≥ 350ms > 300ms). Removed
-  // the throttle and the `lastSearchTime` machinery entirely to simplify.
+  const now = Date.now();
+  if (now - lastSearchTime < MIN_SEARCH_INTERVAL_MS) {
+    searchTimeout = setTimeout(() => doSearch(query), MIN_SEARCH_INTERVAL_MS - (now - lastSearchTime));
+    return;
+  }
+  lastSearchTime = now;
 
   if (searchAbortController) searchAbortController.abort();
   searchAbortController = new AbortController();
@@ -104,9 +104,8 @@ async function doSearch(query: string): Promise<void> {
   const signal = searchAbortController.signal;
 
   if (!_searchResults) return;
-  _searchResults.innerHTML = '<div class="loading" role="status"><div class="spinner"></div>Ricerca in corso...</div>';
+  _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>Ricerca in corso...</div>';
   _searchResults.classList.add('active');
-  if (_searchInput) _searchInput.setAttribute('aria-expanded', 'true');
 
   try {
     const results = await searchShows(query, signal);
@@ -123,14 +122,12 @@ async function doSearch(query: string): Promise<void> {
           const altResults = await searchShows(altQuery, signal);
           if (mySeq !== searchSeq) return;
           if (altResults && altResults.length > 0) {
-            // BUG-10-01: the previous filter `r.show.name.toLowerCase().includes(qLower)`
-            // (where qLower was the FULL multi-word query) was effectively dead —
-            // show names almost never contain the full multi-word query as a
-            // substring, so `filtered` was always empty and we fell through to
-            // `altResults.slice(0, 10)` anyway. Removed the dead filter; the
-            // fallback note already explains the results are for `altQuery`.
+            const qLower = query.toLowerCase();
+            const filtered = altResults.filter(
+              (r) => r && r.show && r.show.name && r.show.name.toLowerCase().includes(qLower),
+            );
             const html = renderSearchResultsHTML(
-              altResults.slice(0, 10),
+              filtered.length > 0 ? filtered : altResults.slice(0, 10),
               'Nessun risultato per "' + query + '". Risultati simili per "' + altQuery + '":',
             );
             if (html) {
@@ -142,11 +139,6 @@ async function doSearch(query: string): Promise<void> {
           const err = e2 as { name?: string };
           if (err.name === 'AbortError') return;
           if (mySeq !== searchSeq) return;
-          // BUG-10-07: propagate network/timeout errors so the outer catch
-          // shows the correct user-facing message ("Connessione internet non
-          // disponibile.") instead of the misleading "Nessuna serie trovata".
-          if (err.name === 'NetworkError' || err.name === 'TimeoutError') throw e2;
-          // Other non-fatal errors fall through to the "no results" message.
         }
       }
       _searchResults.innerHTML =
@@ -193,41 +185,21 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   if (_searchResults) {
     _searchResults.classList.remove('active');
     _searchResults.innerHTML = '';
-    if (_searchInput) _searchInput.setAttribute('aria-expanded', 'false');
   }
+  if (_searchInput) _searchInput.value = '';
   lastSearchResults = [];
   searchSelectedIdx = -1;
-  // BUG-10-05: clear the input only AFTER `addShowToList` resolves with a
-  // success, so on failure ("Serie già presente", storage full, network error)
-  // the user retains the query and can retry or pick a different list.
-  const added = await addShowToList(show, list);
-  if (added && _searchInput) _searchInput.value = '';
+  await addShowToList(show, list);
 }
 
 function updateSearchSelection(items: NodeListOf<Element>): void {
-  // BUG-20-08: toggle both the visual `.selected` class and the ARIA
-  // `aria-selected` attribute so screen readers announce the active option.
-  items.forEach((el, i) => {
-    const selected = i === searchSelectedIdx;
-    el.classList.toggle('selected', selected);
-    el.setAttribute('aria-selected', selected ? 'true' : 'false');
-  });
+  items.forEach((el, i) => el.classList.toggle('selected', i === searchSelectedIdx));
 }
 
 export function initSearch(): void {
   _searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
   _searchResults = document.getElementById('searchResults');
   if (!_searchInput || !_searchResults) return;
-
-  // BUG-20-08: WAI-ARIA listbox semantics on the search results dropdown.
-  // The input acts as a combobox controlling the listbox; each result item is
-  // an `option` with `aria-selected` toggled by `updateSearchSelection`.
-  _searchResults.setAttribute('role', 'listbox');
-  _searchResults.setAttribute('aria-label', 'Risultati di ricerca');
-  _searchInput.setAttribute('role', 'combobox');
-  _searchInput.setAttribute('aria-expanded', 'false');
-  _searchInput.setAttribute('aria-autocomplete', 'list');
-  _searchInput.setAttribute('aria-controls', 'searchResults');
 
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -237,24 +209,16 @@ export function initSearch(): void {
       _searchResults!.innerHTML = '';
       lastSearchResults = [];
       searchSelectedIdx = -1;
-      _searchInput!.setAttribute('aria-expanded', 'false');
       // H10: abortisce anche quando la query è troppo corta
       invalidateCurrentSearch();
       return;
     }
     if (query.length > MAX_QUERY_LENGTH) {
-      // Defensive (BUG-10-04): the input's `maxlength=100` makes this branch
-      // unreachable via normal typing, but it is still reachable if JS sets
-      // `input.value` directly (extensions, paste via JS, programmatic edits).
-      // Kept as defense-in-depth; harmless when not triggered.
       // H10: branch > MAX_QUERY_LENGTH deve abortire la search in-flight
       invalidateCurrentSearch();
       _searchResults!.innerHTML =
-        '<div class="search-no-results" role="status">Query troppo lunga (max ' +
-        MAX_QUERY_LENGTH +
-        ' caratteri)</div>';
+        '<div class="search-no-results">Query troppo lunga (max ' + MAX_QUERY_LENGTH + ' caratteri)</div>';
       _searchResults!.classList.add('active');
-      _searchInput!.setAttribute('aria-expanded', 'true');
       return;
     }
     // H10: abortisce la search precedente prima di schedulare la nuova.
@@ -289,15 +253,7 @@ export function initSearch(): void {
       searchSelectedIdx = Math.max(searchSelectedIdx - 1, -1);
       updateSearchSelection(items);
     } else if (e.key === 'Escape') {
-      // BUG-10-02: fully clear the search state (DOM + lastSearchResults +
-      // selection index) and abort any in-flight search, so a stale Enter
-      // after refocus cannot select an invisible result.
-      invalidateCurrentSearch();
       _searchResults!.classList.remove('active');
-      _searchResults!.innerHTML = '';
-      lastSearchResults = [];
-      searchSelectedIdx = -1;
-      _searchInput!.setAttribute('aria-expanded', 'false');
       _searchInput!.blur();
     }
   });
@@ -322,17 +278,7 @@ export function initSearch(): void {
 
   document.addEventListener('click', (e) => {
     if (!(e.target as HTMLElement).closest('.search-wrap')) {
-      // BUG-10-03: clear DOM + lastSearchResults + selection index (same as
-      // Escape) and abort any in-flight search, so a stale Enter after
-      // refocus cannot select an invisible result. Result-button clicks are
-      // handled above with `stopPropagation`, so we only reach here on true
-      // click-outside.
-      invalidateCurrentSearch();
       _searchResults!.classList.remove('active');
-      _searchResults!.innerHTML = '';
-      lastSearchResults = [];
-      searchSelectedIdx = -1;
-      _searchInput!.setAttribute('aria-expanded', 'false');
     }
   });
 }

@@ -5,21 +5,17 @@ import type { Episode } from '../types';
 /**
  * Converte un valore in un ID positivo e intero.
  * Rifuta tipi non numerici/stringa, valori booleani, array, oggetti,
- * symbol, bigint, notazioni esadecimali/scientifiche e numeri oltre MAX_SAFE_INTEGER.
+ * notazioni esadecimali/scientifiche e numeri oltre MAX_SAFE_INTEGER.
  */
 export function safeId(v: unknown): number {
   if (v === null || v === undefined) return 0;
   if (typeof v === 'boolean') return 0;
-  // BUG-01-h: Symbol would throw on Number(); reject explicitly.
-  if (typeof v === 'symbol') return 0;
-  // BUG-01-i: BigInt is a distinct primitive; reject (doc says "rifiuta tipi non numerici/stringa").
-  if (typeof v === 'bigint') return 0;
   if (typeof v === 'object') return 0;
   if (typeof v === 'string') {
     // Accetta solo stringhe che rappresentano un intero decimale
     if (!/^-?\d+$/.test(v)) return 0;
   }
-  const n = Number(v);
+  const n = typeof v === 'string' ? Number(v) : Number(v);
   if (!Number.isFinite(n)) return 0;
   if (!Number.isInteger(n)) return 0;
   if (n <= 0) return 0;
@@ -28,72 +24,49 @@ export function safeId(v: unknown): number {
 }
 
 export function safeNum(v: unknown): number {
-  // BUG-01-e: reject booleans and arrays (consistent with safeId).
-  if (typeof v === 'boolean') return 0;
-  if (Array.isArray(v)) return 0;
   const n = Number(v);
-  // BUG-01-j: normalize -0 to +0 (`n === 0 ? 0 : n` converts -0 because -0 === 0).
-  return Number.isFinite(n) && n >= 0 ? (n === 0 ? 0 : n) : 0;
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 export function safeImageUrl(u: unknown): string | null {
   if (typeof u !== 'string') return null;
   if (u.length === 0 || u.length > 2048) return null;
   if (u.startsWith('data:')) return null;
-  // BUG-01-k: require at least one non-space/non-slash char after the scheme
-  // (a host). Rejects 'http://' and 'https://' (no host) while accepting 'http://x'.
-  if (!/^https?:\/\/[^\s/]+/i.test(u)) return null;
+  if (!/^https?:\/\//i.test(u)) return null;
   return u;
 }
-
-// Entity map for single-pass HTML entity decoding (BUG-01-b).
-// Each entity occurrence is decoded exactly once (no sequential double-decode).
-const HTML_ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&nbsp;': ' ',
-  '&#x27;': "'",
-  '&apos;': "'",
-};
 
 /**
  * Rimuove i tag HTML e decodifica le entity più comuni.
  * Rimuove anche il contenuto di <script> e <style> (non solo i tag),
  * evitando che codice JavaScript finisca come testo visibile.
- * Gestisce anche tag <script>/<style> non chiusi e sezioni CDATA.
  */
 export function stripHtml(html: unknown): string {
   if (!html) return '';
   const str = String(html);
   return (
     str
-      // Rimuovi contenuto di script/style (compreso il testo interno) — coppie chiuse
+      // Rimuovi contenuto di script/style (compreso il testo interno)
       .replace(/<script[\s\S]*?<\/script>/gi, '')
-      // BUG-01-a: strip unclosed <script> (no closing tag) to end of string
-      .replace(/<script[^>]*>[\s\S]*$/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*$/gi, '')
-      // BUG-01-l: strip CDATA sections (closed and unclosed) before tag-strip
-      .replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, '')
-      .replace(/<!\[CDATA\[[\s\S]*$/gi, '')
       .replace(/<[^>]*>/g, '')
-      // BUG-01-b: single-pass entity decode (no sequential double-decode of &amp;lt; -> <)
-      .replace(/&(?:amp|lt|gt|quot|#39|nbsp|#x27|apos);/g, (m) => HTML_ENTITIES[m] ?? m)
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#x27;/g, "'")
+      .replace(/&apos;/g, "'")
       .trim()
   );
 }
 
 export function getPosterUrl(show: { image?: { medium?: string; original?: string } | null } | null): string | null {
   if (!show || !show.image) return null;
-  // BUG-01-d: validate scheme/host via safeImageUrl. TVMaze images are always
-  // http(s), so this is safe; defends against tampered API responses and
-  // removes the need for every caller to remember to wrap with safeImageUrl.
-  // (safeImageUrl is hoisted — defined below as a `function` declaration.)
-  const url = show.image.medium || show.image.original;
-  return safeImageUrl(url);
+  if (show.image.medium) return show.image.medium;
+  if (show.image.original) return show.image.original;
+  return null;
 }
 
 // ===== DATE HELPERS (timezone-safe) =====
@@ -106,11 +79,6 @@ export function parseISODateLocal(str: unknown): Date | null {
   if (!str || typeof str !== 'string') return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
   if (!m) {
-    // BUG-01-c: only accept strict ISO 8601 datetime with 4-digit year in the
-    // fallback. Rejects arbitrary strings (e.g. negative-year strings like
-    // '-0001-01-01' that V8 misparses as 2001-01-01) and non-ISO formats.
-    const m2 = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/.exec(str);
-    if (!m2) return null;
     const d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -175,10 +143,7 @@ export function getWatchedCount(show: { seasons?: Record<number, Episode[]> } | 
     for (const eps of Object.values(show.seasons)) {
       if (Array.isArray(eps)) {
         for (const ep of eps) {
-          // BUG-01-f: strict boolean check — only `watched === true` counts.
-          // Defense-in-depth against untrusted in-memory Show objects where
-          // `watched` might be a truthy string like "false" or a number.
-          if (ep && ep.watched === true) count++;
+          if (ep && ep.watched) count++;
         }
       }
     }
@@ -204,22 +169,16 @@ export function findNextEpisode<T extends HasSeasons>(
   if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return null;
   try {
     const seasons = Object.keys(show.seasons)
-      // BUG-01-m: strict integer key filter (rejects "1.5", "0x10", " 1 ", "+1").
-      // Previously `parseInt` truncated "1.5" -> 1, colliding with key "1".
-      .filter((k) => /^\d+$/.test(k) && Number(k) > 0)
-      .sort((a, b) => Number(a) - Number(b));
+      .filter((k) => !isNaN(parseInt(k, 10)) && parseInt(k, 10) > 0)
+      .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     for (const s of seasons) {
       const eps = show.seasons![Number(s)];
       if (!Array.isArray(eps)) continue;
       // Ordina per num per restituire davvero il primo episodio non visto
       const sorted = [...eps].sort((a, b) => a.num - b.num);
       for (const ep of sorted) {
-        // BUG-01-g: skip episodes with num <= 0 (defense-in-depth; normalizeShow
-        // already filters these, but untrusted in-memory data may not).
-        if (!ep || !ep.num || ep.num <= 0) continue;
-        // BUG-01-f: strict boolean check — only `watched === true` counts as watched.
-        if (ep.watched !== true) {
-          return { season: Number(s), num: ep.num, airdate: ep.airdate || null, name: ep.name ?? null };
+        if (ep && !ep.watched) {
+          return { season: parseInt(s, 10), num: ep.num, airdate: ep.airdate || null, name: ep.name ?? null };
         }
       }
     }

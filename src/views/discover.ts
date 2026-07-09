@@ -21,30 +21,9 @@ let _popularLoading = false;
 let _recentLoading = false;
 
 let _boundDiscover = false;
-let _clickHandler: ((e: MouseEvent) => void) | null = null;
-let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
-let _resizeHandler: (() => void) | null = null;
-let _mainEl: HTMLElement | null = null;
 
-// BUG-15-02 (High): invalidation token per loadTab. Ogni chiamata cattura un
-// token; dopo l'await, se il token è cambiato (chiamata più recente ha
-// sostituito questa), NON scriviamo innerHTML. Previene il caso in cui una
-// loadTab lenta renderizza su un discoverContent ormai staccato.
-let _loadTabToken = 0;
-
-/**
- * Reset della guardia + rimozione listener accumulati. FIX H1/BUG-15-01:
- * prima di questo fix, resetBoundGuard resettava solo il flag lasciando i
- * listener click su `main` accumularsi ad ogni re-render.
- */
+/** Reset guardia listener — vedi C5/T1 */
 export function resetBoundGuard(): void {
-  if (_clickHandler && _mainEl) _mainEl.removeEventListener('click', _clickHandler);
-  if (_keyHandler && _mainEl) _mainEl.removeEventListener('keydown', _keyHandler);
-  if (_resizeHandler) window.removeEventListener('resize', _resizeHandler);
-  _clickHandler = null;
-  _keyHandler = null;
-  _resizeHandler = null;
-  _mainEl = null;
   _boundDiscover = false;
 }
 
@@ -78,15 +57,7 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
         : ''
       : '';
     const isAdded = getState().shows.find((s) => s.id === show.id);
-    // H17 a11y: carousel-card è un div clickable — role="button" + tabindex="0"
-    // + aria-label per renderlo focusable e operabile da tastiera. Il keydown
-    // handler in bindDiscoverEvents converte Enter/Space in click.
-    html +=
-      '<div class="carousel-card" role="button" tabindex="0" aria-label="Anteprima: ' +
-      escapeAttr(show.name) +
-      '" data-action="previewDiscover" data-show-id="' +
-      show.id +
-      '">';
+    html += '<div class="carousel-card" data-action="previewDiscover" data-show-id="' + show.id + '">';
     if (isAdded) html += '<div class="carousel-card-badge">Aggiunta</div>';
     if (img) {
       html +=
@@ -155,14 +126,8 @@ function renderDiscoverError(err: { name?: string }): string {
  * che `getState()._discoverTab` sia ancora il tab che stavamo caricando;
  * se l'utente ha switchato tab durante il fetch, scartiamo il risultato
  * per non sovrascrivere la vista del nuovo tab.
- *
- * FIX BUG-15-02: aggiungiamo un invalidation token (_loadTabToken). Se una
- * loadTab più recente sostituisce questa (es. perché un re-render ha
- * chiamato loadTab dopo che una loadTab manuale era in flight), la vecchia
- * non scrive innerHTML sul discoverContent (che potrebbe essere staccato).
  */
 async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
-  const myToken = ++_loadTabToken;
   const el = document.getElementById('discoverContent');
   if (!el) return;
   if (tab === 'popular') {
@@ -176,15 +141,12 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
       _popularCache = await getDiscoverPromise('popular');
-      // H15 + BUG-15-02: scarta se l'utente ha cambiato tab durante il fetch
-      // oppure se un'altra loadTab ha sostituito questa.
+      // H15: scarta se l'utente ha cambiato tab durante il fetch
       if (getState()._discoverTab !== 'popular') return;
-      if (_loadTabToken !== myToken) return;
       el.innerHTML = renderDiscoverContent(_popularCache);
       bindCarousels(el);
     } catch (e) {
       if (getState()._discoverTab !== 'popular') return;
-      if (_loadTabToken !== myToken) return;
       el.innerHTML = renderDiscoverError(e as { name?: string });
     } finally {
       _popularLoading = false;
@@ -200,15 +162,12 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
       _recentCache = await getDiscoverPromise('recent');
-      // H15 + BUG-15-02: scarta se l'utente ha cambiato tab durante il fetch
-      // oppure se un'altra loadTab ha sostituito questa.
+      // H15: scarta se l'utente ha cambiato tab durante il fetch
       if (getState()._discoverTab !== 'recent') return;
-      if (_loadTabToken !== myToken) return;
       el.innerHTML = renderDiscoverContent(_recentCache);
       bindCarousels(el);
     } catch (e) {
       if (getState()._discoverTab !== 'recent') return;
-      if (_loadTabToken !== myToken) return;
       el.innerHTML = renderDiscoverError(e as { name?: string });
     } finally {
       _recentLoading = false;
@@ -257,9 +216,7 @@ export function renderDiscover(main: HTMLElement): void {
 export function bindDiscoverEvents(main: HTMLElement): void {
   if (_boundDiscover) return;
   _boundDiscover = true;
-  _mainEl = main;
-
-  _clickHandler = (e: MouseEvent): void => {
+  main.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     const actionEl = target.closest('[data-action]') as HTMLElement | null;
     if (!actionEl) return;
@@ -268,11 +225,13 @@ export function bindDiscoverEvents(main: HTMLElement): void {
     if (action === 'switchDiscoverTab') {
       const tab = actionEl.dataset.tab as 'popular' | 'recent';
       if (!tab) return;
-      // FIX BUG-15-02/BUG-15-03: rimossi i manual DOM ops (class toggle,
-      // innerHTML loading, MANUAL loadTab) che operavano su elementi
-      // staccati dal prossimo re-render. setDiscoverTab emette emitChange
-      // → il renderer rifà renderDiscover → loadTab(tab) con il tab fresco.
       setDiscoverTab(tab);
+      document.querySelectorAll('.discover-tab').forEach((el) => {
+        el.classList.toggle('active', el === actionEl);
+      });
+      const el = document.getElementById('discoverContent');
+      if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento...</div>';
+      loadTab(tab);
       return;
     }
 
@@ -302,8 +261,6 @@ export function bindDiscoverEvents(main: HTMLElement): void {
       const dir = Number(actionEl.dataset.dir);
       const track = document.getElementById(id || '');
       if (!track) return;
-      // BUG-15-05 (Low, left as-is): cardWidth è un magic number 160+12=172
-      // che deve matchare il CSS .carousel-card. Documentato nel report.
       const cardWidth = 160 + 12;
       track.scrollBy({ left: cardWidth * 3 * dir, behavior: 'smooth' });
       return;
@@ -312,38 +269,13 @@ export function bindDiscoverEvents(main: HTMLElement): void {
     const showId = safeId(actionEl.dataset.showId);
     if (!showId) return;
 
-    // BUG-15-06 (Low): rimosso il dead branch `action === 'openDiscover' ||`
-    // — nessun writer imposta data-action="openDiscover" in src/.
-    if (action === 'previewDiscover') {
+    if (action === 'openDiscover' || action === 'previewDiscover') {
       previewDiscover(showId);
     } else if (action === 'addDiscover') {
       const list = actionEl.dataset.list as 'towatch' | 'watching';
       if (list) addDiscoverShow(showId, list);
     }
-  };
-
-  _keyHandler = (e: KeyboardEvent): void => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const target = e.target as HTMLElement;
-    const actionEl = target.closest('[data-action]') as HTMLElement | null;
-    if (!actionEl) return;
-    if (actionEl !== target && !actionEl.contains(target)) return;
-    e.preventDefault();
-    actionEl.click();
-  };
-
-  // BUG-15-09 (Low): aggiorna lo stato disabled dei nav button di tutti i
-  // carousel-track su window resize (prima non erano ricalcolati). Il
-  // listener è tracciato e rimosso in resetBoundGuard per evitare accumulo.
-  _resizeHandler = (): void => {
-    document.querySelectorAll<HTMLElement>('.carousel-track').forEach((track) => {
-      updateCarouselNavState(track);
-    });
-  };
-  window.addEventListener('resize', _resizeHandler);
-
-  main.addEventListener('click', _clickHandler);
-  main.addEventListener('keydown', _keyHandler);
+  });
 }
 
 function previewDiscover(showId: number): void {
@@ -414,10 +346,9 @@ async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Pr
     return;
   }
   await addShowToList(found, list);
-  // FIX BUG-15-04 (Medium): rimosso il direct `renderDiscover(main)` call.
-  // addShowToList → replaceShow → emitChange → renderer (RAF) già re-rendera
-  // la vista discover con i badge "Aggiunta" aggiornati. Il direct call era
-  // ridondante e causava double-render (+ listener accumulation pre-fix).
-  // Se currentView !== 'discover' (es. utente ha cambiato vista), non c'è
-  // nulla da aggiornare qui.
+  if (getState().currentView === 'discover') {
+    // Re-render per aggiornare i badge "Già nella lista"
+    const main = document.getElementById('mainContent');
+    if (main) renderDiscover(main);
+  }
 }

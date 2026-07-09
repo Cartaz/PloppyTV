@@ -2,7 +2,7 @@
 
 import { getState } from '../lib/store';
 import { escapeHtml } from '../lib/utils';
-import { showCardHtml, bindKeyboardNav } from './dashboard';
+import { showCardHtml } from './dashboard';
 
 export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' | 'completed', title: string): void {
   const shows = getState().shows.filter((s) => s.list === list);
@@ -14,9 +14,4 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
     html += '<div class="card-grid">' + shows.map(showCardHtml).join('') + '</div>';
   }
   main.innerHTML = html;
-  // BUG-13-05 (a11y): show-card divs already carry role="button" tabindex="0"
-  // (via showCardHtml in dashboard.ts). Wire the same keydown handler as the
-  // dashboard so Enter/Space on a focused card opens the show. Safe no-op if
-  // dashboard already bound it on the same `main` element (per-element guard).
-  bindKeyboardNav(main);
 }

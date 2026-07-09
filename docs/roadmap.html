@@ -661,34 +661,41 @@
         border-color: rgba(245, 158, 11, 0.3);
       }
 
-      /* ============ ROADMAP ITEM DONE STATE ============ */
+      /* ============ ROADMAP ITEM DONE STATE (matches nutritrack style) ============ */
       .roadmap-item.done {
+        opacity: 0.65;
+        background: var(--c-surface-2);
         border-left-color: var(--c-success, #10b981);
-        background: rgba(16, 185, 129, 0.06);
-        position: relative;
       }
       .roadmap-item.done .ri-title {
-        color: var(--c-text-soft);
         text-decoration: line-through;
-        text-decoration-color: rgba(16, 185, 129, 0.5);
+        text-decoration-color: var(--c-text-soft);
         text-decoration-thickness: 2px;
       }
-      .roadmap-item.done .ri-desc {
-        opacity: 0.7;
+      .roadmap-item.done .ri-desc { opacity: 0.85; }
+      .roadmap-item.done:hover { opacity: 0.9; }
+
+      /* Inline status badge in ri-head (nutritrack pattern) */
+      .roadmap-item .ri-head {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: var(--space-2); margin-bottom: 4px;
       }
-      .roadmap-item.done::after {
-        content: '✓ Completato in v1.1.0';
-        position: absolute;
-        top: 8px;
-        right: 8px;
+      .ri-status {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+        padding: 3px 10px; border-radius: var(--r-full); white-space: nowrap;
         font-family: var(--font-mono);
-        font-size: 10px;
-        font-weight: 700;
-        color: #059669;
-        background: rgba(16, 185, 129, 0.15);
-        padding: 2px 8px;
-        border-radius: var(--r-full);
-        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+      .ri-status.done {
+        background: rgba(16, 185, 129, 0.15); color: #047857;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+      }
+      .ri-status.todo {
+        background: var(--c-bg-elevated); color: var(--c-text-soft);
+        border: 1px solid var(--c-border-soft);
+      }
+      .ri-status.doing {
+        background: rgba(245, 158, 11, 0.15); color: #d97706;
+        border: 1px solid rgba(245, 158, 11, 0.4);
       }
       .ri-tag.done {
         background: rgba(16, 185, 129, 0.15);
@@ -1042,77 +1049,98 @@
                 credibilità e robustezza.
               </p>
               <div class="roadmap-items">
-                <div class="roadmap-item done">
-                  <div class="ri-title">LICENSE MIT</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">LICENSE MIT</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Aggiungere file LICENSE standard MIT. Senza, il codice è tecnicamente "All rights reserved" anche se
                     la repo è pubblica.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>5 min</span><span>LICENSE</span>
+                    <span class="ri-tag done">fix</span><span>5 min</span><span>LICENSE</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">Privacy policy formale</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">Privacy policy formale</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Pagina Markdown chiara: cosa raccoglie PloppyTV (nulla), cosa invia a TVMaze (ricerche), come
                     disinstallare (reset 1-click). Link nell'about.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>1 ora</span><span>PRIVACY.md</span>
+                    <span class="ri-tag done">fix</span><span>1 ora</span><span>PRIVACY.md</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">ESLint + Prettier + Husky</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">ESLint + Prettier + Husky</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Config minimale: eslint:recommended, @typescript-eslint, prettier. Pre-commit hook con husky.
                     Previene regressioni nei prossimi refactor.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>2 ore</span><span>4 file config + hook</span>
+                    <span class="ri-tag done">fix</span><span>2 ore</span><span>4 file config + hook</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">Vitest setup + 64 test core</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">Vitest setup + 64 test core</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Test su normalize.ts, utils.ts (date, watched count), store.ts (reconcileList). Coverage target 30%.
                     Previene regressioni nei 145 bug già fixati.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>3 giorni</span
+                    <span class="ri-tag done">fix</span><span>3 giorni</span
                     ><span>vitest + 64 test, coverage 31%</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">CONTRIBUTING.md</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">CONTRIBUTING.md</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Anche se sei l'unico dev, documentare setup, struttura cartelle, convenzioni commit. Aiuta te stesso
                     tra 6 mesi e i conoscenti che vorranno forkare.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>1 giorno</span
+                    <span class="ri-tag done">fix</span><span>1 giorno</span
                     ><span>CONTRIBUTING.md + issue templates + PR template</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">README arricchito con screenshot</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">README arricchito con screenshot</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     3-4 screenshot della PWA in azione (dashboard, discover, calendario, stats). Aiuta i conoscenti a
                     capire cosa sono per installare.
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>1 ora</span
+                    <span class="ri-tag done">new</span><span>1 ora</span
                     ><span>badge + placeholder + sezioni docs</span>
                   </div>
                 </div>
-                <div class="roadmap-item done">
-                  <div class="ri-title">GitHub Release v1.1.0</div>
+                <div class="roadmap-item done" data-status="done">
+                  <div class="ri-head">
+                    <div class="ri-title">GitHub Release v1.1.0</div>
+                    <span class="ri-status done">Done</span>
+                  </div>
                   <div class="ri-desc">
                     Prima release "ufficiale" con tag, changelog, binary. Milestone psicologica: il progetto esce dalla
                     fase "bozza" ed entra "usabile".
                   </div>
                   <div class="ri-meta">
-                    <span class="ri-tag done">✓ done</span><span>30 min</span
+                    <span class="ri-tag done">new</span><span>30 min</span
                     ><span>CHANGELOG.md + RELEASE_NOTES_v1.1.0.md</span>
                   </div>
                 </div>

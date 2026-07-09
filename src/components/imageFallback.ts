@@ -26,9 +26,7 @@ export function initImageFallback(): void {
       target.dataset.fallbackApplied = '1';
 
       const fallbackName = target.dataset.fallback || 'N/D';
-      // BUG-20-09 (Low): removed the dead double-fallback-class dataset read
-      // (no writer in src/ ever set that attribute; it was a leftover).
-      const cls = target.dataset.fallbackCls || 'img-placeholder';
+      const cls = target.dataset.fallbackFallbackCls || target.dataset.fallbackCls || 'img-placeholder';
       const style = target.dataset.fallbackStyle || '';
       const placeholder = document.createElement('div');
       placeholder.className = cls;

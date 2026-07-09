@@ -9,21 +9,9 @@ export function updateBadges(): void {
   const w = document.getElementById('badge-watching');
   const tw = document.getElementById('badge-towatch');
   const c = document.getElementById('badge-completed');
-  const watchingCount = state.shows.filter((s) => s.list === 'watching').length;
-  const towatchCount = state.shows.filter((s) => s.list === 'towatch').length;
-  const completedCount = state.shows.filter((s) => s.list === 'completed').length;
-  if (w) {
-    w.textContent = String(watchingCount);
-    w.setAttribute('aria-label', watchingCount + ' serie in corso');
-  }
-  if (tw) {
-    tw.textContent = String(towatchCount);
-    tw.setAttribute('aria-label', towatchCount + ' serie da vedere');
-  }
-  if (c) {
-    c.textContent = String(completedCount);
-    c.setAttribute('aria-label', completedCount + ' serie completate');
-  }
+  if (w) w.textContent = String(state.shows.filter((s) => s.list === 'watching').length);
+  if (tw) tw.textContent = String(state.shows.filter((s) => s.list === 'towatch').length);
+  if (c) c.textContent = String(state.shows.filter((s) => s.list === 'completed').length);
 }
 
 export function initHeader(): void {
@@ -53,7 +41,7 @@ export function initHeader(): void {
         '</ul>' +
         '<p><strong>Dati:</strong> API TVMaze (gratuita, senza chiave)</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
-        '<p style="font-size:13px;"><strong>Versione 1.1.1</strong> — stress-test bug-fix release</p>' +
+        '<p style="font-size:13px;"><strong>Versione 1.1</strong> — fondamenta & igiene del progetto</p>' +
         '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">' +
         'Build pipeline moderna: <strong>Vite + TypeScript</strong>, ' +
         'codice suddiviso in moduli, <strong>Web Worker</strong> per statistiche e calendario (UI non si blocca), ' +
@@ -73,7 +61,7 @@ export function initHeader(): void {
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribuire</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>' +
         '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.1.1 · Luglio 2026</p>',
+        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.1.0 · Luglio 2026</p>',
       [{ label: 'Chiudi' }],
     );
   });
@@ -98,17 +86,4 @@ export function initHeader(): void {
 
   // Multi-tab badge sync
   window.addEventListener('ploppytv:badges', updateBadges);
-
-  // Keyboard accessibility for nav items (divs with role="button").
-  // Enter/Space on a focused [role="button"] inside the sidebar should fire a click.
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    sidebar.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      const target = e.target as HTMLElement | null;
-      if (!target || target.getAttribute('role') !== 'button') return;
-      e.preventDefault();
-      target.click();
-    });
-  }
 }
