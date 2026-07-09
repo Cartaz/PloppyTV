@@ -194,7 +194,7 @@ export function scheduleNotifications(): void {
   }, NOTIF_RESCHEDULE_INTERVAL_MS);
 
   if (scheduledCount > 0) {
-    console.log('[notifications] ' + scheduledCount + ' notifications scheduled');
+    console.warn('[notifications] ' + scheduledCount + ' notifications scheduled');
   }
 }
 

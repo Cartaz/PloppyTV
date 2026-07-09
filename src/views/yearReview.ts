@@ -224,24 +224,21 @@ function exportYearCard(stats: YearStats): void {
   ctx.fillText('Generato con PloppyTV', W / 2, 1280);
 
   // Download
-  canvas.toBlob(
-    (blob) => {
-      if (!blob) {
-        showToast('Errore export immagine', 'error');
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'ploppytv-' + stats.year + '.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast(t('yearReview.exported'), 'success');
-    },
-    'image/png',
-  );
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      showToast('Errore export immagine', 'error');
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ploppytv-' + stats.year + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(t('yearReview.exported'), 'success');
+  }, 'image/png');
 }
 
 // Stato: anno selezionato (default = anno corrente)
@@ -290,13 +287,7 @@ export function renderYearReview(main: HTMLElement): void {
   html += '<div class="year-selector">';
   for (const y of years) {
     html +=
-      '<button class="year-btn' +
-      (y === _selectedYear ? ' active' : '') +
-      '" data-year="' +
-      y +
-      '">' +
-      y +
-      '</button>';
+      '<button class="year-btn' + (y === _selectedYear ? ' active' : '') + '" data-year="' + y + '">' + y + '</button>';
   }
   html += '</div>';
 

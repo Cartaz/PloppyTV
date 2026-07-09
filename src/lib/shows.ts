@@ -10,12 +10,7 @@ import { safeId } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { updateBadges } from '../components/header';
-import {
-  MAX_EPISODE_NOTE_LENGTH,
-  MAX_EPISODE_RATING,
-  MAX_TAG_LENGTH,
-  MAX_TAGS_PER_SHOW,
-} from './constants';
+import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_PER_SHOW } from './constants';
 
 const _addShowInFlight = new Set<number>();
 

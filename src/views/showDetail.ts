@@ -106,10 +106,7 @@ function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
       escapeAttr(t) +
       '">×</button></span>';
   }
-  html +=
-    '<button class="tag-add-btn" data-action="addTag" data-show-id="' +
-    show.id +
-    '">+ Aggiungi tag</button>';
+  html += '<button class="tag-add-btn" data-action="addTag" data-show-id="' + show.id + '">+ Aggiungi tag</button>';
   html += '</div></div>';
   return html;
 }
@@ -523,14 +520,18 @@ function openAddTagModal(showId: number): void {
   for (const s of state.shows) {
     if (s.tags && s.id !== showId) for (const t of s.tags) allTags.add(t);
   }
-  const suggestions = Array.from(allTags).sort((a, b) => a.localeCompare(b)).slice(0, 12);
+  const suggestions = Array.from(allTags)
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 12);
 
   let suggestionsHtml = '';
   if (suggestions.length > 0) {
     suggestionsHtml =
       '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">Suggerimenti:</div>' +
       '<div class="tag-suggestions">' +
-      suggestions.map((t) => '<button class="tag-suggestion" data-tag="' + escapeAttr(t) + '">' + escapeHtml(t) + '</button>').join('') +
+      suggestions
+        .map((t) => '<button class="tag-suggestion" data-tag="' + escapeAttr(t) + '">' + escapeHtml(t) + '</button>')
+        .join('') +
       '</div>';
   }
 

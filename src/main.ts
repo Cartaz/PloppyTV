@@ -24,7 +24,17 @@ function applyHash(): void {
   if (!hash) return;
   const state = getState();
   // Mappa hash → view
-  const knownViews = ['dashboard', 'watching', 'towatch', 'completed', 'discover', 'calendar', 'stats', 'library', 'yearreview'];
+  const knownViews = [
+    'dashboard',
+    'watching',
+    'towatch',
+    'completed',
+    'discover',
+    'calendar',
+    'stats',
+    'library',
+    'yearreview',
+  ];
   if (knownViews.includes(hash)) {
     if (state.currentView !== hash || state.currentShowId !== null) {
       switchView(hash);

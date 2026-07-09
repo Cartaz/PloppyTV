@@ -158,7 +158,13 @@ export function renderDashboard(main: HTMLElement): void {
       '<div class="random-gold-info">' +
       '<div class="random-gold-title">Rivedi un episodio oro</div>' +
       '<div class="random-gold-desc">Un episodio 5★ a caso dalla tua libreria</div>' +
-      '<div class="random-gold-hint">' + escapeHtml(goldEp.show.name) + ' — S' + goldEp.season + 'E' + goldEp.ep.num + '</div>' +
+      '<div class="random-gold-hint">' +
+      escapeHtml(goldEp.show.name) +
+      ' — S' +
+      goldEp.season +
+      'E' +
+      goldEp.ep.num +
+      '</div>' +
       '</div>' +
       '<div class="random-gold-action">Sorprendimi</div>' +
       '</div>' +

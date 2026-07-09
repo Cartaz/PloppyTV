@@ -9,11 +9,7 @@ import { getAllUserTags } from '../lib/shows';
 // Stato filtro tag (persiste durante la sessione)
 let _activeTag: string = '';
 
-export function renderShowList(
-  main: HTMLElement,
-  list: 'watching' | 'towatch' | 'completed',
-  title: string,
-): void {
+export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' | 'completed', title: string): void {
   let shows = getState().shows.filter((s) => s.list === list);
 
   // Se c'è un tag attivo, filtra
@@ -31,10 +27,7 @@ export function renderShowList(
 
   if (tagsInList.length > 0) {
     html += '<div class="tag-filter-bar">';
-    html +=
-      '<button class="tag-filter-chip' +
-      (_activeTag === '' ? ' active' : '') +
-      '" data-tag="">Tutti</button>';
+    html += '<button class="tag-filter-chip' + (_activeTag === '' ? ' active' : '') + '" data-tag="">Tutti</button>';
     for (const tag of tagsInList) {
       html +=
         '<button class="tag-filter-chip' +

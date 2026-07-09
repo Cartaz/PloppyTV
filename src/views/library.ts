@@ -125,7 +125,15 @@ function applyFilters(shows: Show[]): Show[] {
 }
 
 function optionHtml(value: string, label: string, current: string): string {
-  return '<option value="' + escapeAttr(value) + '"' + (value === current ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+  return (
+    '<option value="' +
+    escapeAttr(value) +
+    '"' +
+    (value === current ? ' selected' : '') +
+    '>' +
+    escapeHtml(label) +
+    '</option>'
+  );
 }
 
 export function renderLibrary(main: HTMLElement): void {
@@ -165,13 +173,19 @@ export function renderLibrary(main: HTMLElement): void {
     '</div>';
 
   // Genre dropdown
-  html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.genre')) + '</label><select id="libGenreFilter" class="filter-select">';
+  html +=
+    '<div class="filter-group"><label>' +
+    escapeHtml(t('library.filter.genre')) +
+    '</label><select id="libGenreFilter" class="filter-select">';
   html += optionHtml('', t('library.filter.any'), _filters.genre);
   for (const g of genres) html += optionHtml(g, g, _filters.genre);
   html += '</select></div>';
 
   // Status dropdown
-  html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.status')) + '</label><select id="libStatusFilter" class="filter-select">';
+  html +=
+    '<div class="filter-group"><label>' +
+    escapeHtml(t('library.filter.status')) +
+    '</label><select id="libStatusFilter" class="filter-select">';
   html += optionHtml('', t('library.filter.any'), _filters.status);
   html += optionHtml('watching', t('nav.watching'), _filters.status);
   html += optionHtml('towatch', t('nav.towatch'), _filters.status);
@@ -179,7 +193,10 @@ export function renderLibrary(main: HTMLElement): void {
   html += '</select></div>';
 
   // Min rating dropdown
-  html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.rating')) + '</label><select id="libRatingFilter" class="filter-select">';
+  html +=
+    '<div class="filter-group"><label>' +
+    escapeHtml(t('library.filter.rating')) +
+    '</label><select id="libRatingFilter" class="filter-select">';
   html += optionHtml('0', t('library.filter.any'), String(_filters.minRating));
   for (let i = 1; i <= 5; i++) {
     html += optionHtml(String(i), i + '★+', String(_filters.minRating));
@@ -188,7 +205,10 @@ export function renderLibrary(main: HTMLElement): void {
 
   // Network dropdown
   if (networks.length > 0) {
-    html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.network')) + '</label><select id="libNetworkFilter" class="filter-select">';
+    html +=
+      '<div class="filter-group"><label>' +
+      escapeHtml(t('library.filter.network')) +
+      '</label><select id="libNetworkFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.network);
     for (const n of networks) html += optionHtml(n, n, _filters.network);
     html += '</select></div>';
@@ -196,7 +216,10 @@ export function renderLibrary(main: HTMLElement): void {
 
   // Year dropdown
   if (years.length > 0) {
-    html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.year')) + '</label><select id="libYearFilter" class="filter-select">';
+    html +=
+      '<div class="filter-group"><label>' +
+      escapeHtml(t('library.filter.year')) +
+      '</label><select id="libYearFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.year);
     for (const y of years) html += optionHtml(y, y, _filters.year);
     html += '</select></div>';
@@ -204,25 +227,30 @@ export function renderLibrary(main: HTMLElement): void {
 
   // Tag dropdown
   if (tags.length > 0) {
-    html += '<div class="filter-group"><label>' + escapeHtml(t('library.filter.tag')) + '</label><select id="libTagFilter" class="filter-select">';
+    html +=
+      '<div class="filter-group"><label>' +
+      escapeHtml(t('library.filter.tag')) +
+      '</label><select id="libTagFilter" class="filter-select">';
     html += optionHtml('', t('library.filter.any'), _filters.tag);
     for (const tg of tags) html += optionHtml(tg, tg, _filters.tag);
     html += '</select></div>';
   }
 
   // Clear button
-  html += '<button class="btn btn-secondary btn-sm" id="libClearFilters">' + escapeHtml(t('library.filter.clear')) + '</button>';
+  html +=
+    '<button class="btn btn-secondary btn-sm" id="libClearFilters">' +
+    escapeHtml(t('library.filter.clear')) +
+    '</button>';
   html += '</div>'; // .library-filters
 
   // Results
   const filtered = applyFilters(allShows);
-  html += '<div class="library-results-count">' + escapeHtml(t('library.results', { count: filtered.length })) + '</div>';
+  html +=
+    '<div class="library-results-count">' + escapeHtml(t('library.results', { count: filtered.length })) + '</div>';
 
   if (filtered.length === 0) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">' +
-      escapeHtml(t('library.noMatch')) +
-      '</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' + escapeHtml(t('library.noMatch')) + '</div></div>';
   } else {
     html += '<div class="card-grid">' + filtered.map(showCardHtml).join('') + '</div>';
   }
