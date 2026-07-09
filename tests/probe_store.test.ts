@@ -12,7 +12,6 @@
 //    guard prevents a throw when scrollTo is unavailable.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Show } from '../src/types';
 import {
   updateShowListStatus,
   getState,

@@ -14,10 +14,8 @@
 // happen if we replaced document.body.innerHTML each test).
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const fs = require('fs') as typeof import('fs');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const path = require('path') as typeof import('path');
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Show, TvmazeShow } from '../src/types';
 import { setShows, setState, getState } from '../src/lib/store';
 import { initModal, closeAllModals, showModal } from '../src/components/modal';

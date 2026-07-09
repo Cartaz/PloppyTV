@@ -6,11 +6,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Show } from '../src/types';
+import type * as ShowsNS from '../src/lib/shows';
 import { makeShow, makeShowWithSeasons, markWatchedFirst, makeEpisode } from './helpers';
 
 // Mock the network/mutation functions in shows.ts; keep pure helpers (showNeedsEpisodeNames) real.
 vi.mock('../src/lib/shows.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/lib/shows.ts')>();
+  const actual = await importOriginal<ShowsNS>();
   return {
     ...actual,
     moveShowToList: vi.fn(),

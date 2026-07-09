@@ -14,6 +14,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Show } from '../src/types';
+import type * as StoreNS from '../src/lib/store';
+import type * as ShowDetailNS from '../src/views/showDetail';
 
 // ---------- helpers ----------
 
@@ -44,9 +46,8 @@ function makeShow(over: Partial<Show> = {}): Show {
   };
 }
 
-/** Apply the renderer's _doRender pattern for the showDetail branch (sync render). */
 async function simulateRenderDetail(
-  showDetail: typeof import('../src/views/showDetail'),
+  showDetail: ShowDetailNS,
   main: HTMLElement,
 ): Promise<void> {
   showDetail.resetBoundGuard();
@@ -241,7 +242,7 @@ describe('BUG-12-01: showDetail listener accumulation (FIXED)', () => {
   it('switchSeason action fires EXACTLY once (FIXED — no accumulation)', async () => {
     const switchSeasonSpy = vi.fn();
     vi.doMock('../src/lib/store', async () => {
-      const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
+      const actual = await vi.importActual<StoreNS>('../src/lib/store');
       return { ...actual, switchSeason: switchSeasonSpy };
     });
     vi.doMock('../src/lib/shows', () => ({
@@ -352,7 +353,7 @@ describe('BUG-12-01: calendar listener accumulation (FIXED)', () => {
   it('changeWeek fires EXACTLY once after N re-renders (FIXED — no N× drift)', async () => {
     const changeCalendarWeekSpy = vi.fn();
     vi.doMock('../src/lib/store', async () => {
-      const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
+      const actual = await vi.importActual<StoreNS>('../src/lib/store');
       return { ...actual, changeCalendarWeek: changeCalendarWeekSpy };
     });
     vi.doMock('../src/worker/client', () => ({
@@ -407,7 +408,6 @@ describe('BUG-12-02: showDetail bind runs even when renderShowDetail bails (FIXE
 
     const store = await import('../src/lib/store');
     const showDetail = await import('../src/views/showDetail');
-    const renderer = await import('../src/components/renderer');
 
     store.setShows([]); // no shows at all
     store.setState({ currentView: 'dashboard', currentShowId: null });

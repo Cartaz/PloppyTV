@@ -63,7 +63,7 @@ describe('PROBE normalizeShow — seasons key collisions', () => {
     // The first array (2 episodes) is silently lost
     expect(out!.totalEpisodes).toBe(3);
   });
-  it('key " 1 " (whitespace) → safeId rejects (regex ^-?\d+$ fails) → skipped (BUG-02-07 FIXED)', () => {
+  it('key " 1 " (whitespace) → safeId rejects (regex ^-?\\d+$ fails) → skipped (BUG-02-07 FIXED)', () => {
     const out = normalizeShow({
       id: 1,
       seasons: { ' 1 ': [{ num: 1, id: 11 }] },

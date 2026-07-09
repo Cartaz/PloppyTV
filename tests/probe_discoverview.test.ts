@@ -70,12 +70,6 @@ function restoreRaf(): void {
   rafQueue = [];
 }
 
-function flushRaf(): void {
-  const queue = rafQueue;
-  rafQueue = [];
-  for (const cb of queue) cb(Date.now());
-}
-
 function rafQueueLength(): number {
   return rafQueue.length;
 }

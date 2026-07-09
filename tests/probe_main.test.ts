@@ -643,6 +643,7 @@ describe.skipIf(!isMainConfig)('main.ts — SW registration (prod)', () => {
     await import('../src/main');
     const opts = mockRegisterSW.mock.calls[0][0];
     opts.onRegistered(undefined);
+    // eslint-disable-next-line no-console
     expect(console.log).not.toHaveBeenCalled();
     spy.mockRestore();
   });
