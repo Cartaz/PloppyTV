@@ -1,9 +1,7 @@
 name: Audit Sandbox
 
 on:
-  push:
-    branches:
-      - audit/reliability-hardening
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,6 +28,7 @@ jobs:
           echo 'f1a306728348043c946b636a6e0d66b5b013b1be28e9b42fe97824bf2f8c73f7  /tmp/audit.patch' | sha256sum -c -
           patch -p1 --forward --batch < /tmp/audit.patch
           rm -f vitest.config.main.ts
+          echo '6cb9ba20716b547bf0a4bb57f87b86128e001e70a4d736ef10d0c28aa9430b24  .github/audit-test-alignment.patch' | sha256sum -c -
           patch -p1 --forward --batch < .github/audit-test-alignment.patch
       - name: Apply canonical formatting
         run: npm run format
