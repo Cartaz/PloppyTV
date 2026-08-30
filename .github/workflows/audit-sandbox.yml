@@ -1,9 +1,7 @@
 name: Audit Sandbox
 
 on:
-  push:
-    branches:
-      - audit/reliability-hardening
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,7 +24,7 @@ jobs:
         run: npm run format
       - name: Apply staged audit patch
         run: |
-          base64 -d .github/audit.patch.gz.b64 | gzip -d > /tmp/audit.patch
+          cat .github/audit-patch/part-* | base64 -d | gzip -d > /tmp/audit.patch
           echo 'f1a306728348043c946b636a6e0d66b5b013b1be28e9b42fe97824bf2f8c73f7  /tmp/audit.patch' | sha256sum -c -
           patch -p1 --forward --batch < /tmp/audit.patch
           rm -f vitest.config.main.ts
