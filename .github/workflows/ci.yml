@@ -35,6 +35,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - name: Dependency audit
+        run: npm audit --audit-level=high
 
   test:
     name: Vitest
