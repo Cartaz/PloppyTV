@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Refresh lockfile for sandbox dependency changes
+        run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - name: Capture dependency audit
         run: npm audit --json > audit.json || true
