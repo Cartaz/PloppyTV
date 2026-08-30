@@ -1,0 +1,50 @@
+name: Audit Sandbox
+
+on:
+  push:
+    branches:
+      - audit/reliability-hardening
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture dependency audit
+        run: npm audit --json > audit.json || true
+      - name: Apply canonical formatting
+        run: npm run format
+      - name: Validate formatted tree
+        run: |
+          npm run lint
+          npm run format:check
+          npm run typecheck
+          npm run test
+          npm run build
+      - name: Upload working tree and audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-sandbox
+          path: |
+            audit.json
+            src
+            tests
+            package.json
+            package-lock.json
+            vitest.config.ts
+            vitest.config.main.ts
+            vite.config.ts
+            index.html
+            README.md
+            PRIVACY.md
+            .github/workflows/ci.yml
+            .github/workflows/deploy.yml
+          if-no-files-found: error
