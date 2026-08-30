@@ -1,9 +1,7 @@
 name: Audit Sandbox
 
 on:
-  push:
-    branches:
-      - audit/reliability-hardening
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,7 +42,6 @@ jobs:
             package.json
             package-lock.json
             vitest.config.ts
-            vitest.config.main.ts
             vite.config.ts
             index.html
             README.md
