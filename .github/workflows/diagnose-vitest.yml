@@ -1,0 +1,74 @@
+name: Diagnose Vitest CI
+
+on:
+  push:
+    branches: [audit/ci-vitest-diagnostic]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run Vitest with machine-readable report
+        id: vitest
+        shell: bash
+        run: |
+          set +e
+          npm run test -- --reporter=json --outputFile=vitest-report.json >vitest-run.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Summarize failures
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          let out = [];
+          out.push(`checkout=${process.env.GITHUB_SHA}`);
+          out.push(`vitest_exit=${process.env.VITEST_EXIT}`);
+          try {
+            const report = JSON.parse(fs.readFileSync('vitest-report.json', 'utf8'));
+            out.push(`numTotalTests=${report.numTotalTests ?? 'unknown'}`);
+            out.push(`numFailedTests=${report.numFailedTests ?? 'unknown'}`);
+            for (const file of report.testResults ?? []) {
+              const failed = (file.assertionResults ?? []).filter(t => t.status === 'failed');
+              if (file.status === 'failed' || failed.length) {
+                out.push(`FILE: ${file.name}`);
+                for (const test of failed) {
+                  out.push(`TEST: ${(test.ancestorTitles ?? []).concat(test.title ?? []).join(' > ')}`);
+                  for (const msg of test.failureMessages ?? []) out.push(msg);
+                }
+                for (const msg of file.message ? [file.message] : []) out.push(msg);
+              }
+            }
+          } catch (error) {
+            out.push(`REPORT_PARSE_ERROR: ${error.stack || error}`);
+            if (fs.existsSync('vitest-run.log')) {
+              const lines = fs.readFileSync('vitest-run.log', 'utf8').split(/\r?\n/);
+              out.push('LOG_TAIL:');
+              out.push(...lines.slice(-120));
+            }
+          }
+          const text = out.join('\n') + '\n';
+          fs.writeFileSync('failure-summary.txt', text);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```text\n' + text + '```\n');
+          console.log(text);
+          NODE
+        env:
+          VITEST_EXIT: ${{ steps.vitest.outputs.exit_code }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vitest-failure-summary
+          path: failure-summary.txt
+      - name: Preserve test result
+        if: steps.vitest.outputs.exit_code != '0'
+        run: exit 1
