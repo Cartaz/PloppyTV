@@ -278,16 +278,12 @@ describe('sw.ts — BUG-A18-11: SKIP_WAITING message dispatch', () => {
 
   it('dispatching { type: "SKIP_WAITING" } (workbox-window format) calls self.skipWaiting', () => {
     dispatchMessage({ type: 'SKIP_WAITING' });
-    expect(
-      (self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting,
-    ).toHaveBeenCalledTimes(1);
+    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(1);
   });
 
   it('dispatching "SKIP_WAITING" string (legacy format) calls self.skipWaiting', () => {
     dispatchMessage('SKIP_WAITING');
-    expect(
-      (self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting,
-    ).toHaveBeenCalledTimes(1);
+    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -305,18 +301,14 @@ describe('sw.ts — BUG-A18-11: SKIP_WAITING message dispatch', () => {
     ['object with type number', { type: 0 }],
   ])('dispatching %s does NOT call self.skipWaiting', (_label, data) => {
     dispatchMessage(data);
-    expect(
-      (self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting,
-    ).not.toHaveBeenCalled();
+    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).not.toHaveBeenCalled();
   });
 
   it('dispatching multiple valid messages calls skipWaiting multiple times', () => {
     dispatchMessage({ type: 'SKIP_WAITING' });
     dispatchMessage('SKIP_WAITING');
     dispatchMessage({ type: 'SKIP_WAITING' });
-    expect(
-      (self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting,
-    ).toHaveBeenCalledTimes(3);
+    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -419,7 +411,19 @@ describe('sw.ts — code-reading', () => {
 // index.html — BUG-A18-09/10 + structure
 // =====================================================================
 describe('index.html — BUG-A18-09/10 + structure', () => {
-  // BUG-A18-09: noscript fallback
+  const indexDoc = new DOMParser().parseFromString(indexSrc, 'text/html');
+
+  function meta(name: string): HTMLMetaElement | null {
+    return indexDoc.querySelector(`meta[name="${name}"]`);
+  }
+
+  function link(rel: string, href: string): HTMLLinkElement | undefined {
+    return [...indexDoc.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`)].find(
+      (element) => element.getAttribute('href') === href,
+    );
+  }
+
+  // Keep source-order assertions only where order is itself part of the contract.
   it('BUG-A18-09: has <noscript> fallback with Italian JavaScript message', () => {
     expect(indexSrc).toContain('<noscript>');
     expect(indexSrc).toContain('</noscript>');
@@ -436,113 +440,108 @@ describe('index.html — BUG-A18-09/10 + structure', () => {
     expect(appIdx).toBeGreaterThan(noscriptIdx);
   });
 
-  // BUG-A18-10: dark-mode theme-color
   it('BUG-A18-10: has dark-mode theme-color meta with #0f0f14', () => {
-    expect(indexSrc).toMatch(
-      /<meta\s+name="theme-color"\s+media="\(prefers-color-scheme:\s*dark\)"\s+content="#0f0f14">/,
+    const darkTheme = [...indexDoc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find(
+      (element) => element.getAttribute('media') === '(prefers-color-scheme: dark)',
     );
+    expect(darkTheme?.content).toBe('#0f0f14');
   });
 
   it('has default (light) theme-color #ff6b35', () => {
-    expect(indexSrc).toMatch(/<meta\s+name="theme-color"\s+content="#ff6b35">/);
+    const defaultTheme = [...indexDoc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find(
+      (element) => !element.hasAttribute('media'),
+    );
+    expect(defaultTheme?.content).toBe('#ff6b35');
   });
 
   it('has exactly two theme-color meta tags (light + dark)', () => {
-    const matches = [...indexSrc.matchAll(/<meta\s+name="theme-color"/g)];
-    expect(matches.length).toBe(2);
+    expect(indexDoc.querySelectorAll('meta[name="theme-color"]')).toHaveLength(2);
   });
 
-  // Structural sanity
   it('has lang="it" on <html>', () => {
-    expect(indexSrc).toMatch(/<html\s+lang="it">/);
+    expect(indexDoc.documentElement.lang).toBe('it');
   });
 
   it('has charset UTF-8', () => {
-    expect(indexSrc).toMatch(/<meta\s+charset="UTF-8">/);
+    expect(indexDoc.querySelector('meta[charset]')?.getAttribute('charset')?.toUpperCase()).toBe('UTF-8');
   });
 
   it('has viewport meta with viewport-fit=cover', () => {
-    expect(indexSrc).toMatch(/<meta\s+name="viewport"\s+content="[^"]*viewport-fit=cover/);
+    expect(meta('viewport')?.content).toContain('viewport-fit=cover');
   });
 
   it('has description meta', () => {
-    expect(indexSrc).toMatch(/<meta\s+name="description"\s+content="[^"]*PloppyTV/);
+    expect(meta('description')?.content).toContain('PloppyTV');
   });
 
   it('has manifest link', () => {
-    expect(indexSrc).toMatch(/<link\s+rel="manifest"\s+href="manifest\.webmanifest">/);
+    expect(link('manifest', 'manifest.webmanifest')).toBeDefined();
   });
 
   it('has preconnect to api.tvmaze.com with crossorigin', () => {
-    expect(indexSrc).toMatch(
-      /<link\s+rel="preconnect"\s+href="https:\/\/api\.tvmaze\.com"\s+crossorigin>/,
-    );
+    expect(link('preconnect', 'https://api.tvmaze.com')?.hasAttribute('crossorigin')).toBe(true);
   });
 
   it('has preconnect to static.tvmaze.com with crossorigin', () => {
-    expect(indexSrc).toMatch(
-      /<link\s+rel="preconnect"\s+href="https:\/\/static\.tvmaze\.com"\s+crossorigin>/,
-    );
+    expect(link('preconnect', 'https://static.tvmaze.com')?.hasAttribute('crossorigin')).toBe(true);
   });
 
   it('has dns-prefetch for both TVMaze hosts', () => {
-    expect(indexSrc).toMatch(/<link\s+rel="dns-prefetch"\s+href="https:\/\/api\.tvmaze\.com">/);
-    expect(indexSrc).toMatch(/<link\s+rel="dns-prefetch"\s+href="https:\/\/static\.tvmaze\.com">/);
+    expect(link('dns-prefetch', 'https://api.tvmaze.com')).toBeDefined();
+    expect(link('dns-prefetch', 'https://static.tvmaze.com')).toBeDefined();
   });
 
   it('has module script pointing to /src/main.ts', () => {
-    expect(indexSrc).toMatch(/<script\s+type="module"\s+src="\/src\/main\.ts"><\/script>/);
+    const script = [...indexDoc.querySelectorAll<HTMLScriptElement>('script')].find(
+      (element) => element.getAttribute('src') === '/src/main.ts',
+    );
+    expect(script?.type).toBe('module');
   });
 
   it('has apple-mobile-web-app-capable', () => {
-    expect(indexSrc).toContain('apple-mobile-web-app-capable');
+    expect(meta('apple-mobile-web-app-capable')?.content).toBe('yes');
   });
 
   it('has mobile-web-app-capable', () => {
-    expect(indexSrc).toContain('mobile-web-app-capable');
+    expect(meta('mobile-web-app-capable')?.content).toBe('yes');
   });
 
   it('has color-scheme meta with dark light', () => {
-    expect(indexSrc).toMatch(/<meta\s+name="color-scheme"\s+content="dark light">/);
+    expect(meta('color-scheme')?.content).toBe('dark light');
   });
 
   it('has format-detection telephone=no', () => {
-    expect(indexSrc).toMatch(/<meta\s+name="format-detection"\s+content="telephone=no">/);
+    expect(meta('format-detection')?.content).toBe('telephone=no');
   });
 
   it('title contains PloppyTV', () => {
-    expect(indexSrc).toMatch(/<title>[^<]*PloppyTV[^<]*<\/title>/);
+    expect(indexDoc.title).toContain('PloppyTV');
   });
 
   it('has apple-touch-icon link', () => {
-    expect(indexSrc).toMatch(
-      /<link\s+rel="apple-touch-icon"\s+href="icons\/apple-touch-icon\.png">/,
-    );
+    expect(link('apple-touch-icon', 'icons/apple-touch-icon.png')).toBeDefined();
   });
 
   it('has SVG favicon', () => {
-    expect(indexSrc).toMatch(/<link\s+rel="icon"\s+type="image\/svg\+xml"\s+href="icons\/icon\.svg">/);
+    expect(link('icon', 'icons/icon.svg')?.type).toBe('image/svg+xml');
   });
 
   it('has main content container #mainContent', () => {
-    expect(indexSrc).toContain('id="mainContent"');
+    expect(indexDoc.getElementById('mainContent')).not.toBeNull();
   });
 
   it('has toast container #toast', () => {
-    expect(indexSrc).toContain('id="toast"');
+    expect(indexDoc.getElementById('toast')).not.toBeNull();
   });
 
   it('has modal overlay with aria-modal', () => {
-    expect(indexSrc).toContain('aria-modal="true"');
+    expect(indexDoc.querySelector('[aria-modal="true"]')).not.toBeNull();
   });
 
-  it('XSS check: no unescaped reflected query param pattern in HTML', () => {
-    // index.html is static — no server-side templating, no reflected params.
-    // Verify no <script> with inline src containing user-controlled data.
-    const scriptMatches = [...indexSrc.matchAll(/<script[^>]*>/g)];
-    for (const m of scriptMatches) {
-      // The only script should be type="module" src="/src/main.ts"
-      expect(m[0]).toMatch(/src="\/src\/main\.ts"/);
+  it('XSS check: static module scripts do not use user-controlled sources', () => {
+    const scripts = [...indexDoc.querySelectorAll<HTMLScriptElement>('script')];
+    for (const script of scripts) {
+      expect(script.getAttribute('src')).toBe('/src/main.ts');
     }
   });
 });
