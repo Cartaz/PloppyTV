@@ -1,0 +1,163 @@
+name: Prepare Reliability Publish
+
+on:
+  push:
+    branches:
+      - audit/reliability-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated audit source
+        uses: actions/checkout@v4
+        with:
+          path: audit-source
+
+      - name: Checkout exact main baseline
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: publish
+
+      - name: Verify immutable baseline
+        env:
+          EXPECTED_MAIN: edc0dc526bfbab1623649fb38eedfa51cb8938e4
+        run: |
+          test "$(git -C publish rev-parse HEAD)" = "$EXPECTED_MAIN"
+          test "$(git -C publish ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED_MAIN"
+
+      - name: Seed validated toolchain and workflows
+        run: |
+          cp audit-source/package.json publish/package.json
+          cp audit-source/.github/workflows/ci.yml publish/.github/workflows/ci.yml
+          cp audit-source/.github/workflows/deploy.yml publish/.github/workflows/deploy.yml
+
+      - name: Rebuild dependency lock
+        working-directory: publish
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --ignore-scripts
+          npm ci
+
+      - name: Reconstruct validated tree
+        working-directory: publish
+        run: |
+          npm run format
+          cat ../audit-source/.github/audit-patch/part-* | base64 -d | gzip -d > /tmp/audit.patch
+          echo 'f1a306728348043c946b636a6e0d66b5b013b1be28e9b42fe97824bf2f8c73f7  /tmp/audit.patch' | sha256sum -c -
+          patch -p1 --forward --batch < /tmp/audit.patch
+          rm -f vitest.config.main.ts
+          patch -p1 --forward --batch < ../audit-source/.github/audit-test-alignment.patch
+          npm run format
+
+      - name: Validate release contract
+        working-directory: publish
+        run: |
+          npm audit --audit-level=high
+          npm run lint
+          npm run format:check
+          npm run typecheck
+          npm run test
+          npm run build
+          git diff --check
+
+      - name: Verify exact validated blobs
+        working-directory: publish
+        run: |
+          cat > /tmp/expected-blobs <<'EOF'
+          e50ad7738608db6cdf4a9545b8b5b6f514cc3fd5 .github/workflows/ci.yml
+          c3fdbf950b395e0bb68ba5d4a5f1fffb81813681 .github/workflows/deploy.yml
+          82ed8669b8aa148e848f8e555f4ab8289224d536 PRIVACY.md
+          65f0850e609e2897f2bf18abf4b506057edb8657 README.md
+          1945f914f823d3c3b6c302d19e16bcf90d1abe79 index.html
+          3ed1e3d1232134f52f620b7766eb64406ad5af59 package-lock.json
+          76f966dd5ab0303e0b90935d222cbee09b20c40f package.json
+          5f5b49c14a5faef0ccc5e676e74c6b06609f6248 src/components/exportImport.ts
+          300bd4b44545ab760b644b424e0c548d9a41db6a src/components/header.ts
+          eb1b9ad1a8ec4dae0d5d655a9573c1a8b75881f2 src/lib/notifications.ts
+          18ba431ff6bfc5871cc3dfe45e73838406c91892 src/lib/shows.ts
+          4fe8e388a199519a367676bc3fb6701d5fda677b src/lib/storage.ts
+          acd3e0233d839dddce11c065188bb160eb19dc16 src/lib/store.ts
+          e079f815495c4e9edf9bc5f33b590ac19d802cdf src/locales/en.json
+          775540679e22967536d39ac20906235d80d6b78a src/locales/it.json
+          29a9836e3eb06f2ffadc1c7f0ce2732d018dc55c src/main.ts
+          7266ed3b33e054e0ccb47726a06f557e94ca156b src/styles/main.css
+          5d087258d3f5d8485ce95672a1289704b4b4221b src/sw.ts
+          7084c0978ebd687bb221865bd213154cd415bb57 src/views/discover.ts
+          11d5ed042b0e4fec919872fb49509c642efa4c60 src/views/showDetail.ts
+          72174571276ef45d0cb96475f0d09104da641a12 src/worker/client.ts
+          6e935bc48f8a745b568c26d7aac8d13fcdecadb7 tests/probe_a16.test.ts
+          bc16b69d7e564d2bbe27c5bf4a964fb4440a3e46 tests/probe_a19.test.ts
+          4e83c6d346dd8883020b7177646e8cbc0415ab4b tests/probe_crosscutting.test.ts
+          1779c39d1fda55537eec6f23f0c12419d84c5a01 tests/probe_exportimport.test.ts
+          c9826a0a6a4c739dedb0bbd7a0b645b44dc3e677 tests/probe_main.test.ts
+          39e70090d8aa66ac246d999dafddd9dcf157b386 tests/probe_storage.test.ts
+          e0433401aae4730a9f77553cfbc681d00309337d vitest.config.ts
+          EOF
+          while read -r expected path; do
+            actual="$(git hash-object "$path")"
+            if [ "$actual" != "$expected" ]; then
+              echo "Blob mismatch: $path expected=$expected actual=$actual" >&2
+              exit 1
+            fi
+          done < /tmp/expected-blobs
+          test ! -e vitest.config.main.ts
+
+      - name: Verify change set only
+        working-directory: publish
+        env:
+          EXPECTED_MAIN: edc0dc526bfbab1623649fb38eedfa51cb8938e4
+        run: |
+          cat > /tmp/expected-files <<'EOF'
+          .github/workflows/ci.yml
+          .github/workflows/deploy.yml
+          PRIVACY.md
+          README.md
+          index.html
+          package-lock.json
+          package.json
+          src/components/exportImport.ts
+          src/components/header.ts
+          src/lib/notifications.ts
+          src/lib/shows.ts
+          src/lib/storage.ts
+          src/lib/store.ts
+          src/locales/en.json
+          src/locales/it.json
+          src/main.ts
+          src/styles/main.css
+          src/sw.ts
+          src/views/discover.ts
+          src/views/showDetail.ts
+          src/worker/client.ts
+          tests/probe_a16.test.ts
+          tests/probe_a19.test.ts
+          tests/probe_crosscutting.test.ts
+          tests/probe_exportimport.test.ts
+          tests/probe_main.test.ts
+          tests/probe_storage.test.ts
+          vitest.config.main.ts
+          vitest.config.ts
+          EOF
+          git diff --name-only "$EXPECTED_MAIN" | sort > /tmp/actual-files
+          sort /tmp/expected-files > /tmp/expected-files.sorted
+          diff -u /tmp/expected-files.sorted /tmp/actual-files
+
+      - name: Create single publish commit
+        working-directory: publish
+        env:
+          EXPECTED_MAIN: edc0dc526bfbab1623649fb38eedfa51cb8938e4
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED_MAIN"
+          git config user.name "Cartaz"
+          git config user.email "prenc.francesco@gmail.com"
+          git add .github/workflows/ci.yml .github/workflows/deploy.yml PRIVACY.md README.md index.html package.json package-lock.json src tests vitest.config.ts
+          git rm --ignore-unmatch vitest.config.main.ts
+          git commit -m "fix: harden PloppyTV reliability contract"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_MAIN"
+          git push --force origin HEAD:refs/heads/audit/publish-ready
