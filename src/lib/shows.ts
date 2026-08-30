@@ -295,10 +295,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
         num: epNum,
         id: epId,
         watched: existingEp?.watched ?? false,
-        airdate:
-          typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null
-            ? ep.airdate
-            : null,
+        airdate: typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null ? ep.airdate : null,
         name: epName,
         runtime: typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : null,
       };

@@ -76,6 +76,24 @@ registerRoute(
   }),
 );
 
+// Le notifiche locali vengono mostrate dal registration del Service Worker.
+// Al click riportiamo l'utente nell'istanza già aperta oppure apriamo la PWA
+// nello scope corretto (funziona anche sotto il path di GitHub Pages).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const existing = windows.find((client): client is WindowClient => 'focus' in client);
+      if (existing) {
+        await existing.focus();
+        return;
+      }
+      await self.clients.openWindow(new URL('./index.html', self.registration.scope).href);
+    })(),
+  );
+});
+
 // Catch handler per navigazioni offline.
 // CRITICAL FIX (H1/T3): usa matchPrecache invece di caches.open('workbox-precache-v2').
 // Motivo: il cache name reale include un suffix di scope

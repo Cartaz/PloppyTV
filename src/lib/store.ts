@@ -107,10 +107,7 @@ export function getStateSnapshot(): AppState {
         // BUG-A2-05: guard contro seasons malformati.
         if (s.seasons && typeof s.seasons === 'object' && !Array.isArray(s.seasons)) {
           cloned.seasons = Object.fromEntries(
-            Object.entries(s.seasons).map(([k, eps]) => [
-              k,
-              Array.isArray(eps) ? eps.map((ep) => ({ ...ep })) : [],
-            ]),
+            Object.entries(s.seasons).map(([k, eps]) => [k, Array.isArray(eps) ? eps.map((ep) => ({ ...ep })) : []]),
           );
         } else {
           cloned.seasons = {};

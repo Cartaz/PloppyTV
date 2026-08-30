@@ -1,18 +1,11 @@
-// Notifiche push per nuovi episodi (P2.9)
+// Notifiche locali per nuovi episodi (P2.9)
 //
-// Design:
-//   - Usa la Notification API (non Push API con server, che richiederebbe un backend).
-//   - Schedula notifiche locali 1 ora prima dell'airdate degli episodi delle serie in "watching".
-//   - Permission richiesta esplicitamente dall'utente (opt-in).
-//   - Funziona solo se l'app è installata come PWA (display-mode: standalone).
-//   - Re-scheduling automatico ogni 6 ore per cogliere nuovi episodi/airdate.
-//   - Persiste lo stato (enabled/disabled) in localStorage (PREFS_KEY).
-//
-// Limiti:
-//   - Le notifiche programmate con setTimeout non sopravvivono al reload della pagina.
-//     Al reload, re-scheduliamo tutto. Questo è accettabile per una PWA hobby.
-//   - Se l'app è chiusa (non in background), le notifiche non vengono mostrate.
-//     Per notifiche true background servirebbe il Push API + server, che è out of scope.
+// Nessun backend e nessuna Push API: i timer vivono nel contesto della pagina.
+// Quando scattano, preferiamo ServiceWorkerRegistration.showNotification(),
+// necessario sui browser mobile; Notification() resta un fallback desktop.
+// La pianificazione è best-effort: se la PWA è completamente chiusa, il Web
+// platform non offre oggi un timer locale, preciso e cross-browser che possa
+// riattivarla a un orario arbitrario.
 
 import { getState } from './store';
 import { findNextEpisode, parseISODateLocal } from './utils';
@@ -127,6 +120,32 @@ function clearScheduledNotifications(): void {
   }
 }
 
+async function showLocalNotification(title: string, options: NotificationOptions): Promise<void> {
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.showNotification(title, options);
+        return;
+      }
+    } catch (e) {
+      console.warn('[notifications] service worker notification failed:', e);
+    }
+  }
+
+  // Desktop fallback. Su molti browser mobile il costruttore Notification non
+  // è disponibile anche quando il permesso è granted, da qui il path SW sopra.
+  new Notification(title, options);
+}
+
+function notificationIconUrl(): string {
+  try {
+    return new URL('icons/icon-192.png', document.baseURI).href;
+  } catch {
+    return 'icons/icon-192.png';
+  }
+}
+
 /**
  * Schedula notifiche per i prossimi episodi delle serie in "watching".
  * Per ogni serie, prende il nextEpisode (se ha airdate nel futuro) e
@@ -179,22 +198,21 @@ export function scheduleNotifications(): void {
     if (!Number.isFinite(season) || !Number.isFinite(epNum)) continue;
 
     const timer = setTimeout(() => {
-      try {
-        const title = t('notifications.episodeAirs', {
-          show: showName,
-          season: String(season),
-          ep: String(epNum),
-        });
-        const body = showName + ' — S' + season + 'E' + epNum;
-        new Notification(title, {
-          body,
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          tag: 'ploppytv-' + show.id + '-' + season + '-' + epNum,
-        });
-      } catch (e) {
+      const title = t('notifications.episodeAirs', {
+        show: showName,
+        season: String(season),
+        ep: String(epNum),
+      });
+      const body = showName + ' — S' + season + 'E' + epNum;
+      const icon = notificationIconUrl();
+      void showLocalNotification(title, {
+        body,
+        icon,
+        badge: icon,
+        tag: 'ploppytv-' + show.id + '-' + season + '-' + epNum,
+      }).catch((e) => {
         console.warn('[notifications] show error:', e);
-      }
+      });
     }, notifTime - now);
 
     _scheduledTimers.push(timer);

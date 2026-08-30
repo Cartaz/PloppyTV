@@ -173,7 +173,9 @@ function clickButton(label: string): void {
   const btn = modalButtons().find((b) => b.textContent === label);
   if (!btn) {
     throw new Error(
-      `Button "${label}" not found. Available: [${modalButtons().map((b) => b.textContent).join(', ')}]`,
+      `Button "${label}" not found. Available: [${modalButtons()
+        .map((b) => b.textContent)
+        .join(', ')}]`,
     );
   }
   btn.click();
@@ -212,8 +214,7 @@ function lastToast(): { msg: string; type?: string } | null {
 // ===== Setup =====
 beforeAll(() => {
   document.body.innerHTML = APP_HTML;
-  (globalThis as { FileReader: typeof FileReader }).FileReader =
-    MockFileReader as unknown as typeof FileReader;
+  (globalThis as { FileReader: typeof FileReader }).FileReader = MockFileReader as unknown as typeof FileReader;
   initModal();
   initExportImport();
 });
@@ -286,21 +287,18 @@ describe('BUG-11-01: BOM detection (UTF-8/UTF-16 LE/BE) — FIXED', () => {
 });
 
 // =====================================================================
-// BUG-11-02 (FIXED): data.version is now validated. Missing version (or
-// non-number) → warning toast; future version → warning toast. Import
-// still proceeds best-effort (modal still opens).
+// Schema compatibility: old unversioned backups are imported best-effort,
+// while future schemas are rejected because their invariants are unknown.
 // =====================================================================
-describe('BUG-11-02: Version validation — FIXED', () => {
-  it('data.version = 99 (future) → warning toast about future version, modal still opens', () => {
+describe('Import schema compatibility', () => {
+  it('data.version = 99 (future) → import is rejected before the modal opens', () => {
     const backup = { version: 99, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
-    expect(modalTitle()).toBe('Importa backup');
-    expect(modalBody()).toContain('1 serie valide');
+    expect(modalTitle()).not.toBe('Importa backup');
     const t = lastToast();
     expect(t).not.toBeNull();
-    expect(t!.msg).toContain('versione futura');
-    expect(t!.msg).toContain('99');
-    expect(t!.type).toBe('warning');
+    expect(t!.msg).toContain('versione più recente');
+    expect(t!.type).toBe('error');
   });
 
   it('data.version missing (undefined) → warning toast about missing schema version', () => {
@@ -372,9 +370,7 @@ describe('BUG-11-03: merge is field-level (preserves user metadata) — FIXED', 
   });
 
   it('PRESERVES existing.name (local metadata fresher)', () => {
-    setShows([
-      makeShow({ id: 1, name: 'My Local Name', seasons: { 1: [ep(1, false, 1)] }, totalEpisodes: 1 }),
-    ]);
+    setShows([makeShow({ id: 1, name: 'My Local Name', seasons: { 1: [ep(1, false, 1)] }, totalEpisodes: 1 })]);
     const backup = {
       version: 1,
       shows: [makeShow({ id: 1, name: 'Backup Name', seasons: { 1: [ep(1, true, 1)] }, totalEpisodes: 1 })],
@@ -441,15 +437,15 @@ describe('BUG-11-04: merge reconciles list status — FIXED', () => {
     ]);
     const backup = {
       version: 1,
-      shows: [
-        makeShow({ id: 1, list: 'towatch', seasons: { 1: [ep(1, true, 1), ep(2, true, 2)] }, totalEpisodes: 2 }),
-      ],
+      shows: [makeShow({ id: 1, list: 'towatch', seasons: { 1: [ep(1, true, 1), ep(2, true, 2)] }, totalEpisodes: 2 })],
       exportedAt: '2024-01-01',
     };
     setFile(makeFile(JSON.stringify(backup)));
     clickButton('Unisci (smart)');
     const s = getState().shows[0];
-    const watchedCount = Object.values(s.seasons).flat().filter((e) => e.watched).length;
+    const watchedCount = Object.values(s.seasons)
+      .flat()
+      .filter((e) => e.watched).length;
     expect(watchedCount).toBe(2);
     expect(s.totalEpisodes).toBe(2);
     // FIXED: watched === totalEpisodes → list reconciled to 'completed'
@@ -470,7 +466,9 @@ describe('BUG-11-04: merge reconciles list status — FIXED', () => {
     setFile(makeFile(JSON.stringify(backup)));
     clickButton('Unisci (smart)');
     const s = getState().shows[0];
-    const watchedCount = Object.values(s.seasons).flat().filter((e) => e.watched).length;
+    const watchedCount = Object.values(s.seasons)
+      .flat()
+      .filter((e) => e.watched).length;
     expect(watchedCount).toBe(1);
     // FIXED: watched > 0 but not all → list reconciled to 'watching'
     expect(s.list).toBe('watching');
@@ -516,7 +514,11 @@ describe('merge: basic flows', () => {
     setFile(makeFile(JSON.stringify(backup)));
     clickButton('Unisci (smart)');
     expect(getState().shows).toHaveLength(2);
-    expect(getState().shows.map((s) => s.id).sort()).toEqual([1, 2]);
+    expect(
+      getState()
+        .shows.map((s) => s.id)
+        .sort(),
+    ).toEqual([1, 2]);
     expect(saveDataMock).toHaveBeenCalledWith({ immediate: true });
     // BUG-11-06 fix: singular feminine "Importata 1 nuova"
     expect(lastToast()?.msg).toContain('Importata 1 nuova');
@@ -587,7 +589,11 @@ describe('replace flow', () => {
     clickButton('Sì, sostituisci tutto');
     // Replaced
     expect(getState().shows).toHaveLength(2);
-    expect(getState().shows.map((s) => s.id).sort()).toEqual([10, 20]);
+    expect(
+      getState()
+        .shows.map((s) => s.id)
+        .sort(),
+    ).toEqual([10, 20]);
     // All modals closed
     expect(isModalOpen()).toBe(false);
     expect(lastToast()?.msg).toBe('Backup importato (sostituzione)');
@@ -1129,8 +1135,7 @@ describe('reader.onerror', () => {
         if (this.onerror) this.onerror();
       }
     }
-    (globalThis as { FileReader: typeof FileReader }).FileReader =
-      ErrorFileReader as unknown as typeof FileReader;
+    (globalThis as { FileReader: typeof FileReader }).FileReader = ErrorFileReader as unknown as typeof FileReader;
     setFile(makeFile('{"shows":[]}'));
     expect(lastToast()?.msg).toBe('Errore lettura file');
     expect(lastToast()?.type).toBe('error');

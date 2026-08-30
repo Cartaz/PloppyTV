@@ -146,15 +146,20 @@ export function initExportImport(): void {
           input.value = '';
           return;
         }
-        // BUG-11-02: validazione version.
         const hasVersion = typeof data.version === 'number' && Number.isFinite(data.version);
         if (!hasVersion) {
+          // I backup storici senza versione restano importabili: normalizeShow
+          // applica i default del formato corrente.
           showToast('Backup senza versione schema — importo comunque best-effort', 'warning');
         } else if (data.version > SCHEMA_VERSION) {
+          // Un formato futuro può avere invarianti che questa build non conosce.
+          // Meglio rifiutare l'import che corrompere silenziosamente lo stato.
           showToast(
-            'Backup con versione futura (' + data.version + ') — potrebbero esserci incompatibilità',
-            'warning',
+            'Backup creato da una versione più recente di PloppyTV — aggiorna l’app prima di importarlo',
+            'error',
           );
+          input.value = '';
+          return;
         }
         const validShows = data.shows.map(normalizeShow).filter((s): s is Show => s !== null);
         const skipped = data.shows.length - validShows.length;

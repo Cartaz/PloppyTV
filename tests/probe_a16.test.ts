@@ -98,7 +98,11 @@ function setupSearchDom(): void {
   `;
 }
 
-function makeResult(id: number, name: string, premiered = '2020-01-01'): {
+function makeResult(
+  id: number,
+  name: string,
+  premiered = '2020-01-01',
+): {
   score: number;
   show: { id: number; name: string; image: null; premiered: string; network: { name: string }; webChannel: null };
 } {
@@ -242,7 +246,9 @@ function clickButton(label: string): void {
   const btn = modalButtons().find((b) => b.textContent === label);
   if (!btn) {
     throw new Error(
-      `Button "${label}" not found. Available: [${modalButtons().map((b) => b.textContent).join(', ')}]`,
+      `Button "${label}" not found. Available: [${modalButtons()
+        .map((b) => b.textContent)
+        .join(', ')}]`,
     );
   }
   btn.click();
@@ -608,8 +614,7 @@ describe('search.ts probe (A16)', () => {
 describe('exportImport.ts probe (A16)', () => {
   beforeAll(() => {
     document.body.innerHTML = APP_HTML;
-    (globalThis as { FileReader: typeof FileReader }).FileReader =
-      MockFileReader as unknown as typeof FileReader;
+    (globalThis as { FileReader: typeof FileReader }).FileReader = MockFileReader as unknown as typeof FileReader;
     initModal();
     initExportImport();
   });
@@ -679,21 +684,29 @@ describe('exportImport.ts probe (A16)', () => {
     normalizeShowSpy.mockImplementationOnce(() => {
       throw new Error('crash');
     });
-    setFile(makeFile(JSON.stringify({
-      version: 1,
-      shows: [makeShow({ id: 1 })],
-      exportedAt: '2024-01-01',
-    })));
+    setFile(
+      makeFile(
+        JSON.stringify({
+          version: 1,
+          shows: [makeShow({ id: 1 })],
+          exportedAt: '2024-01-01',
+        }),
+      ),
+    );
     expect(lastToast()?.msg).toContain('Errore elaborazione backup');
 
     showToastMock.mockClear();
 
     // Second: valid backup → modal opens (default implementation restored)
-    setFile(makeFile(JSON.stringify({
-      version: 1,
-      shows: [makeShow({ id: 10 })],
-      exportedAt: '2024-01-01',
-    })));
+    setFile(
+      makeFile(
+        JSON.stringify({
+          version: 1,
+          shows: [makeShow({ id: 10 })],
+          exportedAt: '2024-01-01',
+        }),
+      ),
+    );
     expect(modalTitle()).toBe('Importa backup');
     expect(isModalOpen()).toBe(true);
   });
@@ -703,10 +716,7 @@ describe('exportImport.ts probe (A16)', () => {
   it('prototype pollution: __proto__ in shows does not corrupt Object.prototype', () => {
     const backup = {
       version: 1,
-      shows: [
-        makeShow({ id: 1, name: 'Clean' }),
-        { __proto__: { polluted: true }, id: 2, name: 'Polluter' },
-      ],
+      shows: [makeShow({ id: 1, name: 'Clean' }), { __proto__: { polluted: true }, id: 2, name: 'Polluter' }],
       exportedAt: '2024-01-01',
     };
     setFile(makeFile(JSON.stringify(backup)));
@@ -722,9 +732,7 @@ describe('exportImport.ts probe (A16)', () => {
   it('prototype pollution: constructor.prototype in shows does not corrupt Object.prototype', () => {
     const backup = {
       version: 1,
-      shows: [
-        { id: 1, name: 'Test', constructor: { prototype: { polluted: true } } },
-      ],
+      shows: [{ id: 1, name: 'Test', constructor: { prototype: { polluted: true } } }],
       exportedAt: '2024-01-01',
     };
     setFile(makeFile(JSON.stringify(backup)));
@@ -736,21 +744,29 @@ describe('exportImport.ts probe (A16)', () => {
   // --- Edge cases: import of primitives / null / arrays ---
 
   it('import of array of primitives → all filtered as invalid', () => {
-    setFile(makeFile(JSON.stringify({
-      version: 1,
-      shows: [1, 2, 3, 'string', true, null],
-      exportedAt: '2024-01-01',
-    })));
+    setFile(
+      makeFile(
+        JSON.stringify({
+          version: 1,
+          shows: [1, 2, 3, 'string', true, null],
+          exportedAt: '2024-01-01',
+        }),
+      ),
+    );
     expect(lastToast()?.msg).toBe('Nessuna serie valida nel file');
     expect(isModalOpen()).toBe(false);
   });
 
   it('import of empty object shows ({} with no id) → filtered as invalid', () => {
-    setFile(makeFile(JSON.stringify({
-      version: 1,
-      shows: [{}, { name: 'NoId' }, { id: 0 }],
-      exportedAt: '2024-01-01',
-    })));
+    setFile(
+      makeFile(
+        JSON.stringify({
+          version: 1,
+          shows: [{}, { name: 'NoId' }, { id: 0 }],
+          exportedAt: '2024-01-01',
+        }),
+      ),
+    );
     expect(lastToast()?.msg).toBe('Nessuna serie valida nel file');
   });
 
@@ -770,11 +786,15 @@ describe('exportImport.ts probe (A16)', () => {
   });
 
   it('import data.shows is an array of nulls → all invalid', () => {
-    setFile(makeFile(JSON.stringify({
-      version: 1,
-      shows: [null, null, null],
-      exportedAt: '2024-01-01',
-    })));
+    setFile(
+      makeFile(
+        JSON.stringify({
+          version: 1,
+          shows: [null, null, null],
+          exportedAt: '2024-01-01',
+        }),
+      ),
+    );
     expect(lastToast()?.msg).toBe('Nessuna serie valida nel file');
   });
 
@@ -818,33 +838,37 @@ describe('exportImport.ts probe (A16)', () => {
     expect(modalTitle()).toBe('Importa backup');
   });
 
-  it('import with version = 1e308 (very large finite) → "versione futura" warning', () => {
+  it('import with version = 1e308 (very large finite) → rejected as future schema', () => {
     const backup = { version: 1e308, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
-    expect(modalTitle()).toBe('Importa backup');
+    expect(modalTitle()).toBe('');
     const t = lastToast();
     expect(t).not.toBeNull();
-    expect(t!.msg).toContain('versione futura');
-    expect(t!.type).toBe('warning');
+    expect(t!.msg).toContain('versione più recente');
+    expect(t!.type).toBe('error');
   });
 
   // --- Edge cases: merge ---
 
   it('merge: backup show with same id but fewer watched → existing kept (no merge)', () => {
-    setShows([makeShow({
-      id: 1,
-      name: 'Local',
-      seasons: { 1: [{ num: 1, id: 1, watched: true, airdate: null, name: null, runtime: null }] },
-      totalEpisodes: 1,
-    })]);
+    setShows([
+      makeShow({
+        id: 1,
+        name: 'Local',
+        seasons: { 1: [{ num: 1, id: 1, watched: true, airdate: null, name: null, runtime: null }] },
+        totalEpisodes: 1,
+      }),
+    ]);
     const backup = {
       version: 1,
-      shows: [makeShow({
-        id: 1,
-        name: 'Backup',
-        seasons: { 1: [{ num: 1, id: 1, watched: false, airdate: null, name: null, runtime: null }] },
-        totalEpisodes: 1,
-      })],
+      shows: [
+        makeShow({
+          id: 1,
+          name: 'Backup',
+          seasons: { 1: [{ num: 1, id: 1, watched: false, airdate: null, name: null, runtime: null }] },
+          totalEpisodes: 1,
+        }),
+      ],
       exportedAt: '2024-01-01',
     };
     setFile(makeFile(JSON.stringify(backup)));
@@ -853,20 +877,24 @@ describe('exportImport.ts probe (A16)', () => {
   });
 
   it('merge: backup show with same id and MORE watched → existing updated (seasons adopted)', () => {
-    setShows([makeShow({
-      id: 1,
-      name: 'Local',
-      seasons: { 1: [{ num: 1, id: 1, watched: false, airdate: null, name: null, runtime: null }] },
-      totalEpisodes: 1,
-    })]);
+    setShows([
+      makeShow({
+        id: 1,
+        name: 'Local',
+        seasons: { 1: [{ num: 1, id: 1, watched: false, airdate: null, name: null, runtime: null }] },
+        totalEpisodes: 1,
+      }),
+    ]);
     const backup = {
       version: 1,
-      shows: [makeShow({
-        id: 1,
-        name: 'Backup',
-        seasons: { 1: [{ num: 1, id: 1, watched: true, airdate: null, name: null, runtime: null }] },
-        totalEpisodes: 1,
-      })],
+      shows: [
+        makeShow({
+          id: 1,
+          name: 'Backup',
+          seasons: { 1: [{ num: 1, id: 1, watched: true, airdate: null, name: null, runtime: null }] },
+          totalEpisodes: 1,
+        }),
+      ],
       exportedAt: '2024-01-01',
     };
     setFile(makeFile(JSON.stringify(backup)));
@@ -965,8 +993,7 @@ describe('exportImport.ts probe (A16)', () => {
         if (this.onerror) this.onerror();
       }
     }
-    (globalThis as { FileReader: typeof FileReader }).FileReader =
-      ErrorFileReader as unknown as typeof FileReader;
+    (globalThis as { FileReader: typeof FileReader }).FileReader = ErrorFileReader as unknown as typeof FileReader;
     setFile(makeFile('{"shows":[]}'));
     expect(lastToast()?.msg).toBe('Errore lettura file');
     expect(lastToast()?.type).toBe('error');

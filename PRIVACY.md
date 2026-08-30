@@ -1,16 +1,17 @@
 # Privacy Policy — PloppyTV
 
-**Ultimo aggiornamento:** Luglio 2026
+**Ultimo aggiornamento:** 30 agosto 2026
 
 PloppyTV è una PWA (Progressive Web App) local-first per il tracking personale di serie TV. Questa pagina descrive in modo trasparente quali dati vengono raccolti, dove vengono salvati, cosa viene inviato a servizi esterni e come esercitare i propri diritti.
 
 ## TL;DR
 
 - **Nessun account, nessun login, nessun server di backend.**
-- **Tutti i tuoi dati restano nel tuo browser** (localStorage). Non vengono mai inviati a nessun server controllato dall'autore di PloppyTV.
-- Le uniche chiamate di rete sono verso l'API pubblica di **TVMaze** per i metadati delle serie TV (ricerche, poster, episodi, calendario).
-- **Nessun tracking, nessun analytics, nessun cookie di terze parti.**
-- Disinstallare l'app cancella tutti i dati. È disponibile anche una funzione "Reset" 1-click.
+- **Lo stato del tracker resta nel browser**: PloppyTV non ha account né un backend applicativo.
+- L'app statica è ospitata su **GitHub Pages**; le connessioni al sito sono quindi soggette anche alle policy e ai log tecnici del provider di hosting.
+- I metadati delle serie arrivano da **TVMaze**. La sezione Scopri può effettuare un preload poco dopo l'avvio per ridurre il tempo di attesa quando la apri.
+- **Nessun analytics o tracking aggiunto da PloppyTV e nessun cookie applicativo.**
+- Per cancellare i dati locali usa gli strumenti del browser per cancellare i dati del sito; la sola disinstallazione della PWA non è trattata come garanzia di cancellazione cross-browser.
 
 ## 1. Dati raccolti e memorizzati
 
@@ -20,10 +21,12 @@ PloppyTV memorizza nel `localStorage` del tuo browser i seguenti dati, inseriti 
 | --------------------- | --------------------------------------------------------------------------------- | ----------------------------- |
 | Serie TV tracciate    | ID TVMaze, stato (in visione / da vedere / completata), episodi visti             | `localStorage`                |
 | Metadati delle serie  | Nome, poster, generi, rete, data di premiere, riassunto (tutti forniti da TVMaze) | `localStorage` (cache locale) |
-| Impostazioni UI       | Ultima vista aperta, offset calendario, tab "Scopri" attiva                       | `localStorage`                |
+| Impostazioni locali   | Lingua, preferenza notifiche                                                       | `localStorage`                |
+| Cache Scopri           | Elenchi popolari/recenti e timestamp di cache                                     | `localStorage`                |
 | Timestamp di modifica | `savedAt` usato per il multi-tab sync via CAS                                     | `localStorage`                |
+| Cache runtime          | Asset PWA, risposte API e poster                                                   | Cache Storage / Service Worker |
 
-Nessun dato personale (nome, email, posizione, IP) viene raccolto o salvato. Non esiste un sistema di autenticazione, quindi non c'è modo di associare i dati a una tua identità.
+PloppyTV non chiede nome, email, posizione o altri dati identificativi e non possiede un sistema di autenticazione. Come per qualunque sito web, l'indirizzo IP e altri metadati di connessione possono essere trattati tecnicamente dai servizi contattati (hosting GitHub Pages e TVMaze) secondo le rispettive policy.
 
 ## 2. Dati inviati a servizi esterni
 
@@ -33,12 +36,16 @@ PloppyTV usa l'API pubblica gratuita di TVMaze per recuperare metadati delle ser
 
 - **Ricerca di una serie** tramite la search box → TVMaze riceve il termine di ricerca che hai digitato.
 - **Apertura del dettaglio di una serie** → TVMaze riceve l'ID numerico della serie per recuperare stagioni ed episodi.
-- **Caricamento della tab "Scopri"** → TVMaze riceve richieste paginate di elenchi di serie popolari/recenti.
-- **Caricamento del calendario** → i metadati degli episodi sono già in cache locale; nessuna chiamata aggiuntiva se i dati sono già presenti.
+- **Scopri** → circa 1,5 secondi dopo l'avvio, se lo storage locale è disponibile, PloppyTV può avviare in background il caricamento degli elenchi popolari/recenti. Questo preload è intenzionale per rendere la pagina Scopri più rapida; può quindi contattare TVMaze anche se non hai ancora aperto quella vista.
+- **Caricamento del calendario** → usa normalmente gli episodi già presenti nello stato locale.
 
-Le risposte di TVMaze vengono **cached localmente** dal Service Worker (Workbox) per ridurre il traffico di rete. Il traffico verso TVMaze è soggetto alla [privacy policy di TVMaze](https://www.tvmaze.com/privacy).
+Le risposte API e i poster possono essere **cached localmente** dal Service Worker (Workbox) per ridurre traffico e latenza. Il traffico verso TVMaze è soggetto alla [privacy policy di TVMaze](https://www.tvmaze.com/privacy).
 
-### 2.2 Altri servizi
+### 2.2 GitHub Pages
+
+Se usi la versione pubblicata su GitHub Pages, i file della PWA vengono serviti dall'infrastruttura GitHub. PloppyTV non aggiunge analytics propri, ma le richieste HTTP necessarie a scaricare l'app transitano dal provider di hosting e sono soggette alla [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
+### 2.3 Altri servizi integrati da PloppyTV
 
 Nessuno. In particolare:
 
@@ -51,11 +58,11 @@ In futuro, le versioni P4 della roadmap potranno introdurre funzionalità AI opz
 
 ## 3. Cookie
 
-PloppyTV **non utilizza cookie**. L'autenticazione e la sessione non sono necessarie perché non esiste un backend.
+Il codice di PloppyTV non imposta cookie applicativi. L'autenticazione e una sessione lato server non sono necessarie perché non esiste un backend PloppyTV. I provider esterni restano soggetti alle proprie policy quando vengono contattati.
 
 ## 4. LocalStorage e persistenza
 
-I dati sono salvati nella chiave `ploppytv_data_v1` del `localStorage` del browser, con un backup automatico in `ploppytv_data_backup`. Dimensione tipica: 50-500 KB, limite pratico ~5 MB (browser-dependent).
+Lo stato principale è salvato nella chiave `ploppytv_data_v1` del `localStorage`, con backup automatico in `ploppytv_data_backup`. Preferenze e cache Scopri usano chiavi locali separate; il Service Worker usa inoltre Cache Storage per asset, API e poster. Le quote dipendono dal browser e dal dispositivo.
 
 In modalità privata/incognito del browser, `localStorage` può non essere disponibile: in quel caso l'app passa in modalità in-memory e i dati vengono persi alla chiusura della scheda.
 
@@ -74,15 +81,15 @@ PloppyTV non implementa (al momento) alcun sistema di sincronizzazione cloud. Pe
 In quanto applicazione senza backend e senza raccolta di dati personali, l'esercizio dei diritti previsti dal GDPR (artt. 15-22) è diretto e immediato:
 
 - **Diritto di accesso**: i tuoi dati sono visibili in DevTools → Application → Local Storage.
-- **Diritto alla cancellazione ("diritto all'oblio")**: usa la funzione "Reset dati" nelle Impostazioni, oppure cancella i dati di navigazione del sito. La cancellazione è immediata e irrevocabile.
+- **Cancellazione dei dati locali**: cancella i dati del sito/PWA dalle impostazioni del browser. Questa operazione rimuove lo storage locale del relativo origin secondo il comportamento del browser.
 - **Diritto alla portabilità**: usa "Esporta" per ottenere un file JSON con tutti i tuoi dati.
 - **Diritto di rettifica**: modifica i dati direttamente nell'app (segna/sposta episodi, elimina serie).
 
-Poiché non conserviamo alcun dato sui nostri server, non esiste un "titolare del trattamento" nel senso classico: il titolare dei dati sei tu, sul tuo dispositivo.
+PloppyTV non gestisce un database remoto dei tuoi dati del tracker. Per eventuali dati tecnici trattati dai servizi esterni contattati, valgono ruoli e condizioni descritti nelle rispettive privacy policy. Questa pagina descrive il comportamento tecnico del progetto e non sostituisce una valutazione legale.
 
 ## 8. Sicurezza
 
-I dati in `localStorage` sono accessibili solo a script eseguiti nello stesso origin della PWA. L'applicaizone sanitizza tutti gli input provenienti da TVMaze e da file JSON importati (strip HTML, validazione ID, clamp numerici) per prevenire XSS e corruzione dello stato.
+I dati in `localStorage` sono accessibili solo a script eseguiti nello stesso origin della PWA. L'applicazione sanitizza tutti gli input provenienti da TVMaze e da file JSON importati (strip HTML, validazione ID, clamp numerici) per prevenire XSS e corruzione dello stato.
 
 La roadmap P1 introduce ESLint, Prettier, Husky pre-commit e una suite Vitest con copertura sui moduli critici (`normalize.ts`, `utils.ts`, `store.ts`) per prevenire regressioni di sicurezza.
 
@@ -96,6 +103,7 @@ Per domande sulla privacy, apri una issue su [GitHub](https://github.com/Cartaz/
 
 ## 11. Fonti esterne
 
-- [Privacy policy di TVMaze](https://www.tvmaze.com/privacy) — l'unico servizio terzo contattato dall'app.
+- [Privacy policy di TVMaze](https://www.tvmaze.com/privacy) — metadati e poster delle serie.
+- [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) — hosting della versione GitHub Pages.
 - [MDN: Web Storage API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API) — documentazione tecnica su `localStorage`.
 - [GDPR, Regolamento UE 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj) — testo completo del regolamento.

@@ -294,6 +294,8 @@ a:hover {
   font-weight: 500;
   border-left: 3px solid transparent;
   min-height: 48px;
+  width: 100%;
+  text-align: left;
 }
 .nav-item:hover {
   background: var(--bg-card);

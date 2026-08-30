@@ -172,9 +172,7 @@ export function renderShowDetail(main: HTMLElement): void {
   // (numero/oggetto), `.replace` avrebbe throwato TypeError. normalize valida,
   // ma defense-in-depth contro dati importati malevoli/corrotti.
   const bigImg =
-    typeof show.image === 'string'
-      ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/')
-      : null;
+    typeof show.image === 'string' ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/') : null;
   if (bigImg && show.image && bigImg !== show.image) {
     // Catena: original -> medium -> placeholder
     html +=
@@ -492,8 +490,7 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
   // per seasons[season]. Prima, `!show.seasons[season]` throwava TypeError se
   // show.seasons era undefined; e se seasons[season] era non-array (string),
   // `.find()` throwava.
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || !Array.isArray(show.seasons[season]))
-    return;
+  if (!show || !show.seasons || typeof show.seasons !== 'object' || !Array.isArray(show.seasons[season])) return;
   const ep = show.seasons[season].find((e) => e && e.num === epNum);
   if (!ep) return;
   const epName = ep.name || 'Episodio ' + epNum;

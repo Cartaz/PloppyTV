@@ -102,10 +102,7 @@ function installMemLS(mem: MemLS): void {
 }
 
 function putSavedData(mem: MemLS, shows: unknown[], savedAt: number): void {
-  mem.store.set(
-    STORAGE_KEY,
-    JSON.stringify({ version: SCHEMA_VERSION, shows, savedAt }),
-  );
+  mem.store.set(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows, savedAt }));
 }
 
 function readSavedAt(mem: MemLS): number | null {
@@ -179,21 +176,18 @@ describe('BUG-04-01 FIXED: _localDirty now consulted', () => {
     _state.shows = [{ id: 1, name: 'A-edit' }];
     _state._localDirty = true;
 
-    const tabBShows = [{ id: 2, name: 'B1' }, { id: 3, name: 'B2' }];
-    dispatchStorageEvent(
-      STORAGE_KEY,
-      JSON.stringify({ version: SCHEMA_VERSION, shows: tabBShows, savedAt: 2000 }),
-    );
+    const tabBShows = [
+      { id: 2, name: 'B1' },
+      { id: 3, name: 'B2' },
+    ];
+    dispatchStorageEvent(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: tabBShows, savedAt: 2000 }));
 
     // FIXED: _localDirty is consulted → shows preserved, not overwritten.
     expect(_state.shows).toEqual([{ id: 1, name: 'A-edit' }]);
     // setShows was NOT called with tabBShows (handler returned early).
     expect(setShowsMock).not.toHaveBeenCalledWith(tabBShows);
     // A toast was shown warning about the multi-tab update.
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Aggiornamento da altro tab — ricarica per sincronizzare',
-      'warning',
-    );
+    expect(showToastMock).toHaveBeenCalledWith('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
     // The user's edit "A-edit" is preserved in this tab's in-memory shows.
     expect(_state.shows).toContainEqual({ id: 1, name: 'A-edit' });
   });
@@ -229,10 +223,7 @@ describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () 
     const r1 = saveData({ immediate: true });
     expect(r1).toBe(false); // both writes failed
     // "Spazio esaurito" toast from the inner catch
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Spazio esaurito. Esporta backup e rimuovi serie vecchie.',
-      'error',
-    );
+    expect(showToastMock).toHaveBeenCalledWith('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
     // _storageDisabled is NOT set for QuotaExceeded
     expect(setStorageDisabledMock).not.toHaveBeenCalled();
     // Storage still has savedAt=1000 (writes failed)
@@ -264,11 +255,17 @@ describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () 
 // ============================================================
 describe('BUG-04-03 FIXED: storage event null newValue preserves local data', () => {
   it('other tab clears storage → this tab preserves shows + shows toast', () => {
-    _state.shows = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+    _state.shows = [
+      { id: 1, name: 'A' },
+      { id: 2, name: 'B' },
+    ];
     _state._localDirty = true;
     putSavedData(mem, _state.shows, 1000);
     loadData();
-    _state.shows = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+    _state.shows = [
+      { id: 1, name: 'A' },
+      { id: 2, name: 'B' },
+    ];
     _state._localDirty = true;
 
     // Simulate another tab removing STORAGE_KEY (e.g., user clears site data)
@@ -276,12 +273,32 @@ describe('BUG-04-03 FIXED: storage event null newValue preserves local data', ()
     dispatchStorageEvent(STORAGE_KEY, null);
 
     // FIXED: local shows are preserved (not wiped).
-    expect(_state.shows).toEqual([{ id: 1, name: 'A' }, { id: 2, name: 'B' }]);
+    expect(_state.shows).toEqual([
+      { id: 1, name: 'A' },
+      { id: 2, name: 'B' },
+    ]);
     // setShows([]) was NOT called (wipe skipped).
     expect(setShowsMock).not.toHaveBeenCalledWith([]);
     // A toast was shown warning about the data deletion.
+    expect(showToastMock).toHaveBeenCalledWith('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
+  });
+});
+
+describe('CAS revision includes key presence', () => {
+  it('another tab deletes STORAGE_KEY → stale tab cannot recreate it on save', () => {
+    _state.shows = [{ id: 1, name: 'A' }];
+    putSavedData(mem, _state.shows, 1000);
+    loadData();
+
+    // The other tab deletes the primary snapshot. Even if its storage event
+    // has not been delivered yet, presence differs from our loaded baseline.
+    mem.store.delete(STORAGE_KEY);
+    _state.shows = [{ id: 2, name: 'stale edit' }];
+
+    expect(saveData({ immediate: true })).toBe(false);
+    expect(mem.store.has(STORAGE_KEY)).toBe(false);
     expect(showToastMock).toHaveBeenCalledWith(
-      'Dati cancellati in altro tab — ricarica per sincronizzare',
+      'Modifiche in un altro tab — ricarica per vedere i dati aggiornati',
       'warning',
     );
   });
@@ -297,27 +314,31 @@ describe('BUG-04-03 FIXED: storage event null newValue preserves local data', ()
 describe('BUG-04-04 FIXED: modal-open storage event does NOT enable stale overwrite', () => {
   it('modal open → _lastSavedAt NOT advanced, next save CAS-fails, other tab preserved', () => {
     // Tab A: loaded shows=[A1,A2], savedAt=1000
-    _state.shows = [{ id: 1, name: 'A1' }, { id: 2, name: 'A2' }];
+    _state.shows = [
+      { id: 1, name: 'A1' },
+      { id: 2, name: 'A2' },
+    ];
     putSavedData(mem, _state.shows, 1000);
     loadData();
     // User opens a modal (e.g., confirm dialog) — isModalOpen() returns true
     isModalOpenMock.mockReturnValue(true);
 
     // Meanwhile tab B writes [B1,B2,B3] with savedAt=2000
-    const tabBShows = [{ id: 10, name: 'B1' }, { id: 11, name: 'B2' }, { id: 12, name: 'B3' }];
+    const tabBShows = [
+      { id: 10, name: 'B1' },
+      { id: 11, name: 'B2' },
+      { id: 12, name: 'B3' },
+    ];
     putSavedData(mem, tabBShows, 2000);
-    dispatchStorageEvent(
-      STORAGE_KEY,
-      JSON.stringify({ version: SCHEMA_VERSION, shows: tabBShows, savedAt: 2000 }),
-    );
+    dispatchStorageEvent(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: tabBShows, savedAt: 2000 }));
 
     // Modal-open path: shows NOT updated (preserved), _lastSavedAt NOT advanced (H5 fix).
-    expect(_state.shows).toEqual([{ id: 1, name: 'A1' }, { id: 2, name: 'A2' }]);
+    expect(_state.shows).toEqual([
+      { id: 1, name: 'A1' },
+      { id: 2, name: 'A2' },
+    ]);
     // Toast was shown warning about the multi-tab update.
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Aggiornamento da altro tab — ricarica per sincronizzare',
-      'warning',
-    );
+    expect(showToastMock).toHaveBeenCalledWith('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
 
     // Now user closes modal and triggers a save (e.g., beforeunload in main.ts,
     // or a toggleEpisode after closing the modal).
@@ -361,9 +382,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
     // and tab A's write", we stub getItem to return the 1000 snapshot for
     // the FIRST read (tab A's CAS check), and as a side-effect, immediately
     // write the 2000 snapshot (tab B's write) to the real storage map.
-    _state.shows = [
-      { id: 1, name: 'A1', image: 'big-image-data-'.repeat(50) },
-    ];
+    _state.shows = [{ id: 1, name: 'A1', image: 'big-image-data-'.repeat(50) }];
 
     const realGetItem = (globalThis as { localStorage: Storage }).localStorage.getItem.bind(
       (globalThis as { localStorage: Storage }).localStorage,
@@ -373,7 +392,14 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
       if (key === STORAGE_KEY && !casReadDone) {
         casReadDone = true;
         // Side effect: tab B writes savedAt=2000 with [B1,B2]
-        putSavedData(mem, [{ id: 10, name: 'B1' }, { id: 11, name: 'B2' }], 2000);
+        putSavedData(
+          mem,
+          [
+            { id: 10, name: 'B1' },
+            { id: 11, name: 'B2' },
+          ],
+          2000,
+        );
         // Return the OLD 1000 snapshot (tab A's CAS view)
         return JSON.stringify({ version: SCHEMA_VERSION, shows: [], savedAt: 1000 });
       }
@@ -405,7 +431,10 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
 
     // Verify storage still contains tab B's newer shows (recovery did NOT overwrite).
     const writtenShows = readShows(mem) as Array<{ id: number; name: string; image: unknown }>;
-    expect(writtenShows).toEqual([{ id: 10, name: 'B1' }, { id: 11, name: 'B2' }]);
+    expect(writtenShows).toEqual([
+      { id: 10, name: 'B1' },
+      { id: 11, name: 'B2' },
+    ]);
     // Tab A's stripped shows were NOT written.
     expect(writtenShows.find((s) => s.id === 1)).toBeUndefined();
   });
@@ -635,9 +664,7 @@ describe('BUG-04-08 FIXED: corrupted_* keys cleaned on successful load', () => {
     loadData(); // catches, writes to ploppytv_corrupted_<ts>
 
     // A ploppytv_corrupted_* key should exist (corrupted path writes it).
-    const corruptedKeys = Array.from(mem.store.keys()).filter((k) =>
-      k.startsWith('ploppytv_corrupted_'),
-    );
+    const corruptedKeys = Array.from(mem.store.keys()).filter((k) => k.startsWith('ploppytv_corrupted_'));
     expect(corruptedKeys.length).toBe(1);
     expect(mem.store.get(corruptedKeys[0])).toBe(corrupted);
 
@@ -648,9 +675,7 @@ describe('BUG-04-08 FIXED: corrupted_* keys cleaned on successful load', () => {
       mem.store.set(STORAGE_KEY, '{corrupted ' + i);
       loadData();
     }
-    const keysAfter = Array.from(mem.store.keys()).filter((k) =>
-      k.startsWith('ploppytv_corrupted_'),
-    );
+    const keysAfter = Array.from(mem.store.keys()).filter((k) => k.startsWith('ploppytv_corrupted_'));
     expect(keysAfter.length).toBe(6); // 1 initial + 5 iterations (all corrupted loads)
     vi.useRealTimers();
   });
@@ -659,18 +684,14 @@ describe('BUG-04-08 FIXED: corrupted_* keys cleaned on successful load', () => {
     // First: produce a corrupted key via a corrupted loadData
     mem.store.set(STORAGE_KEY, '{bad json');
     loadData();
-    const corruptedKeys = Array.from(mem.store.keys()).filter((k) =>
-      k.startsWith('ploppytv_corrupted_'),
-    );
+    const corruptedKeys = Array.from(mem.store.keys()).filter((k) => k.startsWith('ploppytv_corrupted_'));
     expect(corruptedKeys.length).toBe(1);
 
     // Now write valid data and reload — successful loadData cleans up.
     putSavedData(mem, [{ id: 1, name: 'X' }], 1000);
     loadData();
     // FIXED: corrupted_* keys are removed on successful load.
-    const corruptedKeysAfter = Array.from(mem.store.keys()).filter((k) =>
-      k.startsWith('ploppytv_corrupted_'),
-    );
+    const corruptedKeysAfter = Array.from(mem.store.keys()).filter((k) => k.startsWith('ploppytv_corrupted_'));
     expect(corruptedKeysAfter.length).toBe(0);
   });
 });
@@ -687,10 +708,7 @@ describe('loadData backup recovery (sanity: this path works)', () => {
   it('corrupted STORAGE_KEY + valid backup → restores backup and saves', () => {
     // Pre-populate BACKUP_KEY with valid data
     const backupShows = [{ id: 1, name: 'Restored' }];
-    mem.store.set(
-      BACKUP_KEY,
-      JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 5000 }),
-    );
+    mem.store.set(BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 5000 }));
     // Corrupt STORAGE_KEY
     mem.store.set(STORAGE_KEY, '{bad json');
 
@@ -698,10 +716,7 @@ describe('loadData backup recovery (sanity: this path works)', () => {
 
     // Should have called setShows with the backup shows
     expect(setShowsMock).toHaveBeenCalledWith(backupShows);
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Dati corrotti. Ripristinato backup precedente.',
-      'warning',
-    );
+    expect(showToastMock).toHaveBeenCalledWith('Dati corrotti. Ripristinato backup precedente.', 'warning');
 
     // saveData({immediate:true}) should have been called internally — STORAGE_KEY
     // should now contain valid JSON with the restored shows

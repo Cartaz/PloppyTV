@@ -83,36 +83,22 @@ export function initHeader(): void {
   document.getElementById('aboutBtn')?.addEventListener('click', () => {
     showModal(
       'Informazioni su PloppyTV',
-      "<p>PloppyTV è un'alternativa self-contained a TV Time, funzionante interamente nel browser senza server.</p>" +
+      '<p>PloppyTV è un tracker TV local-first: non richiede account né un backend PloppyTV.</p>' +
         '<p><strong>Caratteristiche:</strong></p>' +
         '<ul style="margin-left:20px;margin-bottom:10px;">' +
-        '<li>Tracking serie TV ed episodi visti</li><li>Liste personalizzate (In corso, Da vedere, Completate)</li>' +
-        '<li>Calendario settimanale con airdate reali</li><li>Statistiche dettagliate</li>' +
-        '<li>Dati salvati localmente nel browser</li><li>Compatibile con tutti i browser moderni</li>' +
+        '<li>Tracking serie TV ed episodi visti</li><li>Liste In corso, Da vedere e Completate</li>' +
+        '<li>Calendario settimanale e statistiche</li><li>Scopri con preload in background</li>' +
+        '<li>Backup Esporta/Importa</li><li>PWA offline per gli asset già in cache</li>' +
         '</ul>' +
-        '<p><strong>Dati:</strong> API TVMaze (gratuita, senza chiave)</p>' +
-        '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
-        '<p style="font-size:13px;"><strong>Versione 1.1</strong> — fondamenta & igiene del progetto</p>' +
-        '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">' +
-        'Build pipeline moderna: <strong>Vite + TypeScript</strong>, ' +
-        'codice suddiviso in moduli, <strong>Web Worker</strong> per statistiche e calendario (UI non si blocca), ' +
-        'code-splitting delle viste (chunk separati lazy-loadati), Service Worker basato su <strong>Workbox</strong> con expiration plugin.' +
-        '</p>' +
-        '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">' +
-        'Rispetto alla versione 1.0 (file HTML singolo da 114 KB): carico iniziale <strong>-26% gzip</strong>, cache più granulare, debugging più semplice.' +
-        '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);">' +
-        'Se vedi questa nota, stai usando la versione refactorata. ' +
-        'Per verificarlo in DevTools → Sources: dovresti vedere chunk separati come <code>discover-*.js</code>, <code>calendar-*.js</code>, <code>stats-*.js</code> e un <code>stats.worker-*.js</code>.' +
-        '</p>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">I tuoi dati sono salvati solo nel tuo browser (localStorage). Usa Esporta/Importa per i backup.</p>' +
+        '<p><strong>Dati:</strong> il tuo stato resta nel browser. I metadati e i poster arrivano da TVMaze; Scopri può pre-caricarli poco dopo l’avvio per ridurre l’attesa.</p>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">Le notifiche sono locali e best-effort: senza backend non possono essere garantite mentre la PWA è completamente chiusa.</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
         '<p style="font-size:12px;color:var(--text-secondary);">' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy Policy</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribuire</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>' +
         '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.1.0 · Luglio 2026</p>',
+        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.2.1 · 2026</p>',
       [{ label: 'Chiudi' }],
     );
   });

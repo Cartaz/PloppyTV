@@ -46,7 +46,7 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 - **Year-in-Review**: pagina annuale con top 5 serie, ore totali, genere dominante, export PNG condivisibile (P2)
 - **Keyboard shortcuts**: `/` search, `g d/c/s/l/y` navigazione, `j/k` episodi, `w` toggle, `?` cheat sheet (P2)
 - **i18n IT + EN**: framework multilingua con switcher nella sidebar, default da navigator.language (P2)
-- **Notifiche push**: notifica 1 ora prima degli episodi delle serie in watching, opt-in (P2)
+- **Notifiche locali (best-effort)**: promemoria 1 ora prima degli episodi mentre il contesto PWA/browser può eseguire i timer; nessun backend o Push server (P2)
 - **Ricerca integrata** su TVMaze con fallback su parole simili
 - **Backup/Import** dei dati in formato JSON (manual o multi-device)
 - **Funzionamento offline** garantito dal Service Worker (Workbox)
@@ -54,7 +54,7 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 
 ## Stack tecnico
 
-- **Vite 5** — bundler + dev server
+- **Vite 6** — bundler + dev server
 - **TypeScript 5** in modalità strict — type safety, zero runtime overhead
 - **Vanilla JS** (no React/Vue) — logica applicativa leggera, preservata dall'originale
 - **vite-plugin-pwa** — Service Worker con Workbox (precache + runtime caching separato per API e immagini)
@@ -82,14 +82,14 @@ Tutti i 7 item completati:
 - [x] **LICENSE MIT** — file `LICENSE` standard MIT
 - [x] **Privacy policy formale** — `PRIVACY.md` con TL;DR, sezioni GDPR, contatti
 - [x] **ESLint + Prettier** — config minimale + Husky pre-commit hook con `lint-staged`
-- [x] **Vitest + 64 test core** — coverage 31% su `normalize.ts`, `utils.ts`, `store.ts` (soglia minima 30%)
+- [x] **Vitest** — suite automatizzata sui contratti core con coverage gate sui moduli critici
 - [x] **CONTRIBUTING.md** — setup, struttura, convenzioni commit, workflow PR
 - [x] **README arricchito** — badge, screenshot placeholder, sezioni test/privacy/roadmap
 - [x] **GitHub Release v1.1.0** — changelog e release notes
 
 **P2 — Quality of life quotidiana ✅ Completata**
 
-Tutti i 9 item completati (schema v2, 870 test passanti):
+Tutti i 9 item completati (schema v2):
 
 - [x] **Rating 5★ per episodio** — stelle 1-5 con media stagione, toggle su click
 - [x] **Note private per episodio** — editor modale (max 500 char) con anteprima
@@ -99,7 +99,7 @@ Tutti i 9 item completati (schema v2, 870 test passanti):
 - [x] **Keyboard shortcuts** — `/` search, `g d/c/s/l/y` navigazione, `j/k` episodi, `w` toggle, `?` cheat sheet
 - [x] **i18n IT + EN** — framework custom con 150+ chiavi, switcher nella sidebar, persistenza lingua
 - [x] **Statistiche Year-in-Review** — pagina annuale con top 5, ore, genere dominante, export PNG via canvas
-- [x] **Notifiche push per nuovi episodi** — Notification API (no backend), scheduling 1h prima, opt-in
+- [x] **Notifiche locali per nuovi episodi** — Notification API/Service Worker, scheduling best-effort 1h prima, opt-in e senza backend
 
 **Stop condition:** la regola d'oro della roadmap è "se una fase ti stressa, salta alla successiva". P1 è il prerequisito per condividere l'app con conoscenti in buona fede; P2 porta l'app a essere pienamente usabile quotidianamente; da P3 in poi è tutto bonus.
 
@@ -271,10 +271,10 @@ Per sicurezza: usa "Esporta" nella vecchia versione per creare un backup JSON, p
 
 PloppyTV è **local-first by design**:
 
-- Tutti i dati restano nel `localStorage` del tuo browser
-- Nessun backend, nessun account, nessun server di terze parti
-- Le uniche chiamate di rete sono verso l'API pubblica di TVMaze per i metadati delle serie
-- Nessun tracking, nessun analytics, nessun cookie di terze parti
+- Lo stato del tracker resta nel browser; non esiste un backend PloppyTV né un account
+- La versione pubblica è servita da GitHub Pages e i metadati/poster arrivano da TVMaze
+- Scopri effettua intenzionalmente un preload in background poco dopo l'avvio per ridurre la latenza della prima apertura
+- Nessun tracking o analytics aggiunto da PloppyTV e nessun cookie applicativo
 
 La privacy policy completa è in [`PRIVACY.md`](./PRIVACY.md). È linkata anche dal modal "Informazioni" dentro l'app.
 

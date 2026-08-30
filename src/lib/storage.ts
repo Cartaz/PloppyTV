@@ -1,26 +1,12 @@
 // Persistenza localStorage con backup + gestione quota + multi-tab sync
 //
-// Multi-tab strategy: optimistic concurrency control (CAS).
-// Ogni `SavedData` porta un `savedAt` (timestamp). Il modulo traccia
-// `_lastSavedAt` = il `savedAt` dell'ultimo snapshot caricato dal localStorage.
-// Prima di scrivere, rilegge `savedAt` da localStorage: se è cambiato, significa
-// che un altro tab ha scritto nel frattempo → la scrittura viene rifiutata
-// (ritorna `false`) e l'azione chiamante deve applicare il rollback.
-// L'evento `storage` aggiorna `_lastSavedAt` dal valore ricevuto.
-//
-// FIXES applicati:
-//  - BUG-04-01: storage event consulta `_localDirty` — se true, skip setShows + toast.
-//  - BUG-04-02: `_lastSavedAt` avanzato solo DOPO un write di successo.
-//  - BUG-04-03: storage event con newValue=null NON wipe se ci sono shows locali.
-//  - BUG-04-04: storage event con modal-open o _localDirty NON avanza _lastSavedAt.
-//  - BUG-04-05: QuotaExceeded recovery re-check CAS prima del stripped write.
-//  - BUG-A4-01: loadData() wrap di localStorage.getItem in try/catch (SecurityError).
-//  - BUG-A4-02: backup write valida che `prev` sia JSON valido (non corrotto).
-//  - BUG-A4-03: loadData() + storage event validano parsed.version (future/past).
-//  - BUG-A4-04: CAS check rifiuta anche quando _lastSavedAt=null ma storage ha dati.
-//  - BUG-A4-05: QuotaExceeded recovery CAS check allineato a BUG-A4-04.
-//  - BUG-A4-06: backup recovery valida tipo di backup.savedAt (number + finite).
-//  - BUG-A4-07: savedAt letto con Number.isFinite (NaN rompe CAS: NaN !== NaN).
+// Multi-tab strategy: optimistic concurrency control (CAS). Ogni tab mantiene
+// la revisione del documento che ha caricato: presenza della chiave + savedAt.
+// Prima di scrivere, la revisione corrente viene riletta da localStorage. Se
+// differisce dalla baseline, la scrittura viene rifiutata e il chiamante può
+// invitare l'utente a ricaricare. La presenza fa parte della revisione: anche
+// una cancellazione in un altro tab è quindi un conflitto, non uno stato vuoto
+// indistinguibile da quello iniziale.
 
 import type { SavedData, Show } from '../types';
 import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
@@ -48,20 +34,42 @@ export function isStorageOK(): boolean {
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-/**
- * `savedAt` dell'ultimo snapshot caricato dal localStorage (in questo tab).
- * Usato per CAS multi-tab: se prima di salvare leggiamo un `savedAt` diverso,
- * significa che un altro tab ha scritto → rifiutiamo la scrittura.
- */
-let _lastSavedAt: number | null = null;
+type StorageRevision = { present: false } | { present: true; savedAt: number | null };
 
-/**
- * BUG-A4-07: valida che `savedAt` (o `version`) sia un numero finito.
- * NaN rompe il CAS perché `NaN !== NaN` è sempre true → ogni save sarebbe
- * rifiutato. Infinity può causare confronti non significativi.
- */
+let _lastRevision: StorageRevision = { present: false };
+
 function _validSavedAt(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function _revisionFromRaw(raw: string | null): StorageRevision {
+  if (raw === null) return { present: false };
+  try {
+    const parsed = JSON.parse(raw) as SavedData;
+    return { present: true, savedAt: _validSavedAt(parsed?.savedAt) };
+  } catch {
+    // La chiave esiste anche se il documento è corrotto. Questo è importante
+    // per distinguere una corruzione da una cancellazione concorrente.
+    return { present: true, savedAt: null };
+  }
+}
+
+function _readStorageRevision(): StorageRevision | null {
+  try {
+    return _revisionFromRaw(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function _sameRevision(a: StorageRevision, b: StorageRevision): boolean {
+  if (a.present !== b.present) return false;
+  if (!a.present || !b.present) return true;
+  return a.savedAt === b.savedAt;
+}
+
+function _setRevisionFromRaw(raw: string | null): void {
+  _lastRevision = _revisionFromRaw(raw);
 }
 
 /**
@@ -82,25 +90,14 @@ function _dedupShowsById(shows: Show[]): Show[] {
   return out;
 }
 
-function _readSavedAtFromStorage(): number | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SavedData;
-    return _validSavedAt(parsed.savedAt);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Salva lo stato corrente su localStorage.
  * - `{ immediate: true }`: scrive sincronamente, ritorna `false` se la
  *   scrittura fallisce (quota, serializzazione, conflitto multi-tab).
  * - senza `immediate`: schedula un debounce di 300ms e ritorna `true`.
  *
- * CAS multi-tab: se il `savedAt` in localStorage è diverso da `_lastSavedAt`,
- * la scrittura viene rifiutata (ritorna `false`).
+ * CAS multi-tab: se la revisione corrente (presenza + `savedAt`) differisce
+ * da quella caricata dal tab, la scrittura viene rifiutata.
  */
 export function saveData(opts?: { immediate?: boolean }): boolean | void {
   if (opts && opts.immediate) return _saveDataNow();
@@ -115,14 +112,8 @@ function _saveDataNow(): boolean {
   const state = getState();
   if (state._storageDisabled || !_storageOK) return false;
 
-  // CAS multi-tab: rileggi savedAt da storage. Se diverso da _lastSavedAt,
-  // un altro tab ha scritto. Rifiuta la nostra scrittura.
-  const currentSavedAt = _readSavedAtFromStorage();
-  // BUG-A4-04: rifiuta ANCHE quando _lastSavedAt=null ma storage ha dati.
-  // Scenario: questo tab ha caricato storage vuoto (_lastSavedAt=null), poi un
-  // altro tab ha scritto dati (currentSavedAt≠null). Senza questo fix, il save
-  // procederebbe e sovrascriverebbe silenziosamente i dati dell'altro tab.
-  if (currentSavedAt !== null && currentSavedAt !== _lastSavedAt) {
+  const currentRevision = _readStorageRevision();
+  if (currentRevision === null || !_sameRevision(currentRevision, _lastRevision)) {
     showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
     return false;
   }
@@ -149,8 +140,8 @@ function _saveDataNow(): boolean {
     setQuotaWarned(true);
   }
 
-  // BUG-04-02: NON avanzare _lastSavedAt qui — solo dopo un write di successo.
-  const prevLastSavedAt = _lastSavedAt;
+  // La baseline avanza solo dopo una scrittura riuscita.
+  const expectedRevision = _lastRevision;
 
   try {
     const prev = localStorage.getItem(STORAGE_KEY);
@@ -169,18 +160,15 @@ function _saveDataNow(): boolean {
       }
     }
     localStorage.setItem(STORAGE_KEY, serialized);
-    // BUG-04-02: write di successo → avanza _lastSavedAt.
-    _lastSavedAt = newSavedAt;
+    _lastRevision = { present: true, savedAt: newSavedAt };
     return true;
   } catch (e: unknown) {
     const err = e as { name?: string; code?: number; message?: string };
     if (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014) {
-      // BUG-04-05: re-check CAS prima del stripped write — se un altro tab ha
-      // scritto tra il nostro CAS read e il write fallito, abort recovery.
-      const recoverSavedAt = _readSavedAtFromStorage();
-      // BUG-A4-05: allineato a BUG-A4-04 — rifiuta anche se prevLastSavedAt
-      // è null (tab non aveva baseline) ma storage ha dati da altro tab.
-      if (recoverSavedAt !== null && recoverSavedAt !== prevLastSavedAt) {
+      // Re-check CAS prima del recovery senza poster: tra il primo controllo
+      // e il write fallito un altro tab potrebbe aver scritto o cancellato.
+      const recoverRevision = _readStorageRevision();
+      if (recoverRevision === null || !_sameRevision(recoverRevision, expectedRevision)) {
         showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
         return false;
       }
@@ -192,8 +180,7 @@ function _saveDataNow(): boolean {
           savedAt: newSavedAt,
         } satisfies SavedData);
         localStorage.setItem(STORAGE_KEY, strippedSerialized);
-        // BUG-04-02: stripped write OK → avanza _lastSavedAt.
-        _lastSavedAt = newSavedAt;
+        _lastRevision = { present: true, savedAt: newSavedAt };
         showToast('Salvato senza immagini (spazio limitato).', 'warning');
         return true;
       } catch {
@@ -205,7 +192,6 @@ function _saveDataNow(): boolean {
     } else {
       showToast('Errore salvataggio: ' + (err.message || 'unknown'), 'error');
     }
-    // BUG-04-02: write fallito → _lastSavedAt resta al valore pre-attempt.
     return false;
   }
 }
@@ -263,10 +249,14 @@ export function loadData(): void {
     return;
   }
   if (!raw) {
-    _lastSavedAt = null;
+    _lastRevision = { present: false };
     setShows([]);
     return;
   }
+
+  // Baseline del documento effettivamente letto. I path di recovery possono
+  // sostituire questo snapshot, ma non uno modificato nel frattempo.
+  _setRevisionFromRaw(raw);
 
   let parsed: SavedData;
   try {
@@ -285,20 +275,17 @@ export function loadData(): void {
       // BUG-A4-06: valida tipo di backup.savedAt — non trustare stringhe/NaN
       // (un backup vecchio o malevolo con savedAt="abc" romperebbe il CAS
       // perché "abc" !== <numero> è sempre true → ogni save futuro rifiutato).
-      _lastSavedAt = _validSavedAt(backup.savedAt);
       setShows(shows);
       showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
       saveData({ immediate: true });
       return;
     }
-    _lastSavedAt = null;
     setShows([]);
     showToast('Dati corrotti. Usa Importa per ripristinare.', 'error');
     return;
   }
 
   if (!parsed || typeof parsed !== 'object') {
-    _lastSavedAt = null;
     setShows([]);
     return;
   }
@@ -311,40 +298,32 @@ export function loadData(): void {
   // - `version` mancante (undefined) → dato molto vecchio, prosegui lenient.
   if (parsed.version !== undefined) {
     if (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version)) {
-      _lastSavedAt = null;
       setShows([]);
       return;
     }
     if (parsed.version > SCHEMA_VERSION) {
-      console.warn(
-        '[PloppyTV] Schema version futura:', parsed.version, '— atteso', SCHEMA_VERSION,
-      );
+      console.warn('[PloppyTV] Schema version futura:', parsed.version, '— atteso', SCHEMA_VERSION);
       const backup = _loadFromBackup();
       if (backup && Array.isArray(backup.shows) && backup.shows.length > 0) {
         const rawShows = backup.shows.map(normalizeShow).filter((s): s is Show => s !== null);
         // BUG-A19-04: dedup by id anche sul path backup recovery.
         const shows = _dedupShowsById(rawShows);
         reconcileAllLists(shows);
-        _lastSavedAt = _validSavedAt(backup.savedAt);
         setShows(shows);
         showToast('Versione dati non supportata. Ripristinato backup.', 'warning');
         saveData({ immediate: true });
         return;
       }
-      _lastSavedAt = null;
       setShows([]);
       showToast('Versione dati non supportata. Usa Importa per ripristinare.', 'error');
       return;
     }
     if (parsed.version < SCHEMA_VERSION) {
-      console.warn(
-        '[PloppyTV] Schema version passata:', parsed.version, '— atteso', SCHEMA_VERSION,
-      );
+      console.warn('[PloppyTV] Schema version passata:', parsed.version, '— atteso', SCHEMA_VERSION);
       // Prosegui — normalizeShow gestisce formati vecchi con defaults.
     }
   }
   if (!Array.isArray(parsed.shows)) {
-    _lastSavedAt = null;
     setShows([]);
     return;
   }
@@ -353,8 +332,6 @@ export function loadData(): void {
   // multi-tab può contenere show duplicati per id.
   const shows = _dedupShowsById(rawShows);
   reconcileAllLists(shows);
-  // BUG-A4-07: Number.isFinite respinge NaN/Infinity che romperebbero il CAS.
-  _lastSavedAt = _validSavedAt(parsed.savedAt);
   setShows(shows);
   // BUG-04-08: pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
   _cleanupCorruptedKeys();
@@ -372,12 +349,12 @@ if (typeof window !== 'undefined') {
       if (ev.newValue === null) {
         if (state.shows.length > 0) {
           showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
-          // BUG-04-04: NON avanza _lastSavedAt (resta al valore pre-event).
+          // BUG-04-04: NON avanza _lastRevision (resta al valore pre-event).
           return;
         }
         // Nessun show locale → safe to wipe.
         setShows([]);
-        _lastSavedAt = null;
+        _lastRevision = { present: false };
         emitChange();
         return;
       }
@@ -411,7 +388,7 @@ if (typeof window !== 'undefined') {
       const newSavedAt = _validSavedAt(parsed.savedAt);
 
       // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
-      // sovrascrivere lo stato. Mostra toast e lascia _lastSavedAt al valore
+      // sovrascrivere lo stato. Mostra toast e lascia _lastRevision al valore
       // pre-event (così il prossimo saveData CAS-fail e forza reload).
       if (state._localDirty) {
         showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
@@ -420,7 +397,7 @@ if (typeof window !== 'undefined') {
 
       // H5 / BUG-04-04: se c'è una modale aperta, NON sovrascrivere lo stato.
       // Mostriamo un toast che invita a ricaricare a modale chiusa.
-      // NON avanza _lastSavedAt (così i salvataggi successivi falliscono per CAS).
+      // NON avanza _lastRevision (così i salvataggi successivi falliscono per CAS).
       if (isModalOpen()) {
         showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
         const evBadges = new CustomEvent('ploppytv:badges');
@@ -429,7 +406,7 @@ if (typeof window !== 'undefined') {
       }
 
       setShows(newShows);
-      _lastSavedAt = newSavedAt;
+      _lastRevision = { present: true, savedAt: newSavedAt };
       emitChange();
     } catch (e) {
       console.warn('Sync multi-tab fallita:', e);

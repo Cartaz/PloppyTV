@@ -339,8 +339,7 @@ function previewDiscover(showId: number): void {
   // BUG-A12-04 (FIXED): the old truthy check `found.rating.average` excluded the
   // valid value 0 — a show with average rating 0 displayed "N/D" instead of "0/10".
   const ratingAvgRaw = found.rating ? found.rating.average : null;
-  const rating =
-    typeof ratingAvgRaw === 'number' && Number.isFinite(ratingAvgRaw) ? ratingAvgRaw + '/10' : 'N/D';
+  const rating = typeof ratingAvgRaw === 'number' && Number.isFinite(ratingAvgRaw) ? ratingAvgRaw + '/10' : 'N/D';
   const img = getPosterUrl(found);
   const summary = stripHtml(found.summary);
 
@@ -374,8 +373,7 @@ function previewDiscover(showId: number): void {
     // BUG-A12-02 (FIXED): found.runtime was interpolated RAW in the modal HTML body.
     // A corrupted cache holding a non-numeric string (e.g. "<img src=x onerror=...>")
     // would execute when set via innerHTML. Coerce to a finite number; omit otherwise.
-    const runtimeNum =
-      typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
+    const runtimeNum = typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
     body +=
       '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' +
       escapeHtml(found.status) +

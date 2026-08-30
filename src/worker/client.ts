@@ -79,11 +79,7 @@ function getWorker(): Worker | null {
  * rimanere pending. La view (renderStats/renderCalendar) ha un try/catch
  * che mostra "Errore caricamento" sulle promise rejected.
  */
-function runFallbackOrReject<T>(
-  fn: () => T,
-  resolve: (v: T) => void,
-  reject: (e: unknown) => void,
-): void {
+function runFallbackOrReject<T>(fn: () => T, resolve: (v: T) => void, reject: (e: unknown) => void): void {
   try {
     resolve(fn());
   } catch (e) {

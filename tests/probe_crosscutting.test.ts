@@ -130,15 +130,15 @@ describe('XSS: dashboard render with malicious show data', () => {
   });
 
   it('continue-card-name escapes show.name (continue watching section)', async () => {
-    setShows([maliciousShow({
-      list: 'watching',
-      seasons: {
-        1: [
-          { num: 1, id: 11, watched: false, airdate: '2024-01-01', name: 'ep1', runtime: 45 },
-        ],
-      },
-      totalEpisodes: 2,
-    })]);
+    setShows([
+      maliciousShow({
+        list: 'watching',
+        seasons: {
+          1: [{ num: 1, id: 11, watched: false, airdate: '2024-01-01', name: 'ep1', runtime: 45 }],
+        },
+        totalEpisodes: 2,
+      }),
+    ]);
     const { renderDashboard } = await import('../src/views/dashboard');
     renderDashboard(document.getElementById('mainContent')!);
     const continueName = document.querySelector('.continue-card-name');
@@ -311,15 +311,11 @@ describe('A11y: clickable divs now have role/tabindex (FIXED H17)', () => {
     expect(ep.tabIndex).toBe(0);
   });
 
-  it('index.html nav-item (sidebar) has role=button and tabindex=0 (FIXED)', () => {
-    const html = fs.readFileSync(
-      path.resolve(__dirname, '..', 'index.html'),
-      'utf-8',
-    );
-    const withRole = (html.match(/<div class="nav-item[^"]*"[^>]*role=/g) || []).length;
-    expect(withRole).toBeGreaterThan(0);
-    const withTabindex = (html.match(/<div class="nav-item[^"]*"[^>]*tabindex=/g) || []).length;
-    expect(withTabindex).toBeGreaterThan(0);
+  it('index.html nav-item (sidebar) uses native button semantics', () => {
+    const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf-8');
+    const nativeNavButtons = (html.match(/<button(?=[^>]*class="nav-item[^"]*")(?=[^>]*type="button")[^>]*>/g) || [])
+      .length;
+    expect(nativeNavButtons).toBeGreaterThan(0);
   });
 });
 
@@ -522,9 +518,7 @@ describe('Cross-module: showNeedsEpisodeNames now treats empty string as missing
     const { showNeedsEpisodeNames } = await import('../src/lib/shows');
     const show = maliciousShow({
       seasons: {
-        1: [
-          { num: 1, id: 11, watched: false, airdate: null, name: '', runtime: 45 },
-        ],
+        1: [{ num: 1, id: 11, watched: false, airdate: null, name: '', runtime: 45 }],
       },
     });
     // FIXED: empty string now treated as missing → returns true
@@ -532,9 +526,7 @@ describe('Cross-module: showNeedsEpisodeNames now treats empty string as missing
 
     const showNull = maliciousShow({
       seasons: {
-        1: [
-          { num: 1, id: 11, watched: false, airdate: null, name: null, runtime: 45 },
-        ],
+        1: [{ num: 1, id: 11, watched: false, airdate: null, name: null, runtime: 45 }],
       },
     });
     expect(showNeedsEpisodeNames(showNull)).toBe(true);
@@ -587,8 +579,10 @@ describe('A11y: search results now has listbox role via JS (FIXED BUG-20-08)', (
   it('search.ts initSearch sets role=listbox on results + combobox on input', async () => {
     // search-results div in index.html may lack static role, but search.ts
     // initSearch sets it. Verify by importing initSearch and calling it.
-    document.body.insertAdjacentHTML('beforeend',
-      '<div class="search-wrap"><input type="text" id="searchInput" maxlength="100"><div class="search-results" id="searchResults"></div></div>');
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div class="search-wrap"><input type="text" id="searchInput" maxlength="100"><div class="search-results" id="searchResults"></div></div>',
+    );
     const { initSearch } = await import('../src/components/search');
     initSearch();
     const results = document.getElementById('searchResults')!;
@@ -605,20 +599,19 @@ describe('A11y: search results now has listbox role via JS (FIXED BUG-20-08)', (
 
 describe('A11y: sidebar nav landmark + nav-badge aria-label (FIXED BUG-20-10)', () => {
   it('index.html has <nav class="sidebar"> landmark (OK)', () => {
-    const html = fs.readFileSync(
-      path.resolve(__dirname, '..', 'index.html'),
-      'utf-8',
-    );
+    const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf-8');
     expect(html).toContain('<nav class="sidebar"');
   });
 
   it('header.ts updateBadges sets aria-label dynamically on nav-badge spans', async () => {
     // nav-badge spans in index.html don't have static aria-label, but
     // header.ts updateBadges sets them dynamically. Verify via import.
-    document.body.insertAdjacentHTML('beforeend',
+    document.body.insertAdjacentHTML(
+      'beforeend',
       '<span class="nav-badge" id="badge-watching">0</span>' +
-      '<span class="nav-badge" id="badge-towatch">0</span>' +
-      '<span class="nav-badge" id="badge-completed">0</span>');
+        '<span class="nav-badge" id="badge-towatch">0</span>' +
+        '<span class="nav-badge" id="badge-completed">0</span>',
+    );
     const { updateBadges } = await import('../src/components/header');
     const { setShows } = await import('../src/lib/store');
     setShows([maliciousShow({ list: 'watching' }), maliciousShow({ id: 2, list: 'towatch' })]);

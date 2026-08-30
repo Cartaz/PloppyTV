@@ -203,8 +203,7 @@ function detectStandalone(): void {
   try {
     // iOS: rileva standalone per nascondere elementi ridondanti
     if (
-      (window.navigator &&
-        (window.navigator as unknown as { standalone?: boolean }).standalone === true) ||
+      (window.navigator && (window.navigator as unknown as { standalone?: boolean }).standalone === true) ||
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     ) {
       document.documentElement.classList.add('pwa-standalone');

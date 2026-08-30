@@ -119,12 +119,7 @@ function installMemLS(mem: MemLS): void {
   });
 }
 
-function putSavedData(
-  mem: MemLS,
-  shows: unknown[],
-  savedAt: number,
-  version = SCHEMA_VERSION,
-): void {
+function putSavedData(mem: MemLS, shows: unknown[], savedAt: number, version = SCHEMA_VERSION): void {
   mem.store.set(STORAGE_KEY, JSON.stringify({ version, shows, savedAt }));
 }
 
@@ -175,6 +170,7 @@ beforeEach(() => {
   mem = makeMemLS();
   installMemLS(mem);
   resetState();
+  loadData();
   vi.mocked(showToast).mockClear();
   vi.mocked(isModalOpen).mockClear();
   vi.mocked(isModalOpen).mockReturnValue(false);
@@ -228,10 +224,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
 
     const r = saveData({ immediate: true });
     expect(r).toBe(false);
-    expect(showToast).toHaveBeenCalledWith(
-      'Spazio esaurito. Esporta backup e rimuovi serie vecchie.',
-      'error',
-    );
+    expect(showToast).toHaveBeenCalledWith('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
     // _lastSavedAt not advanced → next save can retry
     // (storage still has savedAt=1000)
     expect(readSavedAt(mem)).toBe(1000);
@@ -278,10 +271,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
     // list should still be the pre-toggle value ('watching')
     expect(getState().shows[0].list).toBe(prevList);
     // Error toast shown
-    expect(showToast).toHaveBeenCalledWith(
-      'Modifica non salvata (storage error o modifiche in altro tab)',
-      'error',
-    );
+    expect(showToast).toHaveBeenCalledWith('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
   });
 
   it('BACKUP_KEY write failure (quota) is silently ignored — STORAGE_KEY write proceeds', () => {
@@ -306,9 +296,9 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
     setShows([makeShow({ id: 1, name: manyMultibyte })]);
 
     saveData({ immediate: true });
-    const quotaWarnCalls = vi.mocked(showToast).mock.calls.filter(
-      (c) => typeof c[0] === 'string' && String(c[0]).includes('limite'),
-    );
+    const quotaWarnCalls = vi
+      .mocked(showToast)
+      .mock.calls.filter((c) => typeof c[0] === 'string' && String(c[0]).includes('limite'));
     expect(quotaWarnCalls.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -320,10 +310,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
 describe('Section 2: Dati corrotti in localStorage', () => {
   it('JSON malformato → backup recovery (if backup valid)', () => {
     const backupShows = [{ id: 1, name: 'Backup Show', seasons: {} }];
-    mem.store.set(
-      BACKUP_KEY,
-      JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 5000 }),
-    );
+    mem.store.set(BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 5000 }));
     mem.store.set(STORAGE_KEY, '{not valid json');
 
     loadData();
@@ -342,10 +329,7 @@ describe('Section 2: Dati corrotti in localStorage', () => {
 
   it('future version (>SCHEMA_VERSION) → backup recovery', () => {
     const backupShows = [{ id: 1, name: 'Backup', seasons: {} }];
-    mem.store.set(
-      BACKUP_KEY,
-      JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 1000 }),
-    );
+    mem.store.set(BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 1000 }));
     putSavedData(mem, [{ id: 99, name: 'Future' }], 2000, SCHEMA_VERSION + 5);
 
     loadData();
@@ -463,19 +447,13 @@ describe('Section 2: Dati corrotti in localStorage', () => {
   });
 
   it('version non-number (string "bad") → empty state (loadData rejects)', () => {
-    mem.store.set(
-      STORAGE_KEY,
-      JSON.stringify({ version: 'bad', shows: [{ id: 1, name: 'X' }], savedAt: 1000 }),
-    );
+    mem.store.set(STORAGE_KEY, JSON.stringify({ version: 'bad', shows: [{ id: 1, name: 'X' }], savedAt: 1000 }));
     loadData();
     expect(getState().shows).toEqual([]);
   });
 
   it('version undefined (old data) → lenient proceed (data loaded)', () => {
-    mem.store.set(
-      STORAGE_KEY,
-      JSON.stringify({ shows: [{ id: 1, name: 'Old' }], savedAt: 1000 }),
-    );
+    mem.store.set(STORAGE_KEY, JSON.stringify({ shows: [{ id: 1, name: 'Old' }], savedAt: 1000 }));
     loadData();
     expect(getState().shows).toHaveLength(1);
     expect(getState().shows[0].id).toBe(1);
@@ -647,10 +625,7 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
     // Local shows preserved
     expect(getState().shows).toHaveLength(1);
     expect(getState().shows[0].name).toBe('A');
-    expect(showToast).toHaveBeenCalledWith(
-      'Dati cancellati in altro tab — ricarica per sincronizzare',
-      'warning',
-    );
+    expect(showToast).toHaveBeenCalledWith('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
   });
 
   it('storage event with newValue=null and NO local shows → wipes state', () => {
@@ -677,10 +652,7 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
 
     // State NOT updated (modal open)
     expect(getState().shows[0]?.id).toBe(1);
-    expect(showToast).toHaveBeenCalledWith(
-      'Aggiornamento da altro tab — ricarica per sincronizzare',
-      'warning',
-    );
+    expect(showToast).toHaveBeenCalledWith('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
 
     // _lastSavedAt NOT advanced → next save CAS-fails (preserves tab B's data)
     vi.mocked(isModalOpen).mockReturnValue(false);
@@ -817,7 +789,9 @@ describe('Section 5: Offline / API down — apiGet error classification', () => 
   }
 
   it('fetch rejects with TypeError → NetworkError', async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch')) as unknown as typeof globalThis.fetch;
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch')) as unknown as typeof globalThis.fetch;
     await expect(apiGet('/test')).rejects.toMatchObject({ name: 'NetworkError' });
   });
 
@@ -892,9 +866,13 @@ describe('Section 5: Offline / API down — apiGet error classification', () => 
       return new Promise((_resolve, reject) => {
         const signal = (init as { signal?: AbortSignal }).signal;
         if (signal) {
-          signal.addEventListener('abort', () => {
-            reject(new DOMException('The operation was aborted.', 'AbortError'));
-          }, { once: true });
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            },
+            { once: true },
+          );
         }
       });
     }) as unknown as typeof globalThis.fetch;
@@ -996,11 +974,7 @@ describe('Section 6: Date invalide ed estreme — parseISODateLocal', () => {
   });
 
   it('buildShowFromTvmaze rejects "2024-13-45" premiered → null', () => {
-    const result = buildShowFromTvmaze(
-      { id: 1, name: 'X', premiered: '2024-13-45', runtime: 60 },
-      [],
-      'towatch',
-    );
+    const result = buildShowFromTvmaze({ id: 1, name: 'X', premiered: '2024-13-45', runtime: 60 }, [], 'towatch');
     expect(result.premiered).toBeNull();
   });
 
@@ -1176,9 +1150,7 @@ describe('Section 8: Combinazioni cross-cutting', () => {
       status: 200,
       text: () =>
         Promise.resolve(
-          JSON.stringify([
-            { id: 101, season: 1, number: 1, name: 'Bad', airdate: '2024-13-40', runtime: 60 },
-          ]),
+          JSON.stringify([{ id: 101, season: 1, number: 1, name: 'Bad', airdate: '2024-13-40', runtime: 60 }]),
         ),
     }) as unknown as typeof globalThis.fetch;
 
@@ -1220,7 +1192,14 @@ describe('Section 8: Combinazioni cross-cutting', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify([
-            { id: 101, season: 1, number: 1, name: '<script>alert(1)</script>Real', airdate: '2024-01-01', runtime: 60 },
+            {
+              id: 101,
+              season: 1,
+              number: 1,
+              name: '<script>alert(1)</script>Real',
+              airdate: '2024-01-01',
+              runtime: 60,
+            },
           ]),
         ),
     }) as unknown as typeof globalThis.fetch;
@@ -1303,9 +1282,7 @@ describe('Section 8: Combinazioni cross-cutting', () => {
       status: 200,
       text: () =>
         Promise.resolve(
-          JSON.stringify([
-            { id: 101, season: 1, number: 1, name: 'Pilot', airdate: '2024-01-01', runtime: 60 },
-          ]),
+          JSON.stringify([{ id: 101, season: 1, number: 1, name: 'Pilot', airdate: '2024-01-01', runtime: 60 }]),
         ),
     }) as unknown as typeof globalThis.fetch;
 
@@ -1329,10 +1306,7 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     // Show was rolled back (removed from state)
     expect(getState().shows.find((s) => s.id === 99)).toBeUndefined();
     // Error toast shown
-    expect(showToast).toHaveBeenCalledWith(
-      'Impossibile salvare (storage pieno o modifiche in altro tab?)',
-      'error',
-    );
+    expect(showToast).toHaveBeenCalledWith('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
   });
 
   it('computeStats with mixed valid + null entries → filters nulls (safeShows)', () => {
@@ -1400,9 +1374,7 @@ describe('Section 8: Combinazioni cross-cutting', () => {
       status: 200,
       text: () =>
         Promise.resolve(
-          JSON.stringify([
-            { id: 101, season: 1, number: 1, name: 'Refreshed', airdate: '2024-01-01', runtime: 60 },
-          ]),
+          JSON.stringify([{ id: 101, season: 1, number: 1, name: 'Refreshed', airdate: '2024-01-01', runtime: 60 }]),
         ),
     });
 
@@ -1434,7 +1406,7 @@ describe('Section 9: Cross-module regression — combined edge cases', () => {
             'not-an-object', // garbage entry
           ],
           'not-a-number': [], // invalid season key
-          '__proto__': [{ num: 1, id: 1, watched: false }], // proto pollution attempt
+          __proto__: [{ num: 1, id: 1, watched: false }], // proto pollution attempt
         },
         genres: ['Drama', 42, null, '<b>Crime</b>', 'Drama'], // mixed types + dup
         tags: ['<script>tag1</script>', 'tag2', 123, null, 'tag1'], // mixed + dup
@@ -1497,10 +1469,7 @@ describe('Section 9: Cross-module regression — combined edge cases', () => {
     // Rollback: episode not watched
     expect(getState().shows[0].seasons[1][0].watched).toBe(false);
     // Toast about multi-tab
-    expect(showToast).toHaveBeenCalledWith(
-      'Modifica non salvata (storage error o modifiche in altro tab)',
-      'error',
-    );
+    expect(showToast).toHaveBeenCalledWith('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
   });
 
   it('normalizeShow + reconcileAllLists: show with all fields corrupted → valid default show', () => {

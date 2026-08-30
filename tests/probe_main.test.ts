@@ -6,25 +6,18 @@
 // order, inject failures, and exercise edge cases without touching real
 // DOM/storage/network.
 //
-// The 'virtual:pwa-register' module is provided by a Vite plugin declared in
-// vitest.config.main.ts. The plugin delegates to a runtime hook installed on
+// The default Vitest config provides 'virtual:pwa-register' and delegates to
+// a runtime hook installed on
 // globalThis by this test file:
 //   (globalThis).__mainProbeRegisterSWHook = (opts) => { ...; return updateSW; }
 //
 // NOTE: main.ts calls init() at module top-level (line 151). To exercise
 // init() repeatedly, we use vi.resetModules() + dynamic import per test.
 //
-// Run with: npx vitest run --config vitest.config.main.ts tests/probe_main.test.ts
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-
-// Self-skip when not running under vitest.config.main.ts (where the
-// 'virtual:pwa-register' module is provided by a Vite plugin). Without this
-// guard, every dynamic import of main.ts would fail with "Failed to resolve
-// import 'virtual:pwa-register'" when run via the default `vitest.config.ts`.
-const isMainConfig = process.env.VITEST_MAIN_CONFIG === '1';
 
 // =====================================================================
 // Window-listener tracking — vi.resetModules() does NOT remove listeners
@@ -38,11 +31,7 @@ let _origAdd: typeof window.addEventListener | null = null;
 beforeEach(() => {
   _tracked.length = 0;
   _origAdd = window.addEventListener.bind(window);
-  (window as any).addEventListener = function (
-    type: string,
-    listener: any,
-    options?: any,
-  ) {
+  (window as any).addEventListener = function (type: string, listener: any, options?: any) {
     _tracked.push({ type, listener, options });
     return (_origAdd as any)(type, listener, options);
   };
@@ -84,7 +73,7 @@ const mockSaveData = vi.fn((_opts?: any) => true as boolean);
 const mockSubscribe = vi.fn((_fn: any) => vi.fn() as () => void);
 const mockSwitchView = vi.fn((_view: any) => undefined);
 const mockOpenShow = vi.fn((_id: any) => undefined);
-const mockRegisterSW = vi.fn((_opts: any) => (mockUpdateSW as (reloadPage?: boolean) => Promise<void>));
+const mockRegisterSW = vi.fn((_opts: any) => mockUpdateSW as (reloadPage?: boolean) => Promise<void>);
 const mockUpdateSW = vi.fn((_reloadPage?: any) => Promise.resolve());
 
 // Mutable state used by mockGetState — tests can patch via __setState
@@ -105,7 +94,7 @@ function __setState(patch: Partial<typeof _state>): void {
 const mockGetState = vi.fn(() => _state as any);
 
 // Install the runtime hook BEFORE any dynamic import of main.ts. The Vite
-// plugin in vitest.config.main.ts reads this hook when 'virtual:pwa-register'
+// virtual:pwa-register shim reads this hook
 // is imported.
 (globalThis as any).__mainProbeRegisterSWHook = (opts: any) => {
   mockRegisterSW(opts);
@@ -218,16 +207,14 @@ function fireBeforeunload(): void {
 }
 
 function reloadButtons(): NodeListOf<HTMLButtonElement> {
-  return document.querySelectorAll<HTMLButtonElement>(
-    'body > button.btn-primary.btn-sm',
-  );
+  return document.querySelectorAll<HTMLButtonElement>('body > button.btn-primary.btn-sm');
 }
 
 // =====================================================================
 // Tests
 // =====================================================================
 
-describe.skipIf(!isMainConfig)('main.ts — init order', () => {
+describe('main.ts — init order', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -250,44 +237,26 @@ describe.skipIf(!isMainConfig)('main.ts — init order', () => {
     expect(mockRender).toHaveBeenCalledTimes(1);
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
     // Order assertions
-    expect(mockInitModal.mock.invocationCallOrder[0]).toBeLessThan(
-      mockInitHeader.mock.invocationCallOrder[0],
-    );
-    expect(mockInitHeader.mock.invocationCallOrder[0]).toBeLessThan(
-      mockInitSearch.mock.invocationCallOrder[0],
-    );
-    expect(mockInitSearch.mock.invocationCallOrder[0]).toBeLessThan(
-      mockInitExportImport.mock.invocationCallOrder[0],
-    );
-    expect(mockInitExportImport.mock.invocationCallOrder[0]).toBeLessThan(
-      mockInitRenderer.mock.invocationCallOrder[0],
-    );
-    expect(mockInitRenderer.mock.invocationCallOrder[0]).toBeLessThan(
-      mockLoadData.mock.invocationCallOrder[0],
-    );
-    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(
-      mockRender.mock.invocationCallOrder[0],
-    );
-    expect(mockRender.mock.invocationCallOrder[0]).toBeLessThan(
-      mockSubscribe.mock.invocationCallOrder[0],
-    );
+    expect(mockInitModal.mock.invocationCallOrder[0]).toBeLessThan(mockInitHeader.mock.invocationCallOrder[0]);
+    expect(mockInitHeader.mock.invocationCallOrder[0]).toBeLessThan(mockInitSearch.mock.invocationCallOrder[0]);
+    expect(mockInitSearch.mock.invocationCallOrder[0]).toBeLessThan(mockInitExportImport.mock.invocationCallOrder[0]);
+    expect(mockInitExportImport.mock.invocationCallOrder[0]).toBeLessThan(mockInitRenderer.mock.invocationCallOrder[0]);
+    expect(mockInitRenderer.mock.invocationCallOrder[0]).toBeLessThan(mockLoadData.mock.invocationCallOrder[0]);
+    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(mockRender.mock.invocationCallOrder[0]);
+    expect(mockRender.mock.invocationCallOrder[0]).toBeLessThan(mockSubscribe.mock.invocationCallOrder[0]);
   });
 
   it('updateBadges called once after loadData (renderer mock suppresses its own call)', async () => {
     await import('../src/main');
     expect(mockUpdateBadges).toHaveBeenCalledTimes(1);
-    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(
-      mockUpdateBadges.mock.invocationCallOrder[0],
-    );
+    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(mockUpdateBadges.mock.invocationCallOrder[0]);
   });
 
   it('shows storage modal BEFORE loadData when storage disabled', async () => {
     mockIsStorageOK.mockReturnValue(false);
     await import('../src/main');
     expect(mockShowModal).toHaveBeenCalledTimes(1);
-    expect(mockShowModal.mock.invocationCallOrder[0]).toBeLessThan(
-      mockLoadData.mock.invocationCallOrder[0],
-    );
+    expect(mockShowModal.mock.invocationCallOrder[0]).toBeLessThan(mockLoadData.mock.invocationCallOrder[0]);
   });
 
   it('does NOT show storage modal when storage OK', async () => {
@@ -320,9 +289,7 @@ describe.skipIf(!isMainConfig)('main.ts — init order', () => {
     expect(mockSubscribe).not.toHaveBeenCalled();
     expect(mockPreloadDiscover).not.toHaveBeenCalled();
     // Fallback UI is injected.
-    expect(mainEl.querySelector('.empty-state-title')?.textContent).toBe(
-      'Errore di avvio',
-    );
+    expect(mainEl.querySelector('.empty-state-title')?.textContent).toBe('Errore di avvio');
     mainEl.remove();
     spy.mockRestore();
   });
@@ -352,7 +319,7 @@ describe.skipIf(!isMainConfig)('main.ts — init order', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — applyHash routing', () => {
+describe('main.ts — applyHash routing', () => {
   beforeEach(async () => {
     resetMocks();
     vi.useFakeTimers();
@@ -495,7 +462,7 @@ describe.skipIf(!isMainConfig)('main.ts — applyHash routing', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — SW registration (prod)', () => {
+describe('main.ts — SW registration (prod)', () => {
   let originalServiceWorker: any;
 
   beforeEach(() => {
@@ -656,7 +623,7 @@ describe.skipIf(!isMainConfig)('main.ts — SW registration (prod)', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — SW registration (dev)', () => {
+describe('main.ts — SW registration (dev)', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -687,7 +654,7 @@ describe.skipIf(!isMainConfig)('main.ts — SW registration (dev)', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — beforeunload', () => {
+describe('main.ts — beforeunload', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -717,10 +684,7 @@ describe.skipIf(!isMainConfig)('main.ts — beforeunload', () => {
   });
 
   it('FIX-18-06: beforeunload handler wraps saveData in try/catch (code-reading — runtime throws no longer escape as uncaught exceptions)', () => {
-    const src = readFileSync(
-      resolve(__dirname, '../src/main.ts'),
-      'utf8',
-    );
+    const src = readFileSync(resolve(__dirname, '../src/main.ts'), 'utf8');
     // The beforeunload listener is now a multi-statement block with try/catch.
     // Match the full `window.addEventListener('beforeunload', () => { ... })`
     // call, accounting for nested braces.
@@ -753,7 +717,7 @@ describe.skipIf(!isMainConfig)('main.ts — beforeunload', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — preloadDiscover', () => {
+describe('main.ts — preloadDiscover', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -807,7 +771,7 @@ describe.skipIf(!isMainConfig)('main.ts — preloadDiscover', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — standalone detection', () => {
+describe('main.ts — standalone detection', () => {
   let originalMatchMedia: any;
   let originalStandalone: any;
 
@@ -864,7 +828,7 @@ describe.skipIf(!isMainConfig)('main.ts — standalone detection', () => {
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — double init (HMR / re-import)', () => {
+describe('main.ts — double init (HMR / re-import)', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -909,7 +873,7 @@ describe.skipIf(!isMainConfig)('main.ts — double init (HMR / re-import)', () =
   });
 });
 
-describe.skipIf(!isMainConfig)('main.ts — render/subscribe/loadData ordering', () => {
+describe('main.ts — render/subscribe/loadData ordering', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -922,9 +886,7 @@ describe.skipIf(!isMainConfig)('main.ts — render/subscribe/loadData ordering',
 
   it('render() called BEFORE subscribe(render) — first render uses initial state', async () => {
     await import('../src/main');
-    expect(mockRender.mock.invocationCallOrder[0]).toBeLessThan(
-      mockSubscribe.mock.invocationCallOrder[0],
-    );
+    expect(mockRender.mock.invocationCallOrder[0]).toBeLessThan(mockSubscribe.mock.invocationCallOrder[0]);
   });
 
   it('subscribe receives a function (the render callback)', async () => {
@@ -936,15 +898,11 @@ describe.skipIf(!isMainConfig)('main.ts — render/subscribe/loadData ordering',
 
   it('loadData called BEFORE render — render sees loaded shows', async () => {
     await import('../src/main');
-    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(
-      mockRender.mock.invocationCallOrder[0],
-    );
+    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(mockRender.mock.invocationCallOrder[0]);
   });
 
   it('updateBadges called AFTER loadData (so badges reflect loaded data)', async () => {
     await import('../src/main');
-    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(
-      mockUpdateBadges.mock.invocationCallOrder[0],
-    );
+    expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(mockUpdateBadges.mock.invocationCallOrder[0]);
   });
 });
