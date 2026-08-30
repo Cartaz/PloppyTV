@@ -1,7 +1,9 @@
 name: Audit Sandbox
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - audit/reliability-hardening
 
 permissions:
   contents: read
