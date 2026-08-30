@@ -1,7 +1,9 @@
 name: Audit Sandbox
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - audit/reliability-hardening
 
 permissions:
   contents: read
@@ -28,6 +30,7 @@ jobs:
           echo 'f1a306728348043c946b636a6e0d66b5b013b1be28e9b42fe97824bf2f8c73f7  /tmp/audit.patch' | sha256sum -c -
           patch -p1 --forward --batch < /tmp/audit.patch
           rm -f vitest.config.main.ts
+          patch -p1 --forward --batch < .github/audit-test-alignment.patch
       - name: Apply canonical formatting
         run: npm run format
       - name: Capture dependency audit
@@ -40,6 +43,7 @@ jobs:
           npm run test
           npm run build
       - name: Upload working tree and audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: audit-sandbox
