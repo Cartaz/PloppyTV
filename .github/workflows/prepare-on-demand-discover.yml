@@ -1,0 +1,78 @@
+name: Prepare on-demand Discover fix
+
+on:
+  push:
+    branches: [audit/on-demand-discover-runner]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/on-demand-discover
+          path: repo
+      - name: Checkout patch tooling
+        uses: actions/checkout@v4
+        with:
+          ref: audit/on-demand-discover-runner
+          path: diagnostic
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+      - name: Install dependencies
+        working-directory: repo
+        run: npm ci
+      - name: Apply on-demand Discover design
+        working-directory: repo
+        run: |
+          python ../diagnostic/.github/scripts/prepare_on_demand_discover.py
+          npx prettier --write src/main.ts src/lib/discover.ts src/views/discover.ts PRIVACY.md README.md tests/probe_main.test.ts tests/probe_a18.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts
+      - name: Reject stale preload API references
+        working-directory: repo
+        shell: bash
+        run: |
+          if grep -R -n -E 'preloadDiscover|getDiscoverPromise|resetDiscoverPreload' src tests README.md PRIVACY.md; then
+            echo 'Stale Discover preload API references remain'
+            exit 1
+          fi
+      - name: Dependency audit
+        working-directory: repo
+        run: npm audit --audit-level=high
+      - name: Lint
+        working-directory: repo
+        run: npm run lint
+      - name: Format
+        working-directory: repo
+        run: npm run format:check
+      - name: Type-check
+        working-directory: repo
+        run: npm run typecheck
+      - name: Test
+        working-directory: repo
+        run: npm run test
+      - name: Build
+        working-directory: repo
+        run: npm run build
+      - name: Verify change scope
+        working-directory: repo
+        shell: bash
+        run: |
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts | sort)"
+          test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
+      - name: Commit validated fix
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts
+          git commit -m "refactor: load Discover only on user demand"
+          git push origin HEAD:fix/on-demand-discover
