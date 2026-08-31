@@ -208,6 +208,12 @@ pd_src = pd_src.replace(
 )
 probe_discover.write_text(pd_src)
 
+probe_a7 = Path("tests/probe_a7.test.ts")
+a7_src = probe_a7.read_text()
+if "resetDiscoverPreload" not in a7_src:
+    raise SystemExit("tests/probe_a7.test.ts: resetDiscoverPreload not found")
+probe_a7.write_text(a7_src.replace("resetDiscoverPreload", "resetDiscoverLoad"))
+
 probe_view = Path("tests/probe_discoverview.test.ts")
 pv_src = probe_view.read_text()
 for old, new in [
