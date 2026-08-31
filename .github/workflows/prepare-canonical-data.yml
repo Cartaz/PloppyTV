@@ -35,6 +35,7 @@ jobs:
           python ../diagnostic/.github/scripts/prepare_canonical_data_document.py
           python ../diagnostic/.github/scripts/finalize_canonical_generated_files.py
           python ../diagnostic/.github/scripts/align_canonical_contract_tests.py
+          python ../diagnostic/.github/scripts/cleanup_canonical_candidate.py
           python - <<'PY'
           from pathlib import Path
           p = Path('src/components/exportImport.ts')
