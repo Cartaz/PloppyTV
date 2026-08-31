@@ -43,13 +43,14 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/vite-env.d.ts',
       ],
-      // Baseline temporaneo del branch: viene rialzato dopo la prima misura
-      // completa prima di portare il cambiamento su main.
+      // Floor di regressione, fissati appena sotto il baseline misurato
+      // sull'intero runtime (92.38/90/95.96/92.38). Non sono target da
+      // inseguire: impediscono che una modifica perda copertura senza accorgercene.
       thresholds: {
-        statements: 30,
-        branches: 30,
-        functions: 30,
-        lines: 30,
+        statements: 92,
+        branches: 89,
+        functions: 95,
+        lines: 92,
       },
     },
   },
