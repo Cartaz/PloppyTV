@@ -38,7 +38,14 @@ jobs:
         working-directory: repo
         shell: bash
         run: |
-          if grep -R -n -E 'preloadDiscover|getDiscoverPromise|resetDiscoverPreload' src tests README.md PRIVACY.md; then
+          stale=0
+          if grep -R -n -E 'preloadDiscover|getDiscoverPromise|resetDiscoverPreload' src README.md PRIVACY.md; then
+            stale=1
+          fi
+          if grep -R -n -E 'getDiscoverPromise|resetDiscoverPreload' tests; then
+            stale=1
+          fi
+          if [ "$stale" -ne 0 ]; then
             echo 'Stale Discover preload API references remain'
             exit 1
           fi
