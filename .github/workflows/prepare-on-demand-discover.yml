@@ -34,21 +34,29 @@ jobs:
         run: |
           python ../diagnostic/.github/scripts/prepare_on_demand_discover.py
           npx prettier --write src/main.ts src/lib/discover.ts src/views/discover.ts PRIVACY.md README.md tests/probe_main.test.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts
-      - name: Reject stale preload API references
+      - name: Find stale preload API references
+        id: stale
         working-directory: repo
         shell: bash
         run: |
-          stale=0
-          if grep -R -n -E 'preloadDiscover|getDiscoverPromise|resetDiscoverPreload' src README.md PRIVACY.md; then
-            stale=1
+          : > stale-refs.txt
+          grep -R -n -E 'preloadDiscover|getDiscoverPromise|resetDiscoverPreload' src README.md PRIVACY.md >> stale-refs.txt || true
+          grep -R -n -E 'getDiscoverPromise|resetDiscoverPreload' tests >> stale-refs.txt || true
+          cat stale-refs.txt
+          if [ -s stale-refs.txt ]; then
+            echo 'found=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'found=false' >> "$GITHUB_OUTPUT"
           fi
-          if grep -R -n -E 'getDiscoverPromise|resetDiscoverPreload' tests; then
-            stale=1
-          fi
-          if [ "$stale" -ne 0 ]; then
-            echo 'Stale Discover preload API references remain'
-            exit 1
-          fi
+      - name: Upload stale reference report
+        if: steps.stale.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stale-discover-references
+          path: repo/stale-refs.txt
+      - name: Reject stale preload API references
+        if: steps.stale.outputs.found == 'true'
+        run: exit 1
       - name: Dependency audit
         working-directory: repo
         run: npm audit --audit-level=high
