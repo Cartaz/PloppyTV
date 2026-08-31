@@ -14,10 +14,14 @@ interface NotificationRecord {
 
 function installNotification(permission: NotificationPermission, requestResult: NotificationPermission = permission) {
   const records: NotificationRecord[] = [];
-  const requestPermission = vi.fn(async () => requestResult);
+  let currentPermission = permission;
+  const requestPermission = vi.fn(async () => {
+    currentPermission = requestResult;
+    return requestResult;
+  });
   class MockNotification {
     static get permission(): NotificationPermission {
-      return permission;
+      return currentPermission;
     }
     static requestPermission = requestPermission;
 
