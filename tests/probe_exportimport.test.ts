@@ -311,17 +311,17 @@ describe('Import schema compatibility', () => {
     expect(t!.type).toBe('warning');
   });
 
-  it('data.version = "v2" (string, not number) → warning toast about missing schema version', () => {
+  it('data.version = "v2" (string, not number) → import is rejected consistently with storage', () => {
     const backup = { version: 'v2', shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
-    expect(modalTitle()).toBe('Importa backup');
+    expect(modalTitle()).not.toBe('Importa backup');
     const t = lastToast();
     expect(t).not.toBeNull();
-    expect(t!.msg).toContain('senza versione schema');
-    expect(t!.type).toBe('warning');
+    expect(t!.msg).toContain('versione schema non valida');
+    expect(t!.type).toBe('error');
   });
 
-  it('data.version = 1 (current) → no version warning toast', () => {
+  it('data.version = 1 (legacy supported) → no version warning toast', () => {
     const backup = { version: 1, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
     expect(modalTitle()).toBe('Importa backup');
@@ -825,22 +825,19 @@ describe('format validation', () => {
     expect(lastToast()?.msg).toBe('Formato non valido: il file deve contenere un oggetto JSON');
   });
 
-  it('data is an array (typeof object, but data.shows undefined) → shows not array', () => {
+  it('data is an array → rejected because the document envelope must be an object', () => {
     setFile(makeFile('[1,2,3]'));
-    expect(lastToast()?.msg).toContain('"shows" deve essere un array');
-    expect(lastToast()?.msg).toContain('era undefined');
+    expect(lastToast()?.msg).toBe('Formato non valido: il file deve contenere un oggetto JSON');
   });
 
-  it('data.shows is null → "shows deve essere un array (era null)"', () => {
+  it('data.shows is null → rejected by the shared shows-array contract', () => {
     setFile(makeFile('{"version":1,"shows":null}'));
-    expect(lastToast()?.msg).toContain('"shows" deve essere un array');
-    expect(lastToast()?.msg).toContain('era null');
+    expect(lastToast()?.msg).toBe('Formato non valido: "shows" deve essere un array');
   });
 
-  it('data.shows is an object → "shows deve essere un array (era object)"', () => {
+  it('data.shows is an object → rejected by the shared shows-array contract', () => {
     setFile(makeFile('{"version":1,"shows":{"a":1}}'));
-    expect(lastToast()?.msg).toContain('"shows" deve essere un array');
-    expect(lastToast()?.msg).toContain('era object');
+    expect(lastToast()?.msg).toBe('Formato non valido: "shows" deve essere un array');
   });
 
   it('empty file → JSON.parse fails → "File JSON non valido"', () => {

@@ -822,20 +822,20 @@ describe('exportImport.ts probe (A16)', () => {
 
   // --- Edge cases: version validation ---
 
-  it('import with version = 0 → no version warning (0 is finite, < SCHEMA_VERSION)', () => {
+  it('import with version = 0 → rejected as an invalid schema version', () => {
     const backup = { version: 0, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
-    expect(modalTitle()).toBe('Importa backup');
-    const versionToasts = showToastMock.mock.calls.filter(
-      (c) => typeof c[0] === 'string' && (c[0] as string).includes('versione'),
-    );
-    expect(versionToasts.length).toBe(0);
+    expect(modalTitle()).toBe('');
+    expect(lastToast()?.msg).toContain('versione schema non valida');
+    expect(lastToast()?.type).toBe('error');
   });
 
-  it('import with version = -1 → no version warning (negative is finite, < SCHEMA_VERSION)', () => {
+  it('import with version = -1 → rejected as an invalid schema version', () => {
     const backup = { version: -1, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
-    expect(modalTitle()).toBe('Importa backup');
+    expect(modalTitle()).toBe('');
+    expect(lastToast()?.msg).toContain('versione schema non valida');
+    expect(lastToast()?.type).toBe('error');
   });
 
   it('import with version = 1e308 (very large finite) → rejected as future schema', () => {

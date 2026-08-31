@@ -11,7 +11,7 @@
 import type { SavedData, Show } from '../types';
 import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
 import { getState, setShows, setStorageDisabled, setQuotaWarned, emitChange } from './store';
-import { normalizeShow, reconcileAllLists } from './normalize';
+import { canonicalizeDataDocument } from './dataDocument';
 import { showToast } from '../components/toast';
 import { isModalOpen } from '../components/modal';
 
@@ -45,8 +45,12 @@ function _validSavedAt(v: unknown): number | null {
 function _revisionFromRaw(raw: string | null): StorageRevision {
   if (raw === null) return { present: false };
   try {
-    const parsed = JSON.parse(raw) as SavedData;
-    return { present: true, savedAt: _validSavedAt(parsed?.savedAt) };
+    const parsed: unknown = JSON.parse(raw);
+    const savedAt =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>).savedAt
+        : undefined;
+    return { present: true, savedAt: _validSavedAt(savedAt) };
   } catch {
     // La chiave esiste anche se il documento è corrotto. Questo è importante
     // per distinguere una corruzione da una cancellazione concorrente.
@@ -70,24 +74,6 @@ function _sameRevision(a: StorageRevision, b: StorageRevision): boolean {
 
 function _setRevisionFromRaw(raw: string | null): void {
   _lastRevision = _revisionFromRaw(raw);
-}
-
-/**
- * BUG-A19-04: dedup show per id (keep first).
- * localStorage corrotto o race multi-tab può produrre show duplicati per id;
- * senza dedup, toggleEpisode/stats/calendar ne risentono (conteggi doppi,
- * show orfani, toggle ambiguo). Allineato al behaviour di exportImport.
- */
-function _dedupShowsById(shows: Show[]): Show[] {
-  const seen = new Set<number>();
-  const out: Show[] = [];
-  for (const s of shows) {
-    if (!s || typeof s.id !== 'number' || !Number.isFinite(s.id)) continue;
-    if (seen.has(s.id)) continue;
-    seen.add(s.id);
-    out.push(s);
-  }
-  return out;
 }
 
 /**
@@ -196,13 +182,18 @@ function _saveDataNow(): boolean {
   }
 }
 
-function _loadFromBackup(): SavedData | null {
+function _loadFromBackup(): unknown | null {
   try {
     const raw = localStorage.getItem(BACKUP_KEY);
-    return raw ? (JSON.parse(raw) as SavedData) : null;
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
+}
+
+function _loadCanonicalBackup(): Show[] | null {
+  const result = canonicalizeDataDocument(_loadFromBackup());
+  return result.ok && result.document.shows.length > 0 ? result.document.shows : null;
 }
 
 /**
@@ -258,9 +249,9 @@ export function loadData(): void {
   // sostituire questo snapshot, ma non uno modificato nel frattempo.
   _setRevisionFromRaw(raw);
 
-  let parsed: SavedData;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as SavedData;
+    parsed = JSON.parse(raw);
   } catch (e) {
     console.error('JSON corrotto in localStorage:', e);
     try {
@@ -268,14 +259,9 @@ export function loadData(): void {
     } catch {
       // ignore
     }
-    const backup = _loadFromBackup();
-    if (backup && Array.isArray(backup.shows) && backup.shows.length > 0) {
-      const shows = backup.shows.map(normalizeShow).filter((s): s is Show => s !== null);
-      reconcileAllLists(shows);
-      // BUG-A4-06: valida tipo di backup.savedAt — non trustare stringhe/NaN
-      // (un backup vecchio o malevolo con savedAt="abc" romperebbe il CAS
-      // perché "abc" !== <numero> è sempre true → ogni save futuro rifiutato).
-      setShows(shows);
+    const backupShows = _loadCanonicalBackup();
+    if (backupShows) {
+      setShows(backupShows);
       showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
       saveData({ immediate: true });
       return;
@@ -285,54 +271,45 @@ export function loadData(): void {
     return;
   }
 
-  if (!parsed || typeof parsed !== 'object') {
-    setShows([]);
-    return;
-  }
-  // BUG-A4-03: valida schema version.
-  // - `version` presente ma non numero finito → dato inatteso/malevolo → scarta.
-  // - `version > SCHEMA_VERSION` (futura) → non sappiamo interpretare il formato
-  //   → tratta come corruption, prova backup, fallback empty.
-  // - `version < SCHEMA_VERSION` (passata) → prosegui con warning (normalizeShow
-  //   è defensive e gestisce formati vecchi con defaults sensati).
-  // - `version` mancante (undefined) → dato molto vecchio, prosegui lenient.
-  if (parsed.version !== undefined) {
-    if (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version)) {
-      setShows([]);
+  const canonical = canonicalizeDataDocument(parsed);
+  if (!canonical.ok) {
+    const unsupported = canonical.code === 'unsupported-version';
+    if (unsupported) {
+      console.warn('[PloppyTV] Schema version futura:', canonical.version, '— atteso', SCHEMA_VERSION);
+    } else {
+      console.warn('[PloppyTV] Documento storage non valido:', canonical.code);
+    }
+
+    const backupShows = _loadCanonicalBackup();
+    if (backupShows) {
+      setShows(backupShows);
+      showToast(
+        unsupported
+          ? 'Versione dati non supportata. Ripristinato backup.'
+          : 'Dati non validi. Ripristinato backup precedente.',
+        'warning',
+      );
+      saveData({ immediate: true });
       return;
     }
-    if (parsed.version > SCHEMA_VERSION) {
-      console.warn('[PloppyTV] Schema version futura:', parsed.version, '— atteso', SCHEMA_VERSION);
-      const backup = _loadFromBackup();
-      if (backup && Array.isArray(backup.shows) && backup.shows.length > 0) {
-        const rawShows = backup.shows.map(normalizeShow).filter((s): s is Show => s !== null);
-        // BUG-A19-04: dedup by id anche sul path backup recovery.
-        const shows = _dedupShowsById(rawShows);
-        reconcileAllLists(shows);
-        setShows(shows);
-        showToast('Versione dati non supportata. Ripristinato backup.', 'warning');
-        saveData({ immediate: true });
-        return;
-      }
-      setShows([]);
-      showToast('Versione dati non supportata. Usa Importa per ripristinare.', 'error');
-      return;
-    }
-    if (parsed.version < SCHEMA_VERSION) {
-      console.warn('[PloppyTV] Schema version passata:', parsed.version, '— atteso', SCHEMA_VERSION);
-      // Prosegui — normalizeShow gestisce formati vecchi con defaults.
-    }
-  }
-  if (!Array.isArray(parsed.shows)) {
+
     setShows([]);
+    showToast(
+      unsupported
+        ? 'Versione dati non supportata. Usa Importa per ripristinare.'
+        : 'Dati non validi. Usa Importa per ripristinare.',
+      'error',
+    );
     return;
   }
-  const rawShows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
-  // BUG-A19-04: dedup by id (keep first) — localStorage corrotto o race
-  // multi-tab può contenere show duplicati per id.
-  const shows = _dedupShowsById(rawShows);
-  reconcileAllLists(shows);
-  setShows(shows);
+
+  const sourceVersion = canonical.document.sourceVersion;
+  if (sourceVersion === null) {
+    console.warn('[PloppyTV] Documento storage senza schema version — normalizzato al formato corrente');
+  } else if (sourceVersion < SCHEMA_VERSION) {
+    console.warn('[PloppyTV] Schema version passata:', sourceVersion, '— atteso', SCHEMA_VERSION);
+  }
+  setShows(canonical.document.shows);
   // BUG-04-08: pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
   _cleanupCorruptedKeys();
 }
@@ -359,33 +336,24 @@ if (typeof window !== 'undefined') {
         return;
       }
 
-      const parsed = JSON.parse(ev.newValue) as SavedData;
-      if (!parsed || !Array.isArray(parsed.shows)) return;
-      // BUG-A19-05b: rigetta version non-numerica (consistente con loadData).
-      // Prima un event con version='bad' (stringa) era silenziosamente accettato
-      // e sovrascriveva lo stato locale con dati potenzialmente malformati.
-      if (parsed.version !== undefined && (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version))) {
-        console.warn('[PloppyTV] storage event con version non valida:', parsed.version);
+      const parsed = JSON.parse(ev.newValue) as unknown;
+      const canonical = canonicalizeDataDocument(parsed);
+      if (!canonical.ok) {
+        if (canonical.code === 'unsupported-version') {
+          console.warn('[PloppyTV] storage event con version futura:', canonical.version);
+        } else {
+          console.warn('[PloppyTV] storage event ignorato:', canonical.code, canonical.version ?? '');
+        }
         return;
       }
-      // BUG-A4-03: ignora eventi con versione futura non supportata (il formato
-      // potrebbe non essere interpretabile da questa versione dell'app).
-      if (typeof parsed.version === 'number' && parsed.version > SCHEMA_VERSION) {
-        console.warn('[PloppyTV] storage event con version futura:', parsed.version);
-        return;
+      const sourceVersion = canonical.document.sourceVersion;
+      if (sourceVersion === null) {
+        console.warn('[PloppyTV] storage event senza schema version — normalizzato');
+      } else if (sourceVersion < SCHEMA_VERSION) {
+        console.warn('[PloppyTV] storage event con version passata:', sourceVersion);
       }
-      // BUG-A19-05a: avverte su version passata (consistente con loadData,
-      // che logga un warning). Il dato è comunque accettato (normalizeShow è
-      // defensive sui formati vecchi).
-      if (typeof parsed.version === 'number' && parsed.version < SCHEMA_VERSION) {
-        console.warn('[PloppyTV] storage event con version passata:', parsed.version);
-      }
-      const rawNewShows = parsed.shows.map(normalizeShow).filter((s): s is Show => s !== null);
-      // BUG-A19-04: dedup by id (keep first) — consistente con loadData.
-      const newShows = _dedupShowsById(rawNewShows);
-      reconcileAllLists(newShows);
-      // BUG-A4-07: valida savedAt con Number.isFinite (NaN rompe CAS).
-      const newSavedAt = _validSavedAt(parsed.savedAt);
+      const newShows = canonical.document.shows;
+      const newSavedAt = _validSavedAt((parsed as Record<string, unknown>).savedAt);
 
       // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
       // sovrascrivere lo stato. Mostra toast e lascia _lastRevision al valore

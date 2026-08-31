@@ -150,6 +150,7 @@ ploppytv/
     │   ├── storage.ts         # localStorage + backup + multi-tab sync
     │   ├── api.ts             # Client TVMaze con timeout/abort
     │   ├── normalize.ts       # Validazione + sanitizzazione show
+│   ├── dataDocument.ts      # Version gate + canonicalizzazione documenti dati
     │   ├── shows.ts           # Azioni: add/remove/move/toggle episode
     │   └── discover.ts        # Fetch serie popolari + grouping per genere
     ├── worker/

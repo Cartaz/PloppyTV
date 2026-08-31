@@ -2,7 +2,7 @@
 //
 // FIXES applicati:
 //  - BUG-11-01: BOM detection UTF-8/UTF-16 LE/BE via readAsArrayBuffer + TextDecoder.
-//  - BUG-11-02: validazione `data.version` (warning toast su mancante/non-numero/futuro).
+//  - BUG-11-02: policy schema condivisa; legacy senza versione ammesso, versioni invalide/future rifiutate.
 //  - BUG-11-03: merge field-level — preserva addedAt/image/name/status/premiered/
 //    genres/summary/network/runtime locali; adotta solo seasons/totalEpisodes/
 //    totalSeasons/list/manualList dal backup.
@@ -10,16 +10,15 @@
 //  - BUG-11-07: grammatica italiana singolare/plurale.
 //  - BUG-11-09: export JSON minified (no indent).
 
-import type { ExportedData, Show } from '../types';
-import { SCHEMA_VERSION } from '../lib/constants';
+import type { ExportedData } from '../types';
+import { SCHEMA_VERSION, MAX_IMPORT_SIZE } from '../lib/constants';
 import { getState, setShows, emitChange, updateShowListStatus } from '../lib/store';
 import { saveData, isStorageOK } from '../lib/storage';
-import { normalizeShow, reconcileAllLists } from '../lib/normalize';
+import { canonicalizeDataDocument } from '../lib/dataDocument';
 import { getWatchedCount, localISODate } from '../lib/utils';
 import { showToast } from './toast';
 import { showModal, closeAllModals, type ModalAction } from './modal';
 import { updateBadges } from './header';
-import { MAX_IMPORT_SIZE } from '../lib/constants';
 
 const SUPPORTS_EXPORT =
   typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
@@ -113,9 +112,9 @@ export function initExportImport(): void {
         input.value = '';
         return;
       }
-      let data: ExportedData;
+      let data: unknown;
       try {
-        data = JSON.parse(text) as ExportedData;
+        data = JSON.parse(text);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
         // BUG-11-01: non menzionare più UTF-16 (ora gestito).
@@ -123,57 +122,39 @@ export function initExportImport(): void {
         input.value = '';
         return;
       }
-      // BUG-A16-02: wrap post-parse logic in try/catch. Se normalizeShow
+      // BUG-A16-02: wrap post-parse logic in try/catch. Se canonicalizeDataDocument
       // (o qualsiasi altra operazione sincrona dopo il parse) lancia per
-      // un input malformato inatteso (defense-in-depth — normalizeShow è
+      // un input malformato inatteso (defense-in-depth — canonicalizeDataDocument è
       // ben guarded ma un bug futuro o un oggetto Proxy-like potrebbe
       // causare un throw), il user non vedrebbe nulla (onload crash
       // silenziosamente, nessun toast). Mostriamo un toast e reset
       // dell'input.
       try {
-        if (!data || typeof data !== 'object') {
-          showToast('Formato non valido: il file deve contenere un oggetto JSON', 'error');
-          input.value = '';
-          return;
-        }
-        if (!Array.isArray(data.shows)) {
-          showToast(
-            'Formato non valido: "shows" deve essere un array (era ' +
-              (data.shows === null ? 'null' : typeof data.shows) +
-              ')',
-            'error',
-          );
-          input.value = '';
-          return;
-        }
-        const hasVersion = typeof data.version === 'number' && Number.isFinite(data.version);
-        if (!hasVersion) {
-          // I backup storici senza versione restano importabili: normalizeShow
-          // applica i default del formato corrente.
-          showToast('Backup senza versione schema — importo comunque best-effort', 'warning');
-        } else if (data.version > SCHEMA_VERSION) {
-          // Un formato futuro può avere invarianti che questa build non conosce.
-          // Meglio rifiutare l'import che corrompere silenziosamente lo stato.
-          showToast(
-            'Backup creato da una versione più recente di PloppyTV — aggiorna l’app prima di importarlo',
-            'error',
-          );
-          input.value = '';
-          return;
-        }
-        const validShows = data.shows.map(normalizeShow).filter((s): s is Show => s !== null);
-        const skipped = data.shows.length - validShows.length;
-        const seenIds = new Set<number>();
-        const dedupedShows: Show[] = [];
-        let duplicates = 0;
-        for (const s of validShows) {
-          if (seenIds.has(s.id)) {
-            duplicates++;
-            continue;
+        const canonical = canonicalizeDataDocument(data);
+        if (!canonical.ok) {
+          if (canonical.code === 'unsupported-version') {
+            showToast(
+              'Backup creato da una versione più recente di PloppyTV — aggiorna l’app prima di importarlo',
+              'error',
+            );
+          } else if (canonical.code === 'invalid-version') {
+            showToast('Formato non valido: versione schema non valida', 'error');
+          } else if (canonical.code === 'invalid-shows') {
+            showToast('Formato non valido: "shows" deve essere un array', 'error');
+          } else {
+            showToast('Formato non valido: il file deve contenere un oggetto JSON', 'error');
           }
-          seenIds.add(s.id);
-          dedupedShows.push(s);
+          input.value = '';
+          return;
         }
+
+        if (canonical.document.sourceVersion === null) {
+          showToast('Backup senza versione schema — importo comunque best-effort', 'warning');
+        }
+
+        const dedupedShows = canonical.document.shows;
+        const skipped = canonical.document.skippedShows;
+        const duplicates = canonical.document.duplicateShows;
         if (dedupedShows.length === 0) {
           showToast('Nessuna serie valida nel file', 'error');
           input.value = '';
@@ -267,7 +248,6 @@ export function initExportImport(): void {
                   onClick: () => {
                     // Snapshot per rollback
                     const prev = getState().shows.map((s) => ({ ...s }));
-                    reconcileAllLists(dedupedShows);
                     setShows(dedupedShows);
                     if (!saveData({ immediate: true })) {
                       // Rollback al precedente stato
