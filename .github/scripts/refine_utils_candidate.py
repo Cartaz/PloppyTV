@@ -17,7 +17,11 @@ text = text.replace(
 )
 old = '''  if (/\\s/.test(u)) return null;
 '''
-new = '''  if (u !== u.trim() || /[\\u0000-\\u001f\\u007f]/.test(u)) return null;
+new = '''  if (u !== u.trim()) return null;
+  for (let i = 0; i < u.length; i++) {
+    const code = u.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return null;
+  }
 '''
 if old not in text:
     raise SystemExit('generated safeImageUrl guard not found')
