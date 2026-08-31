@@ -1,35 +1,104 @@
-name: Normalize coverage diagnostic
+name: Normalize rationalization diagnostic
 
 on:
   push:
     branches: [audit/normalize-test-rationalization]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: normalize-coverage-diagnostic
+  group: normalize-rationalization-diagnostic
   cancel-in-progress: true
 
 jobs:
-  coverage:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: fix/normalize-test-rationalization
+          path: repo
+      - name: Checkout diagnostic tooling
+        uses: actions/checkout@v4
+        with:
+          ref: audit/normalize-test-rationalization
+          path: diagnostic
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - name: Run coverage
-        run: npm run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary
-      - name: Report normalize coverage
+          cache-dependency-path: repo/package-lock.json
+      - name: Install dependencies
+        working-directory: repo
+        run: npm ci
+      - name: Apply rationalization
+        working-directory: repo
         run: |
+          python ../diagnostic/.github/scripts/rationalize_normalize_tests.py
+          npx prettier --write src/lib/normalize.ts tests/normalize.edgecases.test.ts
+      - name: Verify intended test replacement
+        working-directory: repo
+        run: |
+          test ! -e tests/probe_normalize.test.ts
+          test -e tests/normalize.edgecases.test.ts
+      - name: Dependency audit
+        working-directory: repo
+        run: npm audit --audit-level=high
+      - name: Lint
+        working-directory: repo
+        run: npm run lint
+      - name: Format
+        working-directory: repo
+        run: npm run format:check
+      - name: Type-check
+        working-directory: repo
+        run: npm run typecheck
+      - name: Full test suite
+        working-directory: repo
+        run: npm run test
+      - name: Build
+        working-directory: repo
+        run: npm run build
+      - name: Coverage regression gate
+        working-directory: repo
+        run: |
+          npm run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary
           node - <<'NODE'
           const fs = require('fs');
           const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
           const key = Object.keys(summary).find(k => k.endsWith('/src/lib/normalize.ts'));
           if (!key) throw new Error('normalize.ts missing from coverage summary');
-          console.log('NORMALIZE_COVERAGE=' + JSON.stringify(summary[key]));
-          console.log('TOTAL_COVERAGE=' + JSON.stringify(summary.total));
+          const n = summary[key];
+          const total = summary.total;
+          console.log('NORMALIZE_COVERAGE=' + JSON.stringify(n));
+          console.log('TOTAL_COVERAGE=' + JSON.stringify(total));
+          const requirePct = (actual, min, label) => {
+            if (Number(actual.pct) < min) throw new Error(`${label} coverage ${actual.pct}% < ${min}%`);
+          };
+          requirePct(n.lines, 100, 'normalize lines');
+          requirePct(n.statements, 100, 'normalize statements');
+          requirePct(n.functions, 100, 'normalize functions');
+          requirePct(n.branches, 99.3, 'normalize branches');
+          requirePct(total.lines, 90, 'total lines');
+          requirePct(total.statements, 90, 'total statements');
+          requirePct(total.functions, 95.5, 'total functions');
+          requirePct(total.branches, 91, 'total branches');
           NODE
+      - name: Verify change scope
+        working-directory: repo
+        shell: bash
+        run: |
+          changed="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
+          expected="$(printf '%s\n' src/lib/normalize.ts tests/normalize.edgecases.test.ts tests/probe_normalize.test.ts | sort)"
+          test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
+      - name: Commit validated candidate
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/normalize.ts tests/normalize.edgecases.test.ts tests/probe_normalize.test.ts
+          git commit -m "test: rationalize normalize contracts"
+          git push origin HEAD:fix/normalize-test-rationalization
