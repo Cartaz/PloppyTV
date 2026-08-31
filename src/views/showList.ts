@@ -90,9 +90,7 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
       '<div class="empty-state"><div class="empty-state-title">' +
       escapeHtml(t('library.empty')) +
       '</div><div class="empty-state-text">' +
-      (_activeTag
-        ? escapeHtml(t('library.noTagMatch', { tag: _activeTag }))
-        : escapeHtml(t('library.empty.desc'))) +
+      (_activeTag ? escapeHtml(t('library.noTagMatch', { tag: _activeTag })) : escapeHtml(t('library.empty.desc'))) +
       '</div></div>';
   } else {
     html += '<div class="card-grid">' + shows.map(showCardHtml).join('') + '</div>';
