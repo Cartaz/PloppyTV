@@ -1,0 +1,35 @@
+name: Normalize coverage diagnostic
+
+on:
+  push:
+    branches: [audit/normalize-test-rationalization]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: normalize-coverage-diagnostic
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run coverage
+        run: npm run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary
+      - name: Report normalize coverage
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const key = Object.keys(summary).find(k => k.endsWith('/src/lib/normalize.ts'));
+          if (!key) throw new Error('normalize.ts missing from coverage summary');
+          console.log('NORMALIZE_COVERAGE=' + JSON.stringify(summary[key]));
+          console.log('TOTAL_COVERAGE=' + JSON.stringify(summary.total));
+          NODE
