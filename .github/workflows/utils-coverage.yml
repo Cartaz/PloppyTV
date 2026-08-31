@@ -1,35 +1,104 @@
-name: Utils coverage diagnostic
+name: Utils rationalization diagnostic
 
 on:
   push:
     branches: [audit/utils-test-rationalization]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: utils-coverage-diagnostic
+  group: utils-rationalization-diagnostic
   cancel-in-progress: true
 
 jobs:
-  coverage:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: fix/utils-test-rationalization
+          path: repo
+      - name: Checkout diagnostic tooling
+        uses: actions/checkout@v4
+        with:
+          ref: audit/utils-test-rationalization
+          path: diagnostic
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - name: Run coverage
-        run: npm run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary
-      - name: Report utils coverage
+          cache-dependency-path: repo/package-lock.json
+      - name: Install dependencies
+        working-directory: repo
+        run: npm ci
+      - name: Apply rationalization
+        working-directory: repo
         run: |
+          python ../diagnostic/.github/scripts/rationalize_utils_tests.py
+          npx prettier --write src/lib/utils.ts tests/utils.edgecases.test.ts
+      - name: Verify intended test replacement
+        working-directory: repo
+        run: |
+          test ! -e tests/probe_utils.test.ts
+          test -e tests/utils.edgecases.test.ts
+      - name: Dependency audit
+        working-directory: repo
+        run: npm audit --audit-level=high
+      - name: Lint
+        working-directory: repo
+        run: npm run lint
+      - name: Format
+        working-directory: repo
+        run: npm run format:check
+      - name: Type-check
+        working-directory: repo
+        run: npm run typecheck
+      - name: Full test suite
+        working-directory: repo
+        run: npm run test
+      - name: Build
+        working-directory: repo
+        run: npm run build
+      - name: Coverage regression gate
+        working-directory: repo
+        run: |
+          npm run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary
           node - <<'NODE'
           const fs = require('fs');
           const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
           const key = Object.keys(summary).find(k => k.endsWith('/src/lib/utils.ts'));
           if (!key) throw new Error('utils.ts missing from coverage summary');
-          console.log('UTILS_COVERAGE=' + JSON.stringify(summary[key]));
-          console.log('TOTAL_COVERAGE=' + JSON.stringify(summary.total));
+          const u = summary[key];
+          const total = summary.total;
+          console.log('UTILS_COVERAGE=' + JSON.stringify(u));
+          console.log('TOTAL_COVERAGE=' + JSON.stringify(total));
+          const requirePct = (actual, min, label) => {
+            if (Number(actual.pct) < min) throw new Error(`${label} coverage ${actual.pct}% < ${min}%`);
+          };
+          requirePct(u.lines, 95.26, 'utils lines');
+          requirePct(u.statements, 95.26, 'utils statements');
+          requirePct(u.functions, 100, 'utils functions');
+          requirePct(u.branches, 92.68, 'utils branches');
+          requirePct(total.lines, 90.38, 'total lines');
+          requirePct(total.statements, 90.38, 'total statements');
+          requirePct(total.functions, 95.76, 'total functions');
+          requirePct(total.branches, 91.24, 'total branches');
           NODE
+      - name: Verify change scope
+        working-directory: repo
+        shell: bash
+        run: |
+          changed="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
+          expected="$(printf '%s\n' src/lib/utils.ts tests/probe_utils.test.ts tests/utils.edgecases.test.ts | sort)"
+          test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
+      - name: Commit validated candidate
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/utils.ts tests/probe_utils.test.ts tests/utils.edgecases.test.ts
+          git commit -m "test: rationalize utils contracts"
+          git push origin HEAD:fix/utils-test-rationalization
