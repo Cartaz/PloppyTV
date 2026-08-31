@@ -84,6 +84,7 @@
   "library.filter.clear": "Cancella filtri",
   "library.results": "{count} risultati",
   "library.noMatch": "Nessuna serie corrisponde ai filtri selezionati",
+  "library.noTagMatch": "Nessuna serie con il tag \"{tag}\" in questa lista.",
   "stats.title": "Statistiche",
   "stats.calculating": "Calcolando statistiche...",
   "stats.noData": "Nessun dato",

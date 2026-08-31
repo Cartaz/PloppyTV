@@ -84,6 +84,7 @@
   "library.filter.clear": "Clear filters",
   "library.results": "{count} results",
   "library.noMatch": "No shows match the selected filters",
+  "library.noTagMatch": "No shows with the tag \"{tag}\" in this list.",
   "stats.title": "Statistics",
   "stats.calculating": "Calculating statistics...",
   "stats.noData": "No data",

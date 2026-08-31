@@ -4,6 +4,7 @@ import { getState, openShow, closeShow, switchView } from '../lib/store';
 import { initImageFallback } from './imageFallback';
 import { updateBadges } from './header';
 import { showToast } from './toast';
+import { t } from '../lib/i18n';
 import { safeId } from '../lib/utils';
 
 let _mainEl: HTMLElement | null = null;
@@ -87,14 +88,21 @@ async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promi
     return await chunkPromise;
   } catch (e) {
     console.error('[renderer] chunk load failed:', e);
-    // BUG-A17-07: usa data-action invece di inline onclick (CSP-safe).
+    // Le stringhe del fallback appartengono all'i18n come il resto della UI:
+    // il renderer decide quando mostrare l'errore, non in quale lingua.
     main.innerHTML =
       '<div class="empty-state">' +
-      '<div class="empty-state-title">Errore caricamento vista</div>' +
-      '<div class="empty-state-text">Ricarica la pagina per riprovare. Se il problema persiste, svuota la cache del browser.</div>' +
-      '<button class="btn btn-primary" data-action="reloadPage" style="margin-top:12px;">Ricarica</button>' +
+      '<div class="empty-state-title">' +
+      t('toast.renderError') +
+      '</div>' +
+      '<div class="empty-state-text">' +
+      t('toast.renderError.desc') +
+      '</div>' +
+      '<button class="btn btn-primary" data-action="reloadPage" style="margin-top:12px;">' +
+      t('actions.reload') +
+      '</button>' +
       '</div>';
-    showToast('Errore caricamento modulo — ricarica la pagina', 'error');
+    showToast(t('toast.chunkError'), 'error');
     return null;
   }
 }
@@ -142,10 +150,18 @@ async function _doRender(): Promise<void> {
     case 'towatch':
     case 'completed': {
       const mod = await safeImport(import('../views/showList'), main);
-      const titles: Record<string, string> = { watching: 'In corso', towatch: 'Da vedere', completed: 'Completate' };
+      const titles: Record<'watching' | 'towatch' | 'completed', string> = {
+        watching: t('nav.watching'),
+        towatch: t('nav.towatch'),
+        completed: t('nav.completed'),
+      };
       if (myToken !== _renderToken) return;
       if (!mod) return;
-      mod.renderShowList(main, state.currentView as 'watching' | 'towatch' | 'completed', titles[state.currentView]);
+      mod.renderShowList(
+        main,
+        state.currentView as 'watching' | 'towatch' | 'completed',
+        titles[state.currentView as 'watching' | 'towatch' | 'completed'],
+      );
       break;
     }
     case 'discover': {
