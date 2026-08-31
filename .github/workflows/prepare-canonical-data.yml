@@ -34,6 +34,7 @@ jobs:
         run: |
           python ../diagnostic/.github/scripts/prepare_canonical_data_document.py
           python ../diagnostic/.github/scripts/finalize_canonical_generated_files.py
+          python ../diagnostic/.github/scripts/align_canonical_contract_tests.py
           python - <<'PY'
           from pathlib import Path
           p = Path('src/components/exportImport.ts')
@@ -45,7 +46,7 @@ jobs:
               lines[i] = lines[i].replace('normalizeShow', 'canonicalizeDataDocument')
           p.write_text(''.join(lines))
           PY
-          npx prettier --write src/lib/dataDocument.ts src/lib/storage.ts src/components/exportImport.ts README.md tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts
+          npx prettier --write src/lib/dataDocument.ts src/lib/storage.ts src/components/exportImport.ts README.md tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts tests/probe_a16.test.ts
       - name: Verify single schema owner
         working-directory: repo
         shell: bash
@@ -78,7 +79,7 @@ jobs:
         shell: bash
         run: |
           changed="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
-          expected="$(printf '%s\n' README.md src/components/exportImport.ts src/lib/dataDocument.ts src/lib/storage.ts tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts | sort)"
+          expected="$(printf '%s\n' README.md src/components/exportImport.ts src/lib/dataDocument.ts src/lib/storage.ts tests/probe_a16.test.ts tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts | sort)"
           test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
       - name: Commit validated fix
         working-directory: repo
@@ -86,6 +87,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md src/components/exportImport.ts src/lib/dataDocument.ts src/lib/storage.ts tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts
+          git add README.md src/components/exportImport.ts src/lib/dataDocument.ts src/lib/storage.ts tests/probe_a16.test.ts tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts
           git commit -m "refactor: centralize persisted data schema handling"
           git push origin HEAD:fix/canonical-data-document
