@@ -93,8 +93,13 @@ describe('normalizeShow', () => {
     expect(normalizeShow({ id: 1, premiered: null })!.premiered).toBeNull();
   });
 
-  it('rifiuta image data URL/javascript e conserva URL validi', () => {
-    expect(normalizeShow({ id: 1, image: 'https://x.com/p.jpg' })!.image).toBe('https://x.com/p.jpg');
+  it('accetta solo immagini dal CDN TVMaze e neutralizza origini importate', () => {
+    expect(normalizeShow({ id: 1, image: 'https://static.tvmaze.com/uploads/p.jpg' })!.image).toBe(
+      'https://static.tvmaze.com/uploads/p.jpg',
+    );
+    expect(normalizeShow({ id: 1, image: 'https://attacker.example/unique-id.png' })!.image).toBeNull();
+    expect(normalizeShow({ id: 1, image: 'https://static.tvmaze.com.evil.example/p.jpg' })!.image).toBeNull();
+    expect(normalizeShow({ id: 1, image: 'https://static.tvmaze.com:444/p.jpg' })!.image).toBeNull();
     expect(normalizeShow({ id: 1, image: 'data:image/png;base64,xxx' })!.image).toBeNull();
     expect(normalizeShow({ id: 1, image: 'javascript:alert(1)' })!.image).toBeNull();
   });
@@ -128,7 +133,10 @@ describe('buildShowFromTvmaze', () => {
     genres: ['Drama', 'Drama', 'Crime'],
     summary: '<p>A <b>great</b> show</p>',
     runtime: 60,
-    image: { medium: 'https://img.tvmaze.com/m.jpg', original: 'https://img.tvmaze.com/o.jpg' },
+    image: {
+      medium: 'https://static.tvmaze.com/uploads/m.jpg',
+      original: 'https://static.tvmaze.com/uploads/o.jpg',
+    },
     network: { name: 'HBO' },
   };
 
@@ -145,7 +153,7 @@ describe('buildShowFromTvmaze', () => {
     const show = buildShowFromTvmaze(tvmazeShow, episodes, 'towatch');
     expect(show.id).toBe(42);
     expect(show.name).toBe('Test Show');
-    expect(show.image).toBe('https://img.tvmaze.com/m.jpg'); // preferisce medium
+    expect(show.image).toBe('https://static.tvmaze.com/uploads/m.jpg'); // preferisce medium
     expect(show.network).toBe('HBO');
     expect(show.summary).toBe('A great show'); // stripHtml
     expect(show.genres).toEqual(['Drama', 'Crime']); // deduplica

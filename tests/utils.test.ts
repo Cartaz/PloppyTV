@@ -3,6 +3,7 @@ import {
   safeId,
   safeNum,
   safeImageUrl,
+  safeTvmazeImageUrl,
   stripHtml,
   parseISODateLocal,
   localISODate,
@@ -92,6 +93,21 @@ describe('safeImageUrl', () => {
     expect(safeImageUrl(undefined)).toBeNull();
     expect(safeImageUrl(123)).toBeNull();
     expect(safeImageUrl({})).toBeNull();
+  });
+});
+
+describe('safeTvmazeImageUrl', () => {
+  it('accetta solo immagini HTTPS dall origine CDN TVMaze', () => {
+    expect(safeTvmazeImageUrl('https://static.tvmaze.com/uploads/images/medium_portrait/1/1.jpg')).toBe(
+      'https://static.tvmaze.com/uploads/images/medium_portrait/1/1.jpg',
+    );
+  });
+
+  it('rifiuta origini esterne, host-lookalike, HTTP e porte non standard', () => {
+    expect(safeTvmazeImageUrl('https://attacker.example/tracker.png')).toBeNull();
+    expect(safeTvmazeImageUrl('https://static.tvmaze.com.evil.example/tracker.png')).toBeNull();
+    expect(safeTvmazeImageUrl('http://static.tvmaze.com/uploads/p.jpg')).toBeNull();
+    expect(safeTvmazeImageUrl('https://static.tvmaze.com:444/uploads/p.jpg')).toBeNull();
   });
 });
 
@@ -204,8 +220,18 @@ describe('escapeHtml + escapeAttr', () => {
 describe('getPosterUrl', () => {
   it('preferisce medium, poi original, poi null', () => {
     // BUG-01-d: getPosterUrl ora valida via safeImageUrl (richiede http/https).
-    expect(getPosterUrl({ image: { medium: 'https://x/m.jpg', original: 'https://x/o.jpg' } })).toBe('https://x/m.jpg');
-    expect(getPosterUrl({ image: { original: 'https://x/o.jpg' } })).toBe('https://x/o.jpg');
+    expect(
+      getPosterUrl({
+        image: {
+          medium: 'https://static.tvmaze.com/uploads/m.jpg',
+          original: 'https://static.tvmaze.com/uploads/o.jpg',
+        },
+      }),
+    ).toBe('https://static.tvmaze.com/uploads/m.jpg');
+    expect(getPosterUrl({ image: { original: 'https://static.tvmaze.com/uploads/o.jpg' } })).toBe(
+      'https://static.tvmaze.com/uploads/o.jpg',
+    );
+    expect(getPosterUrl({ image: { medium: 'https://attacker.example/pixel.png' } })).toBeNull();
     expect(getPosterUrl({ image: {} })).toBeNull();
     expect(getPosterUrl({ image: null })).toBeNull();
     expect(getPosterUrl(null)).toBeNull();

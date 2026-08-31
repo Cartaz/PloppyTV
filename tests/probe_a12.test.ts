@@ -80,7 +80,7 @@ function makeTvmazeShow(id: number, over: Record<string, unknown> = {}): Record<
     id,
     name: 'Show ' + id,
     weight: 50,
-    image: { medium: 'http://x/' + id + '.jpg' },
+    image: { medium: 'https://static.tvmaze.com/uploads/' + id + '.jpg' },
     genres: ['Drama'],
     premiered: '2024-01-01',
     rating: { average: 7 },
@@ -681,12 +681,20 @@ describe('Agent-A12 probe: library view', () => {
   describe('library view: filter behavior', () => {
     it('combined filters (AND): genre + status + network + year', () => {
       const show1 = makeLibShow({
-        id: 1, name: 'Breaking Bad', list: 'watching',
-        premiered: '2024-01-01', genres: ['Drama'], network: 'NBC',
+        id: 1,
+        name: 'Breaking Bad',
+        list: 'watching',
+        premiered: '2024-01-01',
+        genres: ['Drama'],
+        network: 'NBC',
       });
       const show2 = makeLibShow({
-        id: 2, name: 'Better Call Saul', list: 'towatch',
-        premiered: '2023-01-01', genres: ['Comedy'], network: 'ABC',
+        id: 2,
+        name: 'Better Call Saul',
+        list: 'towatch',
+        premiered: '2023-01-01',
+        genres: ['Comedy'],
+        network: 'ABC',
       });
       storeMod.setState({ shows: [show1, show2] as unknown as never[] });
       const main = document.getElementById('mainContent')!;
@@ -834,11 +842,13 @@ describe('Agent-A12 probe: library view', () => {
 
     it('minRating filter excludes shows with avg rating below threshold', () => {
       const lowRated = makeLibShow({
-        id: 1, name: 'Low Rated',
+        id: 1,
+        name: 'Low Rated',
         seasons: { 1: [{ num: 1, id: 1, watched: false, airdate: null, name: null, runtime: null, rating: 2 }] },
       });
       const highRated = makeLibShow({
-        id: 2, name: 'High Rated',
+        id: 2,
+        name: 'High Rated',
         seasons: { 1: [{ num: 1, id: 2, watched: false, airdate: null, name: null, runtime: null, rating: 5 }] },
       });
       storeMod.setState({ shows: [lowRated, highRated] as unknown as never[] });

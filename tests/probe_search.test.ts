@@ -191,9 +191,7 @@ describe('search.ts probe', () => {
   it('BUG-10-01 FIXED: fallback shows all altResults.slice(0,10) (dead filter removed)', async () => {
     // query 'foo bar', altQuery 'foo'. Previous filter (matching `name.includes('foo bar')`)
     // was dead code that always returned []; we now show altResults.slice(0,10) directly.
-    mockSearchShows
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([makeResult(1, 'Foo'), makeResult(2, 'Barbaz')]);
+    mockSearchShows.mockResolvedValueOnce([]).mockResolvedValueOnce([makeResult(1, 'Foo'), makeResult(2, 'Barbaz')]);
 
     fireInput('foo bar');
     await vi.advanceTimersByTimeAsync(350);
@@ -630,9 +628,9 @@ describe('search.ts probe', () => {
     expect(imgs[0].tagName).toBe('DIV');
   });
 
-  it('BUG-20-03: valid https: poster URL is preserved', async () => {
+  it('BUG-20-03: valid TVMaze HTTPS poster URL is preserved', async () => {
     const ok = makeResult(1, 'Good') as any;
-    ok.show.image = { medium: 'https://example.com/poster.jpg', original: null };
+    ok.show.image = { medium: 'https://static.tvmaze.com/uploads/poster.jpg', original: null };
     mockSearchShows.mockResolvedValueOnce([ok]);
 
     fireInput('foo');
@@ -642,6 +640,6 @@ describe('search.ts probe', () => {
     const imgs = document.querySelectorAll('.search-result-img');
     expect(imgs.length).toBe(1);
     expect(imgs[0].tagName).toBe('IMG');
-    expect((imgs[0] as HTMLImageElement).getAttribute('src')).toBe('https://example.com/poster.jpg');
+    expect((imgs[0] as HTMLImageElement).getAttribute('src')).toBe('https://static.tvmaze.com/uploads/poster.jpg');
   });
 });

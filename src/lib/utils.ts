@@ -72,6 +72,25 @@ export function safeImageUrl(u: unknown): string | null {
   return u;
 }
 
+const TVMAZE_IMAGE_ORIGIN = 'https://static.tvmaze.com';
+
+/**
+ * Trust boundary per le immagini persistite da PloppyTV. Il prodotto non
+ * supporta URL immagine custom: i poster legittimi arrivano dal CDN TVMaze.
+ * Manteniamo `safeImageUrl` come validatore sintattico generico per il layer
+ * di rendering, mentre qui imponiamo l'origine HTTPS prevista ai dati di dominio.
+ */
+export function safeTvmazeImageUrl(u: unknown): string | null {
+  const safe = safeImageUrl(u);
+  if (!safe) return null;
+  try {
+    if (new URL(safe).origin !== TVMAZE_IMAGE_ORIGIN) return null;
+    return safe;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Rimuove i tag HTML e decodifica le entity più comuni.
  * Rimuove anche il contenuto di <script> e <style> (non solo i tag),
@@ -139,17 +158,17 @@ export function stripHtml(html: unknown): string {
 }
 
 /**
- * BUG-01-d (FIXED): getPosterUrl ora valida gli URL tramite safeImageUrl,
- * quindi `javascript:` e `data:` vengono filtrati → null.
+ * I poster di dominio sono accettati solo dall'origine HTTPS del CDN TVMaze.
+ * Schemi pericolosi e origini esterne vengono neutralizzati a null.
  */
 export function getPosterUrl(show: { image?: { medium?: string; original?: string } | null } | null): string | null {
   if (!show || !show.image) return null;
   if (show.image.medium) {
-    const u = safeImageUrl(show.image.medium);
+    const u = safeTvmazeImageUrl(show.image.medium);
     if (u) return u;
   }
   if (show.image.original) {
-    const u = safeImageUrl(show.image.original);
+    const u = safeTvmazeImageUrl(show.image.original);
     if (u) return u;
   }
   return null;

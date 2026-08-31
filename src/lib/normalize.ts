@@ -2,7 +2,15 @@
 
 import type { ListName, Show, TvmazeShow, Episode, TvmazeEpisode } from '../types';
 import { ALLOWED_LISTS } from '../types';
-import { safeId, safeImageUrl, safeNum, stripHtml, getPosterUrl, getWatchedCount, parseISODateLocal } from './utils';
+import {
+  safeId,
+  safeTvmazeImageUrl,
+  safeNum,
+  stripHtml,
+  getPosterUrl,
+  getWatchedCount,
+  parseISODateLocal,
+} from './utils';
 import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_PER_SHOW } from './constants';
 
 // ===== Helper locali (BUG-A1-xx) =====
@@ -150,7 +158,7 @@ export function normalizeShow(raw: unknown): Show | null {
 
   const list: ListName = ALLOWED_LISTS.includes(r.list as ListName) ? (r.list as ListName) : 'towatch';
 
-  const image = safeImageUrl(r.image);
+  const image = safeTvmazeImageUrl(r.image);
   // BUG-02-08 + BUG-A1-06 FIXED: stripHtml su status e network + fallback 'N/D'
   // se vuoti dopo lo strip (es. "<p></p>" o "   ").
   const status = stripHtmlOrFallback(typeof r.status === 'string' ? r.status : 'N/D', 'N/D', 50);
@@ -277,7 +285,7 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
     id: showId,
     // BUG-A1-05 FIXED: fallback 'Senza titolo' se name vuoto dopo stripHtml.
     name: stripHtmlOrFallback(String(tvmazeShow.name || 'Senza titolo'), 'Senza titolo', 200),
-    image: safeImageUrl(getPosterUrl(tvmazeShow)),
+    image: getPosterUrl(tvmazeShow),
     // BUG-A1-06 FIXED: fallback 'N/D' se status vuoto dopo stripHtml.
     status: stripHtmlOrFallback(String(tvmazeShow.status || 'N/D'), 'N/D', 50),
     // BUG-A1-01 FIXED: parseISODateLocal valida stretta (rifiuta 2024-13-40,
