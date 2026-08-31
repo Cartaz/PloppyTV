@@ -80,7 +80,8 @@ function _setRevisionFromRaw(raw: string | null): void {
  * Salva lo stato corrente su localStorage.
  * - `{ immediate: true }`: scrive sincronamente, ritorna `false` se la
  *   scrittura fallisce (quota, serializzazione, conflitto multi-tab).
- * - senza `immediate`: schedula un debounce di 300ms e ritorna `true`.
+ * - senza `immediate`: schedula un debounce di 300ms e ritorna `void`, perché
+ *   il risultato della persistenza non è ancora disponibile al chiamante.
  *
  * CAS multi-tab: se la revisione corrente (presenza + `savedAt`) differisce
  * da quella caricata dal tab, la scrittura viene rifiutata.
@@ -89,7 +90,6 @@ export function saveData(opts?: { immediate?: boolean }): boolean | void {
   if (opts && opts.immediate) return _saveDataNow();
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(_saveDataNow, 300);
-  // BUG-04-09: debounced path returns void (not true) — il save non è ancora avvenuto.
   return;
 }
 
