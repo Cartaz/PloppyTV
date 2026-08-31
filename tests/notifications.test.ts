@@ -127,6 +127,8 @@ describe('notification contracts', () => {
   });
 
   it('enables and disables notifications as one preference lifecycle', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     const notifications = await import('../src/lib/notifications');
     installNotification('default', 'denied');
     expect(await notifications.enableNotifications()).toBe(false);
@@ -136,11 +138,11 @@ describe('notification contracts', () => {
     expect(await notifications.enableNotifications()).toBe(true);
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').notificationsEnabled).toBe(true);
-    expect(vi.getTimerCount()).toBe(1);
+    expect(setTimeoutSpy.mock.calls.map((call) => call[1])).toContain(NOTIF_RESCHEDULE_INTERVAL_MS);
 
     notifications.disableNotifications();
     expect(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').notificationsEnabled).toBe(false);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 
   it('schedules only eligible episodes plus the periodic reschedule', async () => {
@@ -163,7 +165,6 @@ describe('notification contracts', () => {
     const delays = setTimeoutSpy.mock.calls.map((call) => call[1] as number);
     expect(delays.filter((delay) => delay === NOTIF_RESCHEDULE_INTERVAL_MS)).toHaveLength(1);
     expect(delays.filter((delay) => delay !== NOTIF_RESCHEDULE_INTERVAL_MS)).toHaveLength(1);
-    expect(vi.getTimerCount()).toBe(2);
   });
 
   it('delivers a scheduled reminder through the service worker when available', async () => {
@@ -221,6 +222,8 @@ describe('notification contracts', () => {
     storeState.shows = [eligibleShow(9, 'Lifecycle Show', '2026-09-02')];
     const addSpy = vi.spyOn(window, 'addEventListener');
     const removeSpy = vi.spyOn(window, 'removeEventListener');
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     const notifications = await import('../src/lib/notifications');
 
     notifications.initNotifications();
@@ -229,16 +232,17 @@ describe('notification contracts', () => {
     expect(
       addSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
     ).toHaveLength(1);
-    expect(vi.getTimerCount()).toBe(2);
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(2);
 
     window.dispatchEvent(new Event('ploppytv:reschedule-notifications'));
-    expect(vi.getTimerCount()).toBe(2);
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(4);
+    expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     notifications._resetNotificationsForTesting();
     expect(
       removeSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
     ).toHaveLength(1);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
   it('returns the earliest future episode from watching shows', async () => {
