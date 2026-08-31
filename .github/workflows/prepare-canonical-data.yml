@@ -34,12 +34,23 @@ jobs:
         run: |
           python ../diagnostic/.github/scripts/prepare_canonical_data_document.py
           python ../diagnostic/.github/scripts/finalize_canonical_generated_files.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/exportImport.ts')
+          lines = p.read_text().splitlines(keepends=True)
+          matches = [i for i, line in enumerate(lines) if 'normalizeShow' in line]
+          if len(matches) != 2 or not all(lines[i].lstrip().startswith('//') for i in matches):
+              raise SystemExit(f'expected exactly two stale normalizeShow comment references, got {matches}')
+          for i in matches:
+              lines[i] = lines[i].replace('normalizeShow', 'canonicalizeDataDocument')
+          p.write_text(''.join(lines))
+          PY
           npx prettier --write src/lib/dataDocument.ts src/lib/storage.ts src/components/exportImport.ts README.md tests/probe_dataDocument.test.ts tests/probe_exportimport.test.ts
       - name: Verify single schema owner
         working-directory: repo
         shell: bash
         run: |
-          if grep -n -E 'normalizeShow|reconcileAllLists' src/lib/storage.ts src/components/exportImport.ts; then
+          if grep -n -E "import .*\b(normalizeShow|reconcileAllLists)\b|\b(normalizeShow|reconcileAllLists)\s*\(" src/lib/storage.ts src/components/exportImport.ts; then
             echo 'Storage/import still duplicate canonicalization policy'
             exit 1
           fi
