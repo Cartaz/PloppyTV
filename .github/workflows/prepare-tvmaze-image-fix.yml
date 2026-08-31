@@ -46,9 +46,49 @@ jobs:
       - name: Type-check
         working-directory: repo
         run: npm run typecheck
-      - name: Test
+      - name: Test with report
+        id: vitest
         working-directory: repo
-        run: npm run test
+        shell: bash
+        run: |
+          set +e
+          npm run test -- --reporter=json --outputFile=vitest-report.json >vitest-run.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Summarize test failures
+        if: steps.vitest.outputs.exit_code != '0'
+        working-directory: repo
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('vitest-report.json', 'utf8'));
+          const out = [
+            `numTotalTests=${report.numTotalTests ?? 'unknown'}`,
+            `numFailedTests=${report.numFailedTests ?? 'unknown'}`,
+          ];
+          for (const file of report.testResults ?? []) {
+            const failed = (file.assertionResults ?? []).filter((test) => test.status === 'failed');
+            if (!failed.length) continue;
+            out.push(`FILE: ${file.name}`);
+            for (const test of failed) {
+              out.push(`TEST: ${(test.ancestorTitles ?? []).concat(test.title ?? []).join(' > ')}`);
+              for (const message of test.failureMessages ?? []) out.push(message);
+            }
+          }
+          fs.writeFileSync('failure-summary.txt', out.join('\n') + '\n');
+          console.log(out.join('\n'));
+          NODE
+      - name: Upload failure summary
+        if: steps.vitest.outputs.exit_code != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvmaze-image-test-failures
+          path: repo/failure-summary.txt
+      - name: Preserve test result
+        if: steps.vitest.outputs.exit_code != '0'
+        run: exit 1
       - name: Build
         working-directory: repo
         run: npm run build
