@@ -1,0 +1,70 @@
+name: Prepare TVMaze image trust-boundary fix
+
+on:
+  push:
+    branches: [audit/tvmaze-image-fix-runner]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/tvmaze-image-trust-boundary
+          path: repo
+      - name: Checkout patch tooling
+        uses: actions/checkout@v4
+        with:
+          ref: audit/tvmaze-image-fix-runner
+          path: diagnostic
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+      - name: Install dependencies
+        working-directory: repo
+        run: npm ci
+      - name: Apply trust-boundary change
+        working-directory: repo
+        run: |
+          python ../diagnostic/.github/scripts/prepare_tvmaze_image_fix.py
+          npx prettier --write src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts
+      - name: Dependency audit
+        working-directory: repo
+        run: npm audit --audit-level=high
+      - name: Lint
+        working-directory: repo
+        run: npm run lint
+      - name: Format
+        working-directory: repo
+        run: npm run format:check
+      - name: Type-check
+        working-directory: repo
+        run: npm run typecheck
+      - name: Test
+        working-directory: repo
+        run: npm run test
+      - name: Build
+        working-directory: repo
+        run: npm run build
+      - name: Verify change scope
+        working-directory: repo
+        shell: bash
+        run: |
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' src/lib/normalize.ts src/lib/utils.ts tests/normalize.test.ts tests/utils.test.ts | sort)"
+          test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
+      - name: Commit validated fix
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts
+          git commit -m "fix: restrict persisted poster URLs to TVMaze CDN"
+          git push origin HEAD:fix/tvmaze-image-trust-boundary
