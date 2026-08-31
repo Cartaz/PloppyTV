@@ -33,7 +33,7 @@ jobs:
         working-directory: repo
         run: |
           python ../diagnostic/.github/scripts/prepare_tvmaze_image_fix.py
-          npx prettier --write src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts
+          npx prettier --write src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts tests/probe_a12.test.ts tests/probe_search.test.ts tests/probe_utils.test.ts
       - name: Dependency audit
         working-directory: repo
         run: npm audit --audit-level=high
@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           changed="$(git diff --name-only | sort)"
-          expected="$(printf '%s\n' src/lib/normalize.ts src/lib/utils.ts tests/normalize.test.ts tests/utils.test.ts | sort)"
+          expected="$(printf '%s\n' src/lib/normalize.ts src/lib/utils.ts tests/normalize.test.ts tests/utils.test.ts tests/probe_a12.test.ts tests/probe_search.test.ts tests/probe_utils.test.ts | sort)"
           test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
       - name: Commit validated fix
         working-directory: repo
@@ -105,6 +105,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts
+          git add src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts tests/probe_a12.test.ts tests/probe_search.test.ts tests/probe_utils.test.ts
           git commit -m "fix: restrict persisted poster URLs to TVMaze CDN"
           git push origin HEAD:fix/tvmaze-image-trust-boundary
