@@ -136,7 +136,7 @@ describe('notification contracts', () => {
     expect(await notifications.enableNotifications()).toBe(true);
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').notificationsEnabled).toBe(true);
-    expect(vi.getTimerCount()).toBe(1); // periodic reschedule, no episode timers
+    expect(vi.getTimerCount()).toBe(1);
 
     notifications.disableNotifications();
     expect(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').notificationsEnabled).toBe(false);
@@ -172,7 +172,12 @@ describe('notification contracts', () => {
     enablePreference();
     storeState.shows = [eligibleShow(42, 'Soon Show', '2026-09-02')];
 
-    const showNotification = vi.fn(async () => {});
+    let deliveredTitle = '';
+    let deliveredOptions: NotificationOptions | undefined;
+    const showNotification = vi.fn(async (title: string, options?: NotificationOptions) => {
+      deliveredTitle = title;
+      deliveredOptions = options;
+    });
     installServiceWorker(async () => ({ showNotification } as unknown as ServiceWorkerRegistration));
 
     const { scheduleNotifications } = await import('../src/lib/notifications');
@@ -180,11 +185,10 @@ describe('notification contracts', () => {
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
 
     expect(showNotification).toHaveBeenCalledTimes(1);
-    const [title, options] = showNotification.mock.calls[0];
-    expect(title).toContain('Soon Show');
-    expect(options?.body).toBe('Soon Show — S1E1');
-    expect(options?.tag).toBe('ploppytv-42-1-1');
-    expect(options?.icon).toContain('icons/icon-192.png');
+    expect(deliveredTitle).toContain('Soon Show');
+    expect(deliveredOptions?.body).toBe('Soon Show — S1E1');
+    expect(deliveredOptions?.tag).toBe('ploppytv-42-1-1');
+    expect(deliveredOptions?.icon).toContain('icons/icon-192.png');
     expect(notification.records).toHaveLength(0);
   });
 
@@ -223,7 +227,7 @@ describe('notification contracts', () => {
     notifications.initNotifications();
     notifications.initNotifications();
     expect(
-      addSpy.mock.calls.filter(([type]) => type === 'ploppytv:reschedule-notifications'),
+      addSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
     ).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(2);
 
@@ -232,7 +236,7 @@ describe('notification contracts', () => {
 
     notifications._resetNotificationsForTesting();
     expect(
-      removeSpy.mock.calls.filter(([type]) => type === 'ploppytv:reschedule-notifications'),
+      removeSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
     ).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
