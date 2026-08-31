@@ -59,13 +59,19 @@ export function safeNum(v: unknown): number {
 }
 
 /**
- * BUG-01-k (FIXED): validazione host — la regex richiede almeno un carattere
- * non spazio/non slash dopo `://`. `http://` e `https://` (senza host) sono
- * rifiutati; `http://x` è accettato (host minimo di un carattere).
+ * Validatore sintattico minimo per URL immagine HTTP(S). Whitespace ai bordi
+ * e caratteri di controllo grezzi vengono rifiutati; gli spazi interni restano
+ * parte dell'URL e l'escaping HTML appartiene al renderer. La policy di origine
+ * appartiene a `safeTvmazeImageUrl`.
  */
 export function safeImageUrl(u: unknown): string | null {
   if (typeof u !== 'string') return null;
   if (u.length === 0 || u.length > 2048) return null;
+  if (u !== u.trim()) return null;
+  for (let i = 0; i < u.length; i++) {
+    const code = u.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return null;
+  }
   if (u.startsWith('data:')) return null;
   // Richiede http(s):// seguito da almeno un carattere che non sia spazio o slash.
   if (!/^https?:\/\/[^\s/]/i.test(u)) return null;
@@ -314,7 +320,9 @@ interface HasSeasons {
  * BUG-01-f (FIXED): solo `watched === true` conta come watched; tutti gli
  * altri valori (stringa "false", numero 0, ecc.) sono trattati come UNWATCHED.
  * BUG-01-g (FIXED): episodi con `num <= 0` sono saltati.
- * BUG-01-m (FIXED): chiavi di stagione non intere (es. "1.5") sono filtrate.
+ * Le chiavi stagione devono essere interi positivi in forma decimale canonica:
+ * alias testuali come "01" vengono filtrati come già avviene nel boundary di
+ * persistenza, evitando due rappresentazioni della stessa stagione.
  * BUG-A3-07 (FIXED): `ep.num` deve essere un intero positivo (`typeof number`,
  * `Number.isInteger`, `> 0`). Prima, valori come `undefined`, `NaN`, `Infinity`,
  * `1.5` o stringhe passavano il check `ep.num <= 0` (che è false per NaN/undefined
@@ -329,10 +337,10 @@ export function findNextEpisode<T extends HasSeasons>(
   if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return null;
   try {
     const seasons = Object.keys(show.seasons)
-      // BUG-01-m: filtra solo chiavi intere positive.
+      // Una stagione ha una sola rappresentazione: "1", non "01".
       .filter((k) => {
         const n = Number(k);
-        return Number.isInteger(n) && n > 0;
+        return Number.isInteger(n) && n > 0 && k === String(n);
       })
       .sort((a, b) => Number(a) - Number(b));
     for (const s of seasons) {
