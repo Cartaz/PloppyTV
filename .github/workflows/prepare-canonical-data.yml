@@ -4,6 +4,10 @@ on:
   push:
     branches: [audit/canonical-data-runner]
 
+concurrency:
+  group: canonical-data-validation
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
