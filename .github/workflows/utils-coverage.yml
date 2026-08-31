@@ -37,6 +37,7 @@ jobs:
         working-directory: repo
         run: |
           python ../diagnostic/.github/scripts/rationalize_utils_tests.py
+          python ../diagnostic/.github/scripts/refine_utils_candidate.py
           npx prettier --write src/lib/utils.ts tests/utils.edgecases.test.ts
       - name: Verify intended test replacement
         working-directory: repo
