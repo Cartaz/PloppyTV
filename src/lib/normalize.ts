@@ -78,8 +78,10 @@ function safeEpisodeName(v: unknown): string | null {
  * (rifiuta 2024-13-40, 2024-02-30, ecc.).
  * BUG-02-06 (FIXED): totalEpisodes e totalSeasons SEMPRE ricalcolati dalle
  * stagioni effettive (i valori in input sono ignorati).
- * BUG-02-07 (FIXED): chiavi stagione validate con safeId (regex ^-?\d+$),
- * quindi " 1 ", "1.5", "0x10", "1e2" sono rifiutate.
+ * Le chiavi stagione persistite devono usare la rappresentazione decimale
+ * canonica ("1", "2", ...). Alias come "01" vengono rifiutati prima della
+ * conversione numerica, così due chiavi testuali non possono collidere sulla
+ * stessa stagione e causare sovrascritture silenziose.
  * BUG-02-09 (FIXED): manualList coercito con `!!` (truthy → true).
  * BUG-02-10 (FIXED): episodi duplicati (stesso num) deduplicati — primo
  * tenuto, duplicati saltati.
@@ -98,10 +100,11 @@ export function normalizeShow(raw: unknown): Show | null {
   if (r.seasons && typeof r.seasons === 'object' && !Array.isArray(r.seasons)) {
     for (const [k, v] of Object.entries(r.seasons as Record<string, unknown>)) {
       if (!Array.isArray(v)) continue;
-      // BUG-02-07: valida la chiave con safeId (regex ^-?\d+$); " 1 ", "1.5",
-      // "0x10", "1e2" sono rifiutate.
       const seasonKey = safeId(k);
-      if (!seasonKey) continue;
+      // Una stagione ha una sola rappresentazione persistita. `safeId` è un
+      // parser numerico generico e accetta anche "01"; qui il dominio è più
+      // stretto, quindi accettiamo solo la forma canonica prodotta da PloppyTV.
+      if (!seasonKey || k !== String(seasonKey)) continue;
       const seenNums = new Set<number>();
       const eps: Episode[] = v
         .filter(
