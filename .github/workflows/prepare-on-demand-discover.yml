@@ -33,7 +33,7 @@ jobs:
         working-directory: repo
         run: |
           python ../diagnostic/.github/scripts/prepare_on_demand_discover.py
-          npx prettier --write src/main.ts src/lib/discover.ts src/views/discover.ts PRIVACY.md README.md tests/probe_main.test.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts
+          npx prettier --write src/main.ts src/lib/discover.ts src/views/discover.ts PRIVACY.md README.md tests/probe_main.test.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_a12.test.ts tests/probe_a20.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_renderer.test.ts
       - name: Find stale preload API references
         id: stale
         working-directory: repo
@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           changed="$(git diff --name-only | sort)"
-          expected="$(printf '%s\n' PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts | sort)"
+          expected="$(printf '%s\n' PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_a12.test.ts tests/probe_a20.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts tests/probe_renderer.test.ts | sort)"
           test "$changed" = "$expected" || { printf 'Unexpected changes:\n%s\n' "$changed"; exit 1; }
       - name: Commit validated fix
         working-directory: repo
@@ -88,6 +88,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts
+          git add PRIVACY.md README.md src/lib/discover.ts src/main.ts src/views/discover.ts tests/probe_a18.test.ts tests/probe_a7.test.ts tests/probe_a12.test.ts tests/probe_a20.test.ts tests/probe_discover.test.ts tests/probe_discoverview.test.ts tests/probe_main.test.ts tests/probe_renderer.test.ts
           git commit -m "refactor: load Discover only on user demand"
           git push origin HEAD:fix/on-demand-discover
