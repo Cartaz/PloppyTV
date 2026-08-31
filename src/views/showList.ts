@@ -19,6 +19,7 @@
 
 import { getState } from '../lib/store';
 import { escapeHtml, escapeAttr } from '../lib/utils';
+import { t } from '../lib/i18n';
 import { showCardHtml, bindKeydown } from './dashboard';
 import { getAllUserTags } from '../lib/shows';
 
@@ -65,7 +66,12 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
   // dall'utente o serie eliminata).
   if (tagsInList.length > 0 || _activeTag !== '') {
     html += '<div class="tag-filter-bar">';
-    html += '<button class="tag-filter-chip' + (_activeTag === '' ? ' active' : '') + '" data-tag="">Tutti</button>';
+    html +=
+      '<button class="tag-filter-chip' +
+      (_activeTag === '' ? ' active' : '') +
+      '" data-tag="">' +
+      escapeHtml(t('common.all')) +
+      '</button>';
     for (const tag of tagsInList) {
       html +=
         '<button class="tag-filter-chip' +
@@ -81,10 +87,12 @@ export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' |
 
   if (shows.length === 0) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Nessuna serie</div><div class="empty-state-text">' +
+      '<div class="empty-state"><div class="empty-state-title">' +
+      escapeHtml(t('library.empty')) +
+      '</div><div class="empty-state-text">' +
       (_activeTag
-        ? 'Nessuna serie con il tag "' + escapeHtml(_activeTag) + '" in questa lista.'
-        : 'Non hai serie in questa lista.') +
+        ? escapeHtml(t('library.noTagMatch', { tag: _activeTag }))
+        : escapeHtml(t('library.empty.desc'))) +
       '</div></div>';
   } else {
     html += '<div class="card-grid">' + shows.map(showCardHtml).join('') + '</div>';
