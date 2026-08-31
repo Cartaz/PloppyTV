@@ -19,7 +19,6 @@ def replace_between(path: str, start: str, end: str, replacement: str) -> None:
     p.write_text(src[:start_idx] + replacement + src[end_idx:])
 
 
-# main.ts: startup must not contact TVMaze merely to speculate about a future Discover visit.
 replace_once("src/main.ts", "import { preloadDiscover } from './lib/discover';\n", "")
 replace_between(
     "src/main.ts",
@@ -28,7 +27,6 @@ replace_between(
     "",
 )
 
-# discover.ts: retain only on-demand request sharing; remove the preload concept entirely.
 replace_between(
     "src/lib/discover.ts",
     "// Promise condivise per il preload in background: una volta avviate, le viste\n",
@@ -75,7 +73,6 @@ export function resetDiscoverLoad(tab?: 'popular' | 'recent'): void {
 """,
 )
 
-# View API names now describe semantics rather than Promise/preload implementation details.
 view = Path("src/views/discover.ts")
 view_src = view.read_text()
 for old, new in [
@@ -87,7 +84,6 @@ for old, new in [
     view_src = view_src.replace(old, new)
 view.write_text(view_src)
 
-# Privacy/documentation: external requests from Discover become explicitly user-driven.
 replace_once(
     "PRIVACY.md",
     "**Ultimo aggiornamento:** 30 agosto 2026",
@@ -114,7 +110,6 @@ replace_once(
     "- Scopri contatta TVMaze solo quando apri la vista o richiedi esplicitamente un aggiornamento",
 )
 
-# main probe: remove tests/mocks for behavior deliberately deleted from startup.
 replace_once(
     "tests/probe_main.test.ts",
     "// Stress test: init order, hash routing, SW registration + onNeedRefresh,\n// beforeunload, preloadDiscover, standalone detection, double-init.\n",
@@ -131,7 +126,18 @@ replace_once(
     "",
 )
 replace_once("tests/probe_main.test.ts", "  mockPreloadDiscover.mockReset();\n", "")
-replace_once("tests/probe_main.test.ts", "    expect(mockPreloadDiscover).not.toHaveBeenCalled();\n", "")
+replace_once(
+    "tests/probe_main.test.ts",
+    """    expect(mockRender).not.toHaveBeenCalled();
+    expect(mockSubscribe).not.toHaveBeenCalled();
+    expect(mockPreloadDiscover).not.toHaveBeenCalled();
+    // Fallback UI is injected.
+""",
+    """    expect(mockRender).not.toHaveBeenCalled();
+    expect(mockSubscribe).not.toHaveBeenCalled();
+    // Fallback UI is injected.
+""",
+)
 replace_between(
     "tests/probe_main.test.ts",
     "describe('main.ts — preloadDiscover', () => {\n",
@@ -139,7 +145,6 @@ replace_between(
     "",
 )
 
-# A18 code-reading now protects the privacy/network invariant instead of the removed timer.
 replace_once(
     "tests/probe_a18.test.ts",
     """  it('preloadDiscover wrapped in try/catch inside setTimeout', () => {
@@ -156,7 +161,6 @@ replace_once(
 """,
 )
 
-# Discover library tests: rename the reset API and add direct contract tests for on-demand sharing.
 probe_discover = Path("tests/probe_discover.test.ts")
 pd_src = probe_discover.read_text()
 if "resetDiscoverPreload" not in pd_src:
@@ -204,7 +208,6 @@ pd_src = pd_src.replace(
 )
 probe_discover.write_text(pd_src)
 
-# Discover view mocks follow the semantic API rename.
 probe_view = Path("tests/probe_discoverview.test.ts")
 pv_src = probe_view.read_text()
 for old, new in [
