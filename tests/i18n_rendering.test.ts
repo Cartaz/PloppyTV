@@ -28,6 +28,7 @@ async function useEnglishLocale() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  localStorage.clear();
   vi.doUnmock('../src/views/dashboard');
   vi.doUnmock('../src/components/toast');
   document.body.innerHTML = '';
