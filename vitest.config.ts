@@ -33,8 +33,18 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      include: ['src/lib/**/*.ts'],
-      exclude: ['src/lib/constants.ts', 'src/**/*.test.ts', 'src/vite-env.d.ts'],
+      // Misura tutto il codice runtime. I file esclusi sono solo dichiarazioni
+      // di tipo o tabelle/dati senza comportamento da esercitare.
+      include: ['src/**/*.ts'],
+      exclude: [
+        'src/lib/constants.ts',
+        'src/locales/**/*.ts',
+        'src/types.ts',
+        'src/**/*.test.ts',
+        'src/vite-env.d.ts',
+      ],
+      // Baseline temporaneo del branch: viene rialzato dopo la prima misura
+      // completa prima di portare il cambiamento su main.
       thresholds: {
         statements: 30,
         branches: 30,
