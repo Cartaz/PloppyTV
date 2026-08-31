@@ -226,3 +226,28 @@ for old, new in [
         raise SystemExit(f"tests/probe_discoverview.test.ts: missing {old}")
     pv_src = pv_src.replace(old, new)
 probe_view.write_text(pv_src)
+
+for path in ["tests/probe_a12.test.ts", "tests/probe_a20.test.ts"]:
+    p = Path(path)
+    src = p.read_text()
+    for old, new in [
+        ("mockGetDiscoverPromise", "mockLoadDiscover"),
+        ("getDiscoverPromise", "loadDiscover"),
+        ("mockResetDiscoverPreload", "mockResetDiscoverLoad"),
+        ("resetDiscoverPreload", "resetDiscoverLoad"),
+    ]:
+        if old not in src:
+            raise SystemExit(f"{path}: missing {old}")
+        src = src.replace(old, new)
+    p.write_text(src)
+
+renderer = Path("tests/probe_renderer.test.ts")
+renderer_src = renderer.read_text()
+for old, new in [
+    ("resetDiscoverPreload", "resetDiscoverLoad"),
+    ("getDiscoverPromise", "loadDiscover"),
+]:
+    if old not in renderer_src:
+        raise SystemExit(f"tests/probe_renderer.test.ts: missing {old}")
+    renderer_src = renderer_src.replace(old, new)
+renderer.write_text(renderer_src)
