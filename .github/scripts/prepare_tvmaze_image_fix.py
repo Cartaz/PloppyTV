@@ -73,3 +73,26 @@ replace_once(
     """    expect(show.image).toBe('https://img.tvmaze.com/m.jpg'); // preferisce medium\n""",
     """    expect(show.image).toBe('https://static.tvmaze.com/uploads/m.jpg'); // preferisce medium\n""",
 )
+
+replace_once(
+    "tests/probe_a12.test.ts",
+    """    image: { medium: 'http://x/' + id + '.jpg' },\n""",
+    """    image: { medium: 'https://static.tvmaze.com/uploads/' + id + '.jpg' },\n""",
+)
+
+replace_once(
+    "tests/probe_search.test.ts",
+    """  it('BUG-20-03: valid https: poster URL is preserved', async () => {\n    const ok = makeResult(1, 'Good') as any;\n    ok.show.image = { medium: 'https://example.com/poster.jpg', original: null };\n""",
+    """  it('BUG-20-03: valid TVMaze HTTPS poster URL is preserved', async () => {\n    const ok = makeResult(1, 'Good') as any;\n    ok.show.image = { medium: 'https://static.tvmaze.com/uploads/poster.jpg', original: null };\n""",
+)
+replace_once(
+    "tests/probe_search.test.ts",
+    """    expect((imgs[0] as HTMLImageElement).getAttribute('src')).toBe('https://example.com/poster.jpg');\n""",
+    """    expect((imgs[0] as HTMLImageElement).getAttribute('src')).toBe(\n      'https://static.tvmaze.com/uploads/poster.jpg',\n    );\n""",
+)
+
+replace_once(
+    "tests/probe_utils.test.ts",
+    """  it('image {medium:null, original:\"http://x\"} -> \"http://x\"', () => {\n    // BUG-01-d fixed: getPosterUrl now validates via safeImageUrl; use valid URL.\n    expect(getPosterUrl({ image: { medium: null, original: 'http://x' } as any })).toBe('http://x');\n  });\n\n  it('image {medium:\"\", original:\"http://y\"} -> \"http://y\" (empty string falls back)', () => {\n    // BUG-01-d fixed: getPosterUrl validates; use valid URL for original.\n    expect(getPosterUrl({ image: { medium: '', original: 'http://y' } })).toBe('http://y');\n  });\n\n  it('image {medium:\"http://x\", original:null} -> \"http://x\"', () => {\n    expect(getPosterUrl({ image: { medium: 'http://x', original: null } as any })).toBe('http://x');\n  });\n""",
+    """  it('falls back from null medium to a valid TVMaze original', () => {\n    expect(\n      getPosterUrl({\n        image: { medium: null, original: 'https://static.tvmaze.com/uploads/original.jpg' } as any,\n      }),\n    ).toBe('https://static.tvmaze.com/uploads/original.jpg');\n  });\n\n  it('falls back from empty medium to a valid TVMaze original', () => {\n    expect(\n      getPosterUrl({ image: { medium: '', original: 'https://static.tvmaze.com/uploads/original.jpg' } }),\n    ).toBe('https://static.tvmaze.com/uploads/original.jpg');\n  });\n\n  it('preserves a valid TVMaze medium poster', () => {\n    expect(\n      getPosterUrl({ image: { medium: 'https://static.tvmaze.com/uploads/medium.jpg', original: null } as any }),\n    ).toBe('https://static.tvmaze.com/uploads/medium.jpg');\n  });\n\n  it('rejects an otherwise valid external HTTPS poster host', () => {\n    expect(getPosterUrl({ image: { medium: 'https://attacker.example/pixel.png', original: null } as any })).toBeNull();\n  });\n""",
+)
