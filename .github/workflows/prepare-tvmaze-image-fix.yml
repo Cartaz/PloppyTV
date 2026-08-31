@@ -30,10 +30,29 @@ jobs:
         working-directory: repo
         run: npm ci
       - name: Apply trust-boundary change
+        id: patch
         working-directory: repo
+        shell: bash
         run: |
-          python ../diagnostic/.github/scripts/prepare_tvmaze_image_fix.py
-          npx prettier --write src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts tests/probe_a12.test.ts tests/probe_search.test.ts tests/probe_utils.test.ts
+          set +e
+          python ../diagnostic/.github/scripts/prepare_tvmaze_image_fix.py >patch-application.log 2>&1
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            npx prettier --write src/lib/utils.ts src/lib/normalize.ts tests/utils.test.ts tests/normalize.test.ts tests/probe_a12.test.ts tests/probe_search.test.ts tests/probe_utils.test.ts >>patch-application.log 2>&1
+            code=$?
+          fi
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat patch-application.log
+          exit 0
+      - name: Upload patch diagnostics
+        if: steps.patch.outputs.exit_code != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvmaze-image-patch-failure
+          path: repo/patch-application.log
+      - name: Preserve patch result
+        if: steps.patch.outputs.exit_code != '0'
+        run: exit 1
       - name: Dependency audit
         working-directory: repo
         run: npm audit --audit-level=high
