@@ -1,0 +1,48 @@
+name: A8 rationalization audit
+
+on:
+  push:
+    branches: [audit/a8-rationalization]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Inventory target-module test coupling
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const modules = ['constants', 'i18n', 'notifications', 'keyboard'];
+          const files = fs.readdirSync('tests').filter(f => f.endsWith('.test.ts')).sort();
+          for (const mod of modules) {
+            console.log(`\n=== ${mod} ===`);
+            for (const file of files) {
+              const text = fs.readFileSync(path.join('tests', file), 'utf8');
+              const direct = text.includes(`../src/lib/${mod}`);
+              const mentions = (text.match(new RegExp(mod.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'), 'g')) || []).length;
+              if (direct || mentions > 1) {
+                const tests = (text.match(/\bit\s*\(/g) || []).length;
+                console.log(`${file}: direct=${direct} mentions=${mentions} tests=${tests}`);
+              }
+            }
+          }
+          NODE
+      - name: Measure suite without probe_a8
+        run: |
+          mv tests/probe_a8.test.ts /tmp/probe_a8.test.ts.disabled
+          set +e
+          npm run test:coverage
+          status=$?
+          set -e
+          echo "coverage_exit=$status"
+          exit 0
