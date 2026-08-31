@@ -12,9 +12,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // MOCKS
 // ============================================================
 
-const mockGetDiscoverPromise = vi.fn();
+const mockLoadDiscover = vi.fn();
 const mockInvalidateDiscoverCache = vi.fn();
-const mockResetDiscoverPreload = vi.fn();
+const mockResetDiscoverLoad = vi.fn();
 const mockFindShowInDiscoverGroups = vi.fn();
 const mockAddShowToList = vi.fn();
 const mockShowModal = vi.fn();
@@ -22,9 +22,9 @@ const mockShowToast = vi.fn();
 const mockUpdateBadges = vi.fn();
 
 vi.mock('../src/lib/discover', () => ({
-  getDiscoverPromise: (...args: any[]) => mockGetDiscoverPromise(...args),
+  loadDiscover: (...args: any[]) => mockLoadDiscover(...args),
   invalidateDiscoverCache: (...args: any[]) => mockInvalidateDiscoverCache(...args),
-  resetDiscoverPreload: (...args: any[]) => mockResetDiscoverPreload(...args),
+  resetDiscoverLoad: (...args: any[]) => mockResetDiscoverLoad(...args),
   findShowInDiscoverGroups: (...args: any[]) => mockFindShowInDiscoverGroups(...args),
 }));
 
@@ -143,9 +143,9 @@ describe('Agent-15 probe: discover view', () => {
     installRafPolyfill();
 
     // Reset all mocks
-    mockGetDiscoverPromise.mockReset();
+    mockLoadDiscover.mockReset();
     mockInvalidateDiscoverCache.mockReset();
-    mockResetDiscoverPreload.mockReset();
+    mockResetDiscoverLoad.mockReset();
     mockFindShowInDiscoverGroups.mockReset();
     mockAddShowToList.mockReset();
     mockShowModal.mockReset();
@@ -154,7 +154,7 @@ describe('Agent-15 probe: discover view', () => {
 
     // Defaults
     mockFindShowInDiscoverGroups.mockReturnValue(null);
-    mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+    mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
 
     // Reset modules → fresh discover view (_popularCache=null, _recentCache=null, etc.)
     vi.resetModules();
@@ -234,7 +234,7 @@ describe('Agent-15 probe: discover view', () => {
       const main = document.getElementById('mainContent')!;
 
       // Step 1: Initial render with 'popular'. Populate _popularCache.
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro(); // _popularCache set
@@ -242,16 +242,16 @@ describe('Agent-15 probe: discover view', () => {
       // Step 2: Pending fetch for 'recent'.
       const recentGroups = makeGroups([makeTvmazeShow(2)]);
       const recentFetch = pendingPromise<any>();
-      mockGetDiscoverPromise.mockReturnValue(recentFetch.promise);
+      mockLoadDiscover.mockReturnValue(recentFetch.promise);
 
       // Step 3: Click 'recent' tab. After FIX: handler only calls setDiscoverTab
       // (no manual loadTab, no manual DOM ops). emitChange → RAF queued.
-      mockGetDiscoverPromise.mockClear();
+      mockLoadDiscover.mockClear();
       const recentTab = main.querySelector('[data-tab="recent"]') as HTMLElement;
       recentTab.click();
 
-      // FIX: no getDiscoverPromise call yet (no manual loadTab).
-      expect(mockGetDiscoverPromise).not.toHaveBeenCalled();
+      // FIX: no loadDiscover call yet (no manual loadTab).
+      expect(mockLoadDiscover).not.toHaveBeenCalled();
 
       // Step 4: Simulate the RAF-triggered re-render (as the real renderer would do).
       discoverMod.renderDiscover(main);
@@ -273,14 +273,14 @@ describe('Agent-15 probe: discover view', () => {
     it('CONTRAST: if fetch resolves before re-render, content renders correctly (no bug)', async () => {
       const main = document.getElementById('mainContent')!;
 
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
 
       const recentGroups = makeGroups([makeTvmazeShow(2)]);
       const recentFetch = pendingPromise<any>();
-      mockGetDiscoverPromise.mockReturnValue(recentFetch.promise);
+      mockLoadDiscover.mockReturnValue(recentFetch.promise);
 
       const recentTab = main.querySelector('[data-tab="recent"]') as HTMLElement;
       recentTab.click();
@@ -302,7 +302,7 @@ describe('Agent-15 probe: discover view', () => {
   describe('BUG-15-03: NO stale DOM ops on elements about to be replaced (FIXED)', () => {
     it('clicking tab does NOT manually set innerHTML on OLD discoverContent (FIXED)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -313,7 +313,7 @@ describe('Agent-15 probe: discover view', () => {
 
       // Pending fetch for 'recent'
       const recentFetch = pendingPromise<any>();
-      mockGetDiscoverPromise.mockReturnValue(recentFetch.promise);
+      mockLoadDiscover.mockReturnValue(recentFetch.promise);
 
       // Click 'recent' tab — FIX: handler does NOT manually touch OLD discoverContent.
       const recentTab = main.querySelector('[data-tab="recent"]') as HTMLElement;
@@ -336,7 +336,7 @@ describe('Agent-15 probe: discover view', () => {
 
     it('clicking tab does NOT manually toggle active class on OLD tabs (FIXED)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -376,14 +376,25 @@ describe('Agent-15 probe: discover view', () => {
       const main = document.getElementById('mainContent')!;
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       // Mock addShowToList: call replaceShow (→ emitChange → RAF) like the real impl
       mockAddShowToList.mockImplementation(async (_t: any, list: any) => {
         const newShow = {
-          id: 1, name: 'Show 1', list, seasons: {}, totalSeasons: 0, totalEpisodes: 0,
-          addedAt: Date.now(), image: null, status: 'Running', premiered: '2024-01-01',
-          genres: ['Drama'], summary: '', network: 'NBC', runtime: 45,
+          id: 1,
+          name: 'Show 1',
+          list,
+          seasons: {},
+          totalSeasons: 0,
+          totalEpisodes: 0,
+          addedAt: Date.now(),
+          image: null,
+          status: 'Running',
+          premiered: '2024-01-01',
+          genres: ['Drama'],
+          summary: '',
+          network: 'NBC',
+          runtime: 45,
         };
         storeMod.replaceShow(newShow); // → emitChange → RAF queued
         return newShow;
@@ -433,7 +444,7 @@ describe('Agent-15 probe: discover view', () => {
       }
 
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(
+      mockLoadDiscover.mockResolvedValue(
         makeGroups([makeTvmazeShow(1), makeTvmazeShow(2), makeTvmazeShow(3), makeTvmazeShow(4)]),
       );
       discoverMod.renderDiscover(main);
@@ -471,7 +482,7 @@ describe('Agent-15 probe: discover view', () => {
   describe('BUG-15-06: openDiscover dead branch (FIXED — branch removed)', () => {
     it('rendered HTML never uses data-action="openDiscover" (dead branch removed)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       await flushMicro();
 
@@ -489,7 +500,7 @@ describe('Agent-15 probe: discover view', () => {
   describe('BUG-15-07: carousel-card a11y (FIXED)', () => {
     it('carousel-card has role=button, tabindex=0, aria-label (keyboard accessible)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       await flushMicro();
 
@@ -505,7 +516,7 @@ describe('Agent-15 probe: discover view', () => {
       const main = document.getElementById('mainContent')!;
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -542,7 +553,7 @@ describe('Agent-15 probe: discover view', () => {
     it('show not in cache → showToast error, no modal', async () => {
       mockFindShowInDiscoverGroups.mockReturnValue(null);
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -557,13 +568,24 @@ describe('Agent-15 probe: discover view', () => {
     it('isAdded=true → only "Chiudi" button', async () => {
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
       storeMod.setState({
         shows: [
           {
-            id: 1, name: 'Show 1', list: 'towatch', seasons: {}, totalSeasons: 0,
-            totalEpisodes: 0, addedAt: 0, image: null, status: 'Running',
-            premiered: '2024-01-01', genres: ['Drama'], summary: '', network: 'NBC', runtime: 45,
+            id: 1,
+            name: 'Show 1',
+            list: 'towatch',
+            seasons: {},
+            totalSeasons: 0,
+            totalEpisodes: 0,
+            addedAt: 0,
+            image: null,
+            status: 'Running',
+            premiered: '2024-01-01',
+            genres: ['Drama'],
+            summary: '',
+            network: 'NBC',
+            runtime: 45,
           },
         ],
       });
@@ -586,7 +608,7 @@ describe('Agent-15 probe: discover view', () => {
     it('isAdded=false → "Chiudi" + "Da vedere" + "In corso"', async () => {
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -609,13 +631,24 @@ describe('Agent-15 probe: discover view', () => {
     it('"Aggiunta" badge rendered on card when show is in user list', async () => {
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
       storeMod.setState({
         shows: [
           {
-            id: 1, name: 'Show 1', list: 'watching', seasons: {}, totalSeasons: 0,
-            totalEpisodes: 0, addedAt: 0, image: null, status: 'Running',
-            premiered: '2024-01-01', genres: ['Drama'], summary: '', network: 'NBC', runtime: 45,
+            id: 1,
+            name: 'Show 1',
+            list: 'watching',
+            seasons: {},
+            totalSeasons: 0,
+            totalEpisodes: 0,
+            addedAt: 0,
+            image: null,
+            status: 'Running',
+            premiered: '2024-01-01',
+            genres: ['Drama'],
+            summary: '',
+            network: 'NBC',
+            runtime: 45,
           },
         ],
       });
@@ -636,27 +669,27 @@ describe('Agent-15 probe: discover view', () => {
   describe('refreshDiscover / retryDiscover handlers', () => {
     it('refreshDiscover: invalidates cache + resets preload + nulls view cache + loadTab', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
 
-      mockGetDiscoverPromise.mockClear();
+      mockLoadDiscover.mockClear();
       mockInvalidateDiscoverCache.mockClear();
-      mockResetDiscoverPreload.mockClear();
+      mockResetDiscoverLoad.mockClear();
 
       const refreshBtn = main.querySelector('[data-action="refreshDiscover"]') as HTMLElement;
       refreshBtn.click();
 
       expect(mockInvalidateDiscoverCache).toHaveBeenCalledWith('popular');
-      expect(mockResetDiscoverPreload).toHaveBeenCalledWith('popular');
-      expect(mockGetDiscoverPromise).toHaveBeenCalledWith('popular');
+      expect(mockResetDiscoverLoad).toHaveBeenCalledWith('popular');
+      expect(mockLoadDiscover).toHaveBeenCalledWith('popular');
     });
 
     it('retryDiscover: calls loadTab with current tab', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockRejectedValueOnce({ name: 'NetworkError' });
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockRejectedValueOnce({ name: 'NetworkError' });
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -664,11 +697,11 @@ describe('Agent-15 probe: discover view', () => {
       const retryBtn = main.querySelector('[data-action="retryDiscover"]') as HTMLElement;
       expect(retryBtn).toBeTruthy();
 
-      mockGetDiscoverPromise.mockClear();
+      mockLoadDiscover.mockClear();
       retryBtn.click();
       await flushMicro();
 
-      expect(mockGetDiscoverPromise).toHaveBeenCalledWith('popular');
+      expect(mockLoadDiscover).toHaveBeenCalledWith('popular');
     });
   });
 
@@ -680,21 +713,21 @@ describe('Agent-15 probe: discover view', () => {
       const main = document.getElementById('mainContent')!;
 
       const popularGroups = makeGroups([makeTvmazeShow(1, { name: 'Popular Show' })]);
-      mockGetDiscoverPromise.mockResolvedValue(popularGroups);
+      mockLoadDiscover.mockResolvedValue(popularGroups);
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
 
       // Start 'recent' fetch (pending)
       const recentFetch = pendingPromise<any>();
-      mockGetDiscoverPromise.mockReturnValue(recentFetch.promise);
+      mockLoadDiscover.mockReturnValue(recentFetch.promise);
 
       const recentTab = main.querySelector('[data-tab="recent"]') as HTMLElement;
       recentTab.click();
       // state._discoverTab = 'recent', fetch pending
 
       // Click 'popular' tab → setDiscoverTab('popular'), cache hit renders
-      mockGetDiscoverPromise.mockResolvedValue(popularGroups);
+      mockLoadDiscover.mockResolvedValue(popularGroups);
       const popularTab = main.querySelector('[data-tab="popular"]') as HTMLElement;
       popularTab.click();
       // state._discoverTab = 'popular'
@@ -717,13 +750,24 @@ describe('Agent-15 probe: discover view', () => {
     it('after add, "Aggiunta" badge appears on card via RAF render (FIXED)', async () => {
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
       // FIX: mockAddShowToList calls replaceShow (real emitChange → RAF queued).
       mockAddShowToList.mockImplementation(async (_t: any, list: any) => {
         const newShow = {
-          id: 1, name: 'Show 1', list, seasons: {}, totalSeasons: 0, totalEpisodes: 0,
-          addedAt: 0, image: null, status: 'Running', premiered: '2024-01-01',
-          genres: ['Drama'], summary: '', network: 'NBC', runtime: 45,
+          id: 1,
+          name: 'Show 1',
+          list,
+          seasons: {},
+          totalSeasons: 0,
+          totalEpisodes: 0,
+          addedAt: 0,
+          image: null,
+          status: 'Running',
+          premiered: '2024-01-01',
+          genres: ['Drama'],
+          summary: '',
+          network: 'NBC',
+          runtime: 45,
         };
         storeMod.replaceShow(newShow); // → emitChange → RAF queued
         return newShow;
@@ -764,7 +808,7 @@ describe('Agent-15 probe: discover view', () => {
   describe('carousel nav state (FIXED — resize listener updates nav state)', () => {
     it('resize listener is registered on bindDiscoverEvents (FIXED)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       const addSpy = vi.spyOn(window, 'addEventListener');
       discoverMod.bindDiscoverEvents(main);
@@ -776,7 +820,7 @@ describe('Agent-15 probe: discover view', () => {
 
     it('resize event triggers updateCarouselNavState on all tracks (FIXED)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro();
@@ -809,7 +853,7 @@ describe('Agent-15 probe: discover view', () => {
   describe('single loadTab on tab switch (FIXED)', () => {
     it('clicking popular tab: no MANUAL loadTab, only renderDiscover loadTab runs (FIXED)', async () => {
       const main = document.getElementById('mainContent')!;
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
       await flushMicro(); // _popularCache set
@@ -820,12 +864,12 @@ describe('Agent-15 probe: discover view', () => {
 
       // Click 'popular' tab (already active). FIX: handler only setDiscoverTab,
       // no manual loadTab. setDiscoverTab emits emitChange → RAF queued.
-      mockGetDiscoverPromise.mockClear();
+      mockLoadDiscover.mockClear();
       const popularTab = main.querySelector('[data-tab="popular"]') as HTMLElement;
       popularTab.click();
 
-      // FIX: no getDiscoverPromise call yet (no manual loadTab; cache hit on render only).
-      expect(mockGetDiscoverPromise).not.toHaveBeenCalled();
+      // FIX: no loadDiscover call yet (no manual loadTab; cache hit on render only).
+      expect(mockLoadDiscover).not.toHaveBeenCalled();
 
       // OLD discoverContent still has its carousel-track content (no manual innerHTML write).
       expect(oldContent.innerHTML).toContain('carousel-track');

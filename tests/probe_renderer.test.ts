@@ -48,10 +48,7 @@ function makeShow(over: Partial<Show> = {}): Show {
   };
 }
 
-async function simulateRenderDetail(
-  showDetail: typeof ShowDetailNS,
-  main: HTMLElement,
-): Promise<void> {
+async function simulateRenderDetail(showDetail: typeof ShowDetailNS, main: HTMLElement): Promise<void> {
   showDetail.resetBoundGuard();
   showDetail.renderShowDetail(main);
   showDetail.bindShowDetailEvents(main);
@@ -287,8 +284,8 @@ describe('BUG-12-01: discover listener accumulation (FIXED)', () => {
   it('after N simulated render cycles, only ONE click listener is ACTIVE', async () => {
     vi.doMock('../src/lib/discover', () => ({
       invalidateDiscoverCache: vi.fn(),
-      resetDiscoverPreload: vi.fn(),
-      getDiscoverPromise: vi.fn(async () => ({})),
+      resetDiscoverLoad: vi.fn(),
+      loadDiscover: vi.fn(async () => ({})),
       findShowInDiscoverGroups: vi.fn(() => null),
     }));
     vi.doMock('../src/lib/shows', () => ({ addShowToList: vi.fn() }));
@@ -514,10 +511,10 @@ describe('applyHash edge cases', () => {
   const KNOWN_VIEWS = ['dashboard', 'watching', 'towatch', 'completed', 'discover', 'calendar', 'stats'];
   const SHOW_RE = /^show\/(\d+)$/;
 
-  function applyHashLogic(hash: string, state: { currentView: string; currentShowId: number | null }):
-    | { action: 'switchView'; view: string }
-    | { action: 'openShow'; id: number }
-    | { action: 'noop' } {
+  function applyHashLogic(
+    hash: string,
+    state: { currentView: string; currentShowId: number | null },
+  ): { action: 'switchView'; view: string } | { action: 'openShow'; id: number } | { action: 'noop' } {
     if (!hash) return { action: 'noop' };
     if (KNOWN_VIEWS.includes(hash)) {
       if (state.currentView !== hash || state.currentShowId !== null) {

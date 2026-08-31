@@ -4,8 +4,8 @@ import type { TvmazeShow } from '../types';
 import { getState, setDiscoverTab } from '../lib/store';
 import {
   invalidateDiscoverCache,
-  resetDiscoverPreload,
-  getDiscoverPromise,
+  resetDiscoverLoad,
+  loadDiscover,
   findShowInDiscoverGroups,
   type DiscoverGroups,
 } from '../lib/discover';
@@ -149,7 +149,7 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     _popularLoading = true;
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
-      _popularCache = await getDiscoverPromise('popular');
+      _popularCache = await loadDiscover('popular');
       // H15: scarta se l'utente ha cambiato tab durante il fetch
       if (getState()._discoverTab !== 'popular') return;
       el.innerHTML = renderDiscoverContent(_popularCache);
@@ -170,7 +170,7 @@ async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
     _recentLoading = true;
     el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
     try {
-      _recentCache = await getDiscoverPromise('recent');
+      _recentCache = await loadDiscover('recent');
       // H15: scarta se l'utente ha cambiato tab durante il fetch
       if (getState()._discoverTab !== 'recent') return;
       el.innerHTML = renderDiscoverContent(_recentCache);
@@ -257,11 +257,11 @@ export function bindDiscoverEvents(main: HTMLElement): void {
       const state = getState();
       if (state._discoverTab === 'popular') {
         invalidateDiscoverCache('popular');
-        resetDiscoverPreload('popular');
+        resetDiscoverLoad('popular');
         _popularCache = null;
       } else {
         invalidateDiscoverCache('recent');
-        resetDiscoverPreload('recent');
+        resetDiscoverLoad('recent');
         _recentCache = null;
       }
       loadTab(state._discoverTab);

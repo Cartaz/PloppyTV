@@ -31,12 +31,7 @@ vi.mock('../src/lib/api', () => ({
 }));
 
 import { getShowsPage } from '../src/lib/api';
-import {
-  getPopularShows,
-  getRecentShows,
-  resetDiscoverPreload,
-  invalidateDiscoverCache,
-} from '../src/lib/discover';
+import { getPopularShows, getRecentShows, resetDiscoverLoad, invalidateDiscoverCache } from '../src/lib/discover';
 import {
   DISCOVER_TARGET_PER_GENRE,
   DISCOVER_TARGET_OTHER,
@@ -75,7 +70,7 @@ function flattenGroups(groups: Record<string, unknown>): TvmazeShow[] {
 
 beforeEach(() => {
   localStorage.clear();
-  resetDiscoverPreload();
+  resetDiscoverLoad();
   mockedGetShowsPage.mockReset();
   // Stub RAF in case jsdom doesn't provide it (vitest+jsdom usually does).
   if (typeof globalThis.requestAnimationFrame !== 'function') {
@@ -183,10 +178,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
   it('BUG-A7-03: valid cache (all arrays) is still accepted (no regression)', async () => {
     const cachedGroups: Record<string, unknown> = { _other: [], Drama: [makeShow(77)] };
     for (const g of GENRE_CAROUSELS) if (g !== 'Drama') cachedGroups[g] = [];
-    localStorage.setItem(
-      DISCOVER_CACHE_KEY,
-      JSON.stringify({ cachedAt: Date.now(), groups: cachedGroups }),
-    );
+    localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), groups: cachedGroups }));
 
     mockedGetShowsPage.mockImplementation(async () => [makeShow(99)]);
 
@@ -260,15 +252,12 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     });
 
     const groups = await getPopularShows();
-    const dramaIds = ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
-    const otherIds = ((groups as unknown as Record<string, unknown>)._other as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
-    const comedyIds = ((groups as unknown as Record<string, unknown>).Comedy as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
+    const dramaIds =
+      ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
+    const otherIds =
+      ((groups as unknown as Record<string, unknown>)._other as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
+    const comedyIds =
+      ((groups as unknown as Record<string, unknown>).Comedy as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
 
     // Fixed: multi-genre show goes to Drama (secondary with space), not _other.
     expect(dramaIds).toContain(99);
@@ -291,9 +280,8 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     });
 
     const groups = await getPopularShows();
-    const dramaIds = ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
+    const dramaIds =
+      ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
     expect(dramaIds).toContain(99);
   });
 
@@ -317,15 +305,12 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     });
 
     const groups = await getPopularShows();
-    const otherIds = ((groups as unknown as Record<string, unknown>)._other as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
-    const dramaIds = ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
-    const comedyIds = ((groups as unknown as Record<string, unknown>).Comedy as TvmazeShow[] | undefined)?.map(
-      (s) => s.id,
-    ) ?? [];
+    const otherIds =
+      ((groups as unknown as Record<string, unknown>)._other as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
+    const dramaIds =
+      ((groups as unknown as Record<string, unknown>).Drama as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
+    const comedyIds =
+      ((groups as unknown as Record<string, unknown>).Comedy as TvmazeShow[] | undefined)?.map((s) => s.id) ?? [];
 
     // Both genres at cap → spillover to _other (FASE 2).
     expect(otherIds).toContain(999);
@@ -494,7 +479,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(localStorage.getItem(DISCOVER_CACHE_KEY)).toBeNull();
   });
 
-  it('BUG-A7-14 [Low]: invalidateDiscoverCache + resetDiscoverPreload allows fresh fetch', async () => {
+  it('BUG-A7-14 [Low]: invalidateDiscoverCache + resetDiscoverLoad allows fresh fetch', async () => {
     // First fetch populates cache.
     mockedGetShowsPage.mockImplementation(async () => [makeShow(1)]);
     await getPopularShows();
@@ -502,7 +487,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
 
     // Invalidate cache + reset preload.
     invalidateDiscoverCache('popular');
-    resetDiscoverPreload('popular');
+    resetDiscoverLoad('popular');
     expect(localStorage.getItem(DISCOVER_CACHE_KEY)).toBeNull();
 
     // Second fetch with different data.

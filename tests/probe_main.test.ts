@@ -1,6 +1,6 @@
 // Agent 18 — probe tests for src/main.ts
 // Stress test: init order, hash routing, SW registration + onNeedRefresh,
-// beforeunload, preloadDiscover, standalone detection, double-init.
+// beforeunload, standalone detection, double-init.
 //
 // Mocks all dependencies (store, storage, components) so we can capture call
 // order, inject failures, and exercise edge cases without touching real
@@ -65,7 +65,6 @@ const mockInitSearch = vi.fn();
 const mockInitExportImport = vi.fn();
 const mockInitRenderer = vi.fn();
 const mockRender = vi.fn();
-const mockPreloadDiscover = vi.fn();
 const mockShowToast = vi.fn((_msg: any, _type?: any) => undefined);
 const mockIsStorageOK = vi.fn(() => true as boolean);
 const mockLoadData = vi.fn();
@@ -114,10 +113,6 @@ vi.mock('../src/lib/storage', () => ({
   saveData: (opts?: any) => mockSaveData(opts),
 }));
 
-vi.mock('../src/lib/discover', () => ({
-  preloadDiscover: () => mockPreloadDiscover(),
-}));
-
 vi.mock('../src/components/modal', () => ({
   initModal: () => mockInitModal(),
   showModal: (t: any, b: any, a: any) => mockShowModal(t, b, a),
@@ -158,7 +153,6 @@ function resetMocks(): void {
   mockInitExportImport.mockReset();
   mockInitRenderer.mockReset();
   mockRender.mockReset();
-  mockPreloadDiscover.mockReset();
   mockShowToast.mockReset();
   mockIsStorageOK.mockReset();
   mockIsStorageOK.mockReturnValue(true);
@@ -287,7 +281,6 @@ describe('main.ts — init order', () => {
     expect(mockLoadData).not.toHaveBeenCalled();
     expect(mockRender).not.toHaveBeenCalled();
     expect(mockSubscribe).not.toHaveBeenCalled();
-    expect(mockPreloadDiscover).not.toHaveBeenCalled();
     // Fallback UI is injected.
     expect(mainEl.querySelector('.empty-state-title')?.textContent).toBe('Errore di avvio');
     mainEl.remove();
@@ -714,60 +707,6 @@ describe('main.ts — beforeunload', () => {
     // FIX: try/catch is now present.
     expect(block).toMatch(/\btry\s*\{/);
     expect(block).toMatch(/\bcatch\s*\(/);
-  });
-});
-
-describe('main.ts — preloadDiscover', () => {
-  beforeEach(() => {
-    resetMocks();
-    vi.useFakeTimers();
-    vi.resetModules();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-    document.documentElement.classList.remove('pwa-standalone');
-  });
-
-  it('preloadDiscover scheduled after 1.5s when isStorageOK', async () => {
-    mockIsStorageOK.mockReturnValue(true);
-    await import('../src/main');
-    expect(mockPreloadDiscover).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(mockPreloadDiscover).toHaveBeenCalledTimes(1);
-  });
-
-  it('preloadDiscover NOT scheduled when !isStorageOK', async () => {
-    mockIsStorageOK.mockReturnValue(false);
-    await import('../src/main');
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(mockPreloadDiscover).not.toHaveBeenCalled();
-  });
-
-  it('preloadDiscover throw is caught (no uncaught exception)', async () => {
-    mockPreloadDiscover.mockImplementation(() => {
-      throw new Error('discover boom');
-    });
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await import('../src/main');
-    expect(() => vi.advanceTimersByTime(1500)).not.toThrow();
-    expect(console.warn).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it('preloadDiscover runs only ONCE (setTimeout, not interval)', async () => {
-    mockIsStorageOK.mockReturnValue(true);
-    await import('../src/main');
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(mockPreloadDiscover).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(mockPreloadDiscover).toHaveBeenCalledTimes(1);
-  });
-
-  it('preloadDiscover does NOT run before 1.5s (no race with init render)', async () => {
-    mockIsStorageOK.mockReturnValue(true);
-    await import('../src/main');
-    await vi.advanceTimersByTimeAsync(1499);
-    expect(mockPreloadDiscover).not.toHaveBeenCalled();
   });
 });
 

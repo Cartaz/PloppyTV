@@ -25,7 +25,8 @@ import { getShowsPage } from '../src/lib/api';
 import {
   getPopularShows,
   getRecentShows,
-  resetDiscoverPreload,
+  loadDiscover,
+  resetDiscoverLoad,
   findShowInDiscoverGroups,
   invalidateDiscoverCache,
 } from '../src/lib/discover';
@@ -68,7 +69,7 @@ function flattenGroups(groups: Record<string, unknown>): TvmazeShow[] {
 
 beforeEach(() => {
   localStorage.clear();
-  resetDiscoverPreload();
+  resetDiscoverLoad();
   mockedGetShowsPage.mockReset();
   // Stub RAF in case jsdom doesn't provide it (vitest+jsdom usually does).
   if (typeof globalThis.requestAnimationFrame !== 'function') {
@@ -87,6 +88,33 @@ afterEach(() => {
 // ---------- tests ----------
 
 describe('Agent-07 probe: discover.ts', () => {
+  it('loadDiscover deduplicates concurrent requests for the same tab', async () => {
+    mockedGetShowsPage.mockImplementation(async (page: number) => [makeShow(page * 1000 + 1)]);
+
+    const first = loadDiscover('popular');
+    const second = loadDiscover('popular');
+
+    expect(second).toBe(first);
+    await first;
+    expect(mockedGetShowsPage).toHaveBeenCalledTimes(DISCOVER_POPULAR_PAGES.length);
+  });
+
+  it('resetDiscoverLoad makes the next load a fresh request', async () => {
+    mockedGetShowsPage.mockImplementation(async (page: number) => [makeShow(page * 1000 + 1)]);
+
+    const first = loadDiscover('popular');
+    await first;
+    const callsAfterFirstLoad = mockedGetShowsPage.mock.calls.length;
+
+    invalidateDiscoverCache('popular');
+    resetDiscoverLoad('popular');
+    const second = loadDiscover('popular');
+
+    expect(second).not.toBe(first);
+    await second;
+    expect(mockedGetShowsPage.mock.calls.length).toBe(callsAfterFirstLoad + DISCOVER_POPULAR_PAGES.length);
+  });
+
   it('FASE2 respects DISCOVER_TARGET_PER_GENRE cap (BUG-07-01 fixed)', async () => {
     // 40 Sci-Fi shows, no other genres. FASE1 caps Sci-Fi at 20.
     // FASE2 deficit = 150 - 20 = 130; the remaining 20 Sci-Fi candidates
@@ -200,10 +228,7 @@ describe('Agent-07 probe: discover.ts', () => {
       _other: [],
       'Science-Fiction': [makeShow(999, { genres: ['Science-Fiction'] })],
     };
-    localStorage.setItem(
-      DISCOVER_CACHE_KEY,
-      JSON.stringify({ cachedAt: futureTime, groups: cachedGroups }),
-    );
+    localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: futureTime, groups: cachedGroups }));
 
     // Fixed: future cachedAt is invalid → cache rejected → fresh fetch happens.
     mockedGetShowsPage.mockImplementation(async () => [makeShow(1, { genres: ['Science-Fiction'] })]);
@@ -226,10 +251,7 @@ describe('Agent-07 probe: discover.ts', () => {
 
   it('readCache: malformed groups rejected → fresh fetch (BUG-07-05 fixed)', async () => {
     // cached.groups is a string, not an object. readCache now validates shape.
-    localStorage.setItem(
-      DISCOVER_CACHE_KEY,
-      JSON.stringify({ cachedAt: Date.now(), groups: 'not-an-object' }),
-    );
+    localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), groups: 'not-an-object' }));
 
     // Fixed: malformed cache rejected → fresh fetch happens.
     mockedGetShowsPage.mockImplementation(async () => [makeShow(1)]);
@@ -246,10 +268,7 @@ describe('Agent-07 probe: discover.ts', () => {
   });
 
   it('readCache: malformed cachedAt (string) → treated as NaN, cache invalid → fetch', async () => {
-    localStorage.setItem(
-      DISCOVER_CACHE_KEY,
-      JSON.stringify({ cachedAt: 'abc', groups: { _other: [] } }),
-    );
+    localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: 'abc', groups: { _other: [] } }));
 
     mockedGetShowsPage.mockImplementation(async () => [makeShow(1)]);
 

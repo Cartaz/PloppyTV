@@ -30,7 +30,6 @@ import { initHeader, updateBadges } from './components/header';
 import { initSearch } from './components/search';
 import { initExportImport } from './components/exportImport';
 import { initRenderer, render } from './components/renderer';
-import { preloadDiscover } from './lib/discover';
 import { showToast } from './components/toast';
 import { initI18n, subscribeI18n } from './lib/i18n';
 import { initKeyboard } from './lib/keyboard';
@@ -279,22 +278,6 @@ function init(): void {
     registerPWA();
 
     detectStandalone();
-
-    // Preload in background dei dati Discover (serie popolari + recenti).
-    // Delay di 1.5s per non competere con il render iniziale e il caricamento
-    // della dashboard. In questo modo, quando l'utente clicca su "Scopri",
-    // i dati sono già pronti (o in corso di caricamento) e non c'è attesa.
-    // Salto il preload in modalità privata (storage disabilitato): Discover è
-    // già disabilitato lì.
-    if (isStorageOK()) {
-      setTimeout(() => {
-        try {
-          preloadDiscover();
-        } catch (e) {
-          console.warn('[discover] preload error:', e);
-        }
-      }, 1500);
-    }
 
     // BUG-A18-02: beforeunload registrato DENTRO init() DOPO loadData.
     // Se init lancia prima di loadData (es. initRenderer throw), il listener

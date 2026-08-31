@@ -38,7 +38,7 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 - **Rating 5★ per episodio** con media stagione (P2)
 - **Note private per episodio** (max 500 caratteri) con editor modale (P2)
 - **Tag personalizzabili per serie** con filtro nelle liste (P2)
-- **Scopri**: serie popolari e recenti raggruppate per genere, con preload in background
+- **Scopri**: serie popolari e recenti raggruppate per genere, caricate on demand con cache locale
 - **Libreria**: search avanzata con filtri (genere, status, rating, network, anno, tag) (P2)
 - **Rivedi un episodio casuale**: suggerimento di un episodio 5★ a caso dalla tua libreria (P2)
 - **Calendario settimanale** con airdate reali (calcolato in un Web Worker dedicato)
@@ -273,7 +273,7 @@ PloppyTV è **local-first by design**:
 
 - Lo stato del tracker resta nel browser; non esiste un backend PloppyTV né un account
 - La versione pubblica è servita da GitHub Pages e i metadati/poster arrivano da TVMaze
-- Scopri effettua intenzionalmente un preload in background poco dopo l'avvio per ridurre la latenza della prima apertura
+- Scopri contatta TVMaze solo quando apri la vista o richiedi esplicitamente un aggiornamento
 - Nessun tracking o analytics aggiunto da PloppyTV e nessun cookie applicativo
 
 La privacy policy completa è in [`PRIVACY.md`](./PRIVACY.md). È linkata anche dal modal "Informazioni" dentro l'app.

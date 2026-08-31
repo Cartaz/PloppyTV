@@ -56,15 +56,15 @@ vi.mock('../src/lib/storage', () => ({
 }));
 
 // Mock discover lib — control groups + findShowInDiscoverGroups.
-const mockGetDiscoverPromise = vi.fn();
+const mockLoadDiscover = vi.fn();
 const mockFindShowInDiscoverGroups = vi.fn();
 const mockInvalidateDiscoverCache = vi.fn();
-const mockResetDiscoverPreload = vi.fn();
+const mockResetDiscoverLoad = vi.fn();
 vi.mock('../src/lib/discover', () => ({
-  getDiscoverPromise: (...args: unknown[]) => mockGetDiscoverPromise(...args),
+  loadDiscover: (...args: unknown[]) => mockLoadDiscover(...args),
   findShowInDiscoverGroups: (...args: unknown[]) => mockFindShowInDiscoverGroups(...args),
   invalidateDiscoverCache: (...args: unknown[]) => mockInvalidateDiscoverCache(...args),
-  resetDiscoverPreload: (...args: unknown[]) => mockResetDiscoverPreload(...args),
+  resetDiscoverLoad: (...args: unknown[]) => mockResetDiscoverLoad(...args),
 }));
 
 // Mock api — control search results.
@@ -336,7 +336,7 @@ describe('A20 — XSS via summary TVMaze (end-to-end render)', () => {
   it('discover: summary with XSS → escaped in preview modal', async () => {
     const xssSummary = '<script>alert(1)</script><img src=x onerror=alert(1)><p>safe</p>';
     const show = makeTvmazeShow({ summary: xssSummary });
-    mockGetDiscoverPromise.mockResolvedValue({ Drama: [show], _other: [] });
+    mockLoadDiscover.mockResolvedValue({ Drama: [show], _other: [] });
     mockFindShowInDiscoverGroups.mockReturnValue(show);
 
     const discoverMod = await import('../src/views/discover');
@@ -709,9 +709,7 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     const show = corruptShow({
       id: 1,
       seasons: {
-        1: [
-          makeEpisode({ num: 1, id: 1, runtime: NaN } as unknown as Partial<Episode>) as Episode,
-        ],
+        1: [makeEpisode({ num: 1, id: 1, runtime: NaN } as unknown as Partial<Episode>) as Episode],
       },
       totalEpisodes: 1,
       totalSeasons: 1,
@@ -793,10 +791,7 @@ describe('A20 — Episode 0 / season 0 / duplicates', () => {
     const show = corruptShow({
       id: 1,
       seasons: {
-        1: [
-          makeEpisode({ num: 0, id: 0 }),
-          makeEpisode({ num: 1, id: 1 }),
-        ],
+        1: [makeEpisode({ num: 0, id: 0 }), makeEpisode({ num: 1, id: 1 })],
       },
       totalEpisodes: 1,
       totalSeasons: 1,
@@ -818,10 +813,7 @@ describe('A20 — Episode 0 / season 0 / duplicates', () => {
     const show = corruptShow({
       id: 1,
       seasons: {
-        1: [
-          makeEpisode({ num: 1, id: 1 }),
-          makeEpisode({ num: 1, id: 2 }),
-        ],
+        1: [makeEpisode({ num: 1, id: 1 }), makeEpisode({ num: 1, id: 2 })],
       },
       totalEpisodes: 2,
       totalSeasons: 1,
@@ -881,9 +873,7 @@ describe('A20 — Type confusion (string instead of number/boolean)', () => {
     const show = corruptShow({
       id: 1,
       seasons: {
-        1: [
-          makeEpisode({ num: '2' as unknown as number, id: 1 }),
-        ],
+        1: [makeEpisode({ num: '2' as unknown as number, id: 1 })],
       } as unknown as Show['seasons'],
       totalEpisodes: 1,
       totalSeasons: 1,
@@ -905,9 +895,7 @@ describe('A20 — Type confusion (string instead of number/boolean)', () => {
     const show = corruptShow({
       id: 1,
       seasons: {
-        1: [
-          makeEpisode({ num: 1, id: 1, airdate: 123 as unknown as string }),
-        ],
+        1: [makeEpisode({ num: 1, id: 1, airdate: 123 as unknown as string })],
       } as unknown as Show['seasons'],
       totalEpisodes: 1,
       totalSeasons: 1,
@@ -1664,7 +1652,10 @@ describe('A20 — normalize.ts defense-in-depth (XSS on import)', () => {
       name: 'Show',
       totalEpisodes: 999, // wrong
       seasons: {
-        1: [{ num: 1, id: 1 }, { num: 2, id: 2 }],
+        1: [
+          { num: 1, id: 1 },
+          { num: 2, id: 2 },
+        ],
       },
     };
     const show = normalizeMod.normalizeShow(raw);

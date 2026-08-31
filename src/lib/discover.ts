@@ -294,60 +294,43 @@ export async function getRecentShows(onProgress?: (text: string) => void): Promi
   return groups;
 }
 
-// Promise condivise per il preload in background: una volta avviate, le viste
-// possono "attaccarsi" alla stessa promise senza rifare il fetch.
-let _popularPromise: Promise<DiscoverGroups> | null = null;
-let _recentPromise: Promise<DiscoverGroups> | null = null;
+// Richieste condivise per tab: due render concorrenti si agganciano allo stesso
+// caricamento on-demand senza duplicare le chiamate TVMaze.
+let _popularRequest: Promise<DiscoverGroups> | null = null;
+let _recentRequest: Promise<DiscoverGroups> | null = null;
 
 /**
- * Avvia il caricamento in background dei dati Discover (popolari + recenti).
- * Da chiamare all'avvio dell'app, idealmente dopo un piccolo delay per non
- * competere con il render iniziale. Silenzioso: nessuna UI di caricamento.
- * Usa le promise condivise: se già in corso, non riparte.
+ * Carica i dati del tab richiesto solo quando la vista Discover ne ha bisogno.
+ * Una richiesta in corso viene condivisa; se fallisce, il riferimento viene
+ * azzerato così un successivo retry può davvero effettuare una nuova richiesta.
  */
-export function preloadDiscover(): void {
-  // Popolari
-  if (!_popularPromise) {
-    _popularPromise = getPopularShows().catch((e) => {
-      console.warn('[discover] preload popular failed:', e);
-      _popularPromise = null; // consenti retry al prossimo avvio/tab
-      throw e;
+export function loadDiscover(tab: 'popular' | 'recent'): Promise<DiscoverGroups> {
+  if (tab === 'popular') {
+    if (!_popularRequest) {
+      _popularRequest = getPopularShows().catch((error) => {
+        _popularRequest = null;
+        throw error;
+      });
+    }
+    return _popularRequest;
+  }
+
+  if (!_recentRequest) {
+    _recentRequest = getRecentShows().catch((error) => {
+      _recentRequest = null;
+      throw error;
     });
   }
-  // Recenti (sequenziale per non sovraccaricare TVMaze con troppi fetch paralleli)
-  if (!_recentPromise) {
-    _recentPromise = _popularPromise
-      .catch(() => null) // non bloccare recenti se popolari fallisce
-      .then(() => getRecentShows())
-      .catch((e) => {
-        console.warn('[discover] preload recent failed:', e);
-        _recentPromise = null;
-        throw e;
-      });
-  }
+  return _recentRequest;
 }
 
 /**
- * Restituisce la promise (già avviata dal preload o nuova) per il tab richiesto.
- * La vista Discover usa questa invece di chiamare getPopularShows/getRecentShows
- * direttamente, così se il preload è già in corso ci si attacca a quello.
+ * Dimentica la richiesta condivisa del tab indicato. Usato da "Aggiorna lista"
+ * dopo l'invalidazione della cache locale, così il prossimo load è fresco.
  */
-export function getDiscoverPromise(tab: 'popular' | 'recent'): Promise<DiscoverGroups> {
-  if (tab === 'popular') {
-    if (!_popularPromise) _popularPromise = getPopularShows();
-    return _popularPromise;
-  }
-  if (!_recentPromise) _recentPromise = getRecentShows();
-  return _recentPromise;
-}
-
-/**
- * Resetta le promise condivise (usato quando l'utente invalida la cache
- * tramite "Aggiorna lista").
- */
-export function resetDiscoverPreload(tab?: 'popular' | 'recent'): void {
-  if (!tab || tab === 'popular') _popularPromise = null;
-  if (!tab || tab === 'recent') _recentPromise = null;
+export function resetDiscoverLoad(tab?: 'popular' | 'recent'): void {
+  if (!tab || tab === 'popular') _popularRequest = null;
+  if (!tab || tab === 'recent') _recentRequest = null;
 }
 
 export function invalidateDiscoverCache(tab: 'popular' | 'recent'): void {

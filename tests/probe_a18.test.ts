@@ -234,11 +234,9 @@ describe('main.ts — BUG-A18 fixes (code-reading)', () => {
     expect(fnBody).toContain('setTimeout(applyHash, 0)');
   });
 
-  it('preloadDiscover wrapped in try/catch inside setTimeout', () => {
-    const idx = mainSrc.indexOf('preloadDiscover()');
-    const block = mainSrc.slice(idx - 100, idx + 100);
-    expect(block).toMatch(/\btry\s*\{/);
-    expect(block).toMatch(/catch\s*\(/);
+  it('startup does not preload Discover or import its network module', () => {
+    expect(mainSrc).not.toContain('preloadDiscover');
+    expect(mainSrc).not.toContain("from './lib/discover'");
   });
 
   it('detectStandalone wrapped in try/catch', () => {

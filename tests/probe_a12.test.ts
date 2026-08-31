@@ -23,18 +23,18 @@ import type * as Library from '../src/views/library';
 // MOCKS (hoisted)
 // ============================================================
 
-const mockGetDiscoverPromise = vi.fn();
+const mockLoadDiscover = vi.fn();
 const mockInvalidateDiscoverCache = vi.fn();
-const mockResetDiscoverPreload = vi.fn();
+const mockResetDiscoverLoad = vi.fn();
 const mockFindShowInDiscoverGroups = vi.fn();
 const mockShowModal = vi.fn();
 const mockShowToast = vi.fn();
 const mockUpdateBadges = vi.fn();
 
 vi.mock('../src/lib/discover', () => ({
-  getDiscoverPromise: (...args: unknown[]) => mockGetDiscoverPromise(...args),
+  loadDiscover: (...args: unknown[]) => mockLoadDiscover(...args),
   invalidateDiscoverCache: (...args: unknown[]) => mockInvalidateDiscoverCache(...args),
-  resetDiscoverPreload: (...args: unknown[]) => mockResetDiscoverPreload(...args),
+  resetDiscoverLoad: (...args: unknown[]) => mockResetDiscoverLoad(...args),
   findShowInDiscoverGroups: (...args: unknown[]) => mockFindShowInDiscoverGroups(...args),
 }));
 
@@ -136,16 +136,16 @@ describe('Agent-A12 probe: discover view', () => {
   beforeEach(async () => {
     setupDom();
 
-    mockGetDiscoverPromise.mockReset();
+    mockLoadDiscover.mockReset();
     mockInvalidateDiscoverCache.mockReset();
-    mockResetDiscoverPreload.mockReset();
+    mockResetDiscoverLoad.mockReset();
     mockFindShowInDiscoverGroups.mockReset();
     mockShowModal.mockReset();
     mockShowToast.mockReset();
     mockUpdateBadges.mockReset();
 
     mockFindShowInDiscoverGroups.mockReturnValue(null);
-    mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
+    mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
 
     vi.resetModules();
     storeMod = await import('../src/lib/store');
@@ -172,7 +172,7 @@ describe('Agent-A12 probe: discover view', () => {
       const xssPayload = '<img src=x onerror=alert(1)>';
       const show = makeTvmazeShow(1, { rating: { average: xssPayload } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -193,7 +193,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('rating.average as valid number 7 → modal body shows "7/10"', async () => {
       const show = makeTvmazeShow(1, { rating: { average: 7 } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -210,7 +210,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('rating.average as NaN → falls back to "N/D" (no "NaN/10")', async () => {
       const show = makeTvmazeShow(1, { rating: { average: NaN } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -231,7 +231,7 @@ describe('Agent-A12 probe: discover view', () => {
       // payloads like "8.5</div><script>..." from being rendered.
       const show = makeTvmazeShow(1, { rating: { average: '8.5' } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -254,7 +254,7 @@ describe('Agent-A12 probe: discover view', () => {
       const xssPayload = '<img src=x onerror=alert(1)>';
       const show = makeTvmazeShow(1, { runtime: xssPayload });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -273,7 +273,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('runtime as valid number 45 → modal body shows "45 min/ep"', async () => {
       const show = makeTvmazeShow(1, { runtime: 45 });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -290,7 +290,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('runtime as string "60" → omitted (no string interpolation)', async () => {
       const show = makeTvmazeShow(1, { runtime: '60' });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -308,7 +308,7 @@ describe('Agent-A12 probe: discover view', () => {
       // runtime=0 is unlikely from TVMaze but defensively omit it (0 means "no runtime")
       const show = makeTvmazeShow(1, { runtime: 0 });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -333,7 +333,7 @@ describe('Agent-A12 probe: discover view', () => {
       // Simulate corrupted cache where id is a string with quote/HTML
       const show = makeTvmazeShow(1);
       (show as { id: unknown }).id = '1"><img src=x onerror=alert(1)>';
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -356,7 +356,7 @@ describe('Agent-A12 probe: discover view', () => {
 
     it('show.id as valid number 42 → data-show-id="42"', async () => {
       const show = makeTvmazeShow(42);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -374,7 +374,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('rating.average = 0 → modal body shows "0/10" (not "N/D")', async () => {
       const show = makeTvmazeShow(1, { rating: { average: 0 } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -392,7 +392,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('rating.average = null → modal body shows "N/D"', async () => {
       const show = makeTvmazeShow(1, { rating: { average: null } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -409,7 +409,7 @@ describe('Agent-A12 probe: discover view', () => {
     it('rating = null → modal body shows "N/D"', async () => {
       const show = makeTvmazeShow(1, { rating: null });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([show]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([show]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
@@ -430,7 +430,7 @@ describe('Agent-A12 probe: discover view', () => {
   describe('discover view: edge cases', () => {
     it('genre with 0 shows is not rendered (skipped)', async () => {
       // Only _other has shows; all GENRE_CAROUSELS are empty
-      mockGetDiscoverPromise.mockResolvedValue({
+      mockLoadDiscover.mockResolvedValue({
         'Science-Fiction': [],
         Crime: [],
         Action: [],
@@ -451,7 +451,7 @@ describe('Agent-A12 probe: discover view', () => {
     });
 
     it('_other shows are rendered with title "Altro"', async () => {
-      mockGetDiscoverPromise.mockResolvedValue(makeGroups([makeTvmazeShow(1)], [makeTvmazeShow(2)]));
+      mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)], [makeTvmazeShow(2)]));
 
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);

@@ -1,6 +1,6 @@
 # Privacy Policy — PloppyTV
 
-**Ultimo aggiornamento:** 30 agosto 2026
+**Ultimo aggiornamento:** 31 agosto 2026
 
 PloppyTV è una PWA (Progressive Web App) local-first per il tracking personale di serie TV. Questa pagina descrive in modo trasparente quali dati vengono raccolti, dove vengono salvati, cosa viene inviato a servizi esterni e come esercitare i propri diritti.
 
@@ -9,7 +9,7 @@ PloppyTV è una PWA (Progressive Web App) local-first per il tracking personale 
 - **Nessun account, nessun login, nessun server di backend.**
 - **Lo stato del tracker resta nel browser**: PloppyTV non ha account né un backend applicativo.
 - L'app statica è ospitata su **GitHub Pages**; le connessioni al sito sono quindi soggette anche alle policy e ai log tecnici del provider di hosting.
-- I metadati delle serie arrivano da **TVMaze**. La sezione Scopri può effettuare un preload poco dopo l'avvio per ridurre il tempo di attesa quando la apri.
+- I metadati delle serie arrivano da **TVMaze**. La sezione Scopri contatta TVMaze solo quando la apri o chiedi esplicitamente di aggiornarla.
 - **Nessun analytics o tracking aggiunto da PloppyTV e nessun cookie applicativo.**
 - Per cancellare i dati locali usa gli strumenti del browser per cancellare i dati del sito; la sola disinstallazione della PWA non è trattata come garanzia di cancellazione cross-browser.
 
@@ -36,7 +36,7 @@ PloppyTV usa l'API pubblica gratuita di TVMaze per recuperare metadati delle ser
 
 - **Ricerca di una serie** tramite la search box → TVMaze riceve il termine di ricerca che hai digitato.
 - **Apertura del dettaglio di una serie** → TVMaze riceve l'ID numerico della serie per recuperare stagioni ed episodi.
-- **Scopri** → circa 1,5 secondi dopo l'avvio, se lo storage locale è disponibile, PloppyTV può avviare in background il caricamento degli elenchi popolari/recenti. Questo preload è intenzionale per rendere la pagina Scopri più rapida; può quindi contattare TVMaze anche se non hai ancora aperto quella vista.
+- **Scopri** → quando apri la vista, PloppyTV carica il tab richiesto (popolari o recenti); ulteriori richieste avvengono quando cambi tab o usi "Aggiorna lista" se i dati non sono già disponibili in cache.
 - **Caricamento del calendario** → usa normalmente gli episodi già presenti nello stato locale.
 
 Le risposte API e i poster possono essere **cached localmente** dal Service Worker (Workbox) per ridurre traffico e latenza. Il traffico verso TVMaze è soggetto alla [privacy policy di TVMaze](https://www.tvmaze.com/privacy).
