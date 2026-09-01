@@ -243,7 +243,11 @@ describe('index.html document contract', () => {
   it('provides a noscript fallback inside body before the app shell', () => {
     const noscript = indexDoc.querySelector('body > noscript');
     const app = indexDoc.querySelector('body > .app');
-    expect(noscript?.textContent).toContain('JavaScript');
-    expect(noscript?.compareDocumentPosition(app!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(noscript).not.toBeNull();
+    expect(app).not.toBeNull();
+    if (!noscript || !app) return;
+
+    expect(noscript.textContent).toContain('JavaScript');
+    expect(noscript.compareDocumentPosition(app) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
