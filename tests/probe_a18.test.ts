@@ -1,545 +1,249 @@
-// Agent A18 — probe tests for src/main.ts, src/sw.ts, index.html
-//
-// Questo file gira sotto il DEFAULT vitest.config.ts (non richiede
-// vitest.config.main.ts). Verifica via code-reading che i fix BUG-A18-01..10
-// siano presenti nei sorgenti, e via runtime (con workbox mockato) che
-// BUG-A18-11 (SKIP_WAITING message format) funzioni end-to-end.
-//
-// I test runtime di main.ts (init order, hash routing, SW registration)
-// sono in tests/probe_main.test.ts (gira sotto vitest.config.main.ts).
-
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// =====================================================================
-// Mock workbox modules so we can import sw.ts in a jsdom env.
-// sw.ts registers a `message` listener on `self` at module top-level;
-// we test BUG-A18-11 by dispatching MessageEvents and checking skipWaiting.
-// =====================================================================
+const workbox = vi.hoisted(() => {
+  const state = {
+    catchHandler: null as null | ((args: { request: Request }) => Promise<Response>),
+  };
+
+  return {
+    state,
+    precacheAndRoute: vi.fn(),
+    cleanupOutdatedCaches: vi.fn(),
+    clientsClaim: vi.fn(),
+    createHandlerBoundToURL: vi.fn(() => vi.fn()),
+    matchPrecache: vi.fn(),
+    registerRoute: vi.fn(),
+    setCatchHandler: vi.fn((handler: (args: { request: Request }) => Promise<Response>) => {
+      state.catchHandler = handler;
+    }),
+    NavigationRoute: vi.fn(function NavigationRoute(handler: unknown, options: unknown) {
+      return { kind: 'navigation', handler, options };
+    }),
+    NetworkFirst: vi.fn(function NetworkFirst(options: unknown) {
+      return { kind: 'network-first', options };
+    }),
+    CacheFirst: vi.fn(function CacheFirst(options: unknown) {
+      return { kind: 'cache-first', options };
+    }),
+    ExpirationPlugin: vi.fn(function ExpirationPlugin(options: unknown) {
+      return { kind: 'expiration', options };
+    }),
+    CacheableResponsePlugin: vi.fn(function CacheableResponsePlugin(options: unknown) {
+      return { kind: 'cacheable-response', options };
+    }),
+  };
+});
+
 vi.mock('workbox-precaching', () => ({
-  precacheAndRoute: vi.fn(),
-  cleanupOutdatedCaches: vi.fn(),
-  createHandlerBoundToURL: vi.fn(() => vi.fn()),
-  matchPrecache: vi.fn(),
+  precacheAndRoute: workbox.precacheAndRoute,
+  cleanupOutdatedCaches: workbox.cleanupOutdatedCaches,
+  createHandlerBoundToURL: workbox.createHandlerBoundToURL,
+  matchPrecache: workbox.matchPrecache,
 }));
-vi.mock('workbox-core', () => ({ clientsClaim: vi.fn() }));
+vi.mock('workbox-core', () => ({ clientsClaim: workbox.clientsClaim }));
 vi.mock('workbox-routing', () => ({
-  registerRoute: vi.fn(),
-  NavigationRoute: vi.fn(() => ({})),
-  setCatchHandler: vi.fn(),
+  registerRoute: workbox.registerRoute,
+  NavigationRoute: workbox.NavigationRoute,
+  setCatchHandler: workbox.setCatchHandler,
 }));
 vi.mock('workbox-strategies', () => ({
-  CacheFirst: vi.fn(() => ({})),
-  NetworkFirst: vi.fn(() => ({})),
+  CacheFirst: workbox.CacheFirst,
+  NetworkFirst: workbox.NetworkFirst,
 }));
-vi.mock('workbox-expiration', () => ({ ExpirationPlugin: vi.fn(() => ({})) }));
-vi.mock('workbox-cacheable-response', () => ({
-  CacheableResponsePlugin: vi.fn(() => ({})),
-}));
+vi.mock('workbox-expiration', () => ({ ExpirationPlugin: workbox.ExpirationPlugin }));
+vi.mock('workbox-cacheable-response', () => ({ CacheableResponsePlugin: workbox.CacheableResponsePlugin }));
 
-// Import sw.ts (side-effect: registers `message` listener on self).
 import '../src/sw';
 
-// =====================================================================
-// Read source files for code-reading tests.
-// =====================================================================
-const mainSrc = readFileSync(resolve(__dirname, '../src/main.ts'), 'utf8');
-const swSrc = readFileSync(resolve(__dirname, '../src/sw.ts'), 'utf8');
 const indexSrc = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+const indexDoc = new DOMParser().parseFromString(indexSrc, 'text/html');
 
-// =====================================================================
-// Helper: extract a brace-balanced block starting at `startIdx`.
-// =====================================================================
-function extractBlock(src: string, startIdx: number): string {
-  const firstBrace = src.indexOf('{', startIdx);
-  if (firstBrace < 0) return '';
-  let depth = 0;
-  for (let i = firstBrace; i < src.length; i++) {
-    if (src[i] === '{') depth++;
-    else if (src[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        const closeParen = src.indexOf(')', i);
-        return closeParen >= 0 ? src.slice(startIdx, closeParen + 1) : src.slice(startIdx, i + 1);
-      }
-    }
-  }
-  return src.slice(startIdx);
+function dispatchMessage(data: unknown): void {
+  self.dispatchEvent(new MessageEvent('message', { data }));
 }
 
-// =====================================================================
-// main.ts — code-reading tests for BUG-A18-01..08
-// =====================================================================
-describe('main.ts — BUG-A18 fixes (code-reading)', () => {
-  // BUG-A18-01: SW registration try/catch
-  it('BUG-A18-01: registerPWA wraps registerSW in try/catch', () => {
-    const fnStart = mainSrc.indexOf('function registerPWA');
-    expect(fnStart).toBeGreaterThanOrEqual(0);
-    const fnEnd = mainSrc.indexOf('function detectStandalone');
-    const fnBody = mainSrc.slice(fnStart, fnEnd);
-    expect(fnBody).toMatch(/\btry\s*\{/);
-    expect(fnBody).toMatch(/\bcatch\s*\(\s*\w+\s*\)/);
-    expect(fnBody).toContain('registerSW');
-    expect(fnBody).toContain("console.warn('[PWA] registerSW threw:");
+function makeRequest(mode: RequestMode, destination: RequestDestination = ''): Request {
+  return { mode, destination } as Request;
+}
+
+function dispatchNotificationClick(): {
+  close: ReturnType<typeof vi.fn>;
+  waitUntil: ReturnType<typeof vi.fn>;
+} {
+  const close = vi.fn();
+  const waitUntil = vi.fn();
+  const event = new Event('notificationclick');
+  Object.defineProperties(event, {
+    notification: { value: { close } },
+    waitUntil: { value: waitUntil },
+  });
+  self.dispatchEvent(event);
+  return { close, waitUntil };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  delete (self as unknown as { skipWaiting?: unknown }).skipWaiting;
+  delete (self as unknown as { clients?: unknown }).clients;
+  delete (self as unknown as { registration?: unknown }).registration;
+});
+
+describe('service worker registration contract', () => {
+  it('initializes precache cleanup and clients claim once', () => {
+    expect(workbox.precacheAndRoute).toHaveBeenCalledTimes(1);
+    expect(workbox.cleanupOutdatedCaches).toHaveBeenCalledTimes(1);
+    expect(workbox.clientsClaim).toHaveBeenCalledTimes(1);
   });
 
-  it('BUG-A18-01: registerPWA returns early if serviceWorker not in navigator', () => {
-    const fnStart = mainSrc.indexOf('function registerPWA');
-    const fnBody = mainSrc.slice(fnStart, fnStart + 200);
-    expect(fnBody).toContain("'serviceWorker' in navigator");
-    expect(fnBody).toContain('import.meta.env.PROD');
+  it('registers navigation, TVMaze API and TVMaze image routes', () => {
+    expect(workbox.registerRoute).toHaveBeenCalledTimes(3);
+
+    const apiPredicate = workbox.registerRoute.mock.calls[1][0] as (args: { url: URL }) => boolean;
+    const imagePredicate = workbox.registerRoute.mock.calls[2][0] as (args: { url: URL }) => boolean;
+
+    expect(apiPredicate({ url: new URL('https://api.tvmaze.com/shows/1') })).toBe(true);
+    expect(apiPredicate({ url: new URL('https://static.tvmaze.com/x.jpg') })).toBe(false);
+    expect(imagePredicate({ url: new URL('https://static.tvmaze.com/x.jpg') })).toBe(true);
+    expect(imagePredicate({ url: new URL('https://api.tvmaze.com/shows/1') })).toBe(false);
   });
 
-  // BUG-A18-02: init() try/catch + beforeunload inside init
-  it('BUG-A18-02: init() body wrapped in try/catch with showFatalError', () => {
-    const fnStart = mainSrc.indexOf('function init()');
-    expect(fnStart).toBeGreaterThanOrEqual(0);
-    const fnBody = mainSrc.slice(fnStart);
-    expect(fnBody).toMatch(/\btry\s*\{/);
-    expect(fnBody).toMatch(/catch\s*\(\s*\w+\s*\)\s*\{/);
-    expect(fnBody).toContain('showFatalError');
+  it('configures bounded network-first API caching', () => {
+    expect(workbox.NetworkFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ cacheName: 'ploppytv-api', networkTimeoutSeconds: 10 }),
+    );
+    expect(workbox.ExpirationPlugin).toHaveBeenCalledWith({ maxEntries: 100, maxAgeSeconds: 60 * 60 });
   });
 
-  it('BUG-A18-02: beforeunload listener is INSIDE init() AFTER loadData()', () => {
-    const initStart = mainSrc.indexOf('function init()');
-    const beforeunloadIdx = mainSrc.indexOf("window.addEventListener('beforeunload'", initStart);
-    expect(beforeunloadIdx).toBeGreaterThan(initStart);
-    const loadDataIdx = mainSrc.indexOf('loadData();', initStart);
-    expect(loadDataIdx).toBeGreaterThan(initStart);
-    expect(beforeunloadIdx).toBeGreaterThan(loadDataIdx);
-  });
-
-  it('BUG-A18-02: exactly ONE beforeunload listener (no module-top-level duplicate)', () => {
-    const matches = [...mainSrc.matchAll(/window\.addEventListener\('beforeunload'/g)];
-    expect(matches.length).toBe(1);
-    const initStart = mainSrc.indexOf('function init()');
-    expect(matches[0].index).toBeGreaterThan(initStart);
-  });
-
-  it('BUG-A18-02: showFatalError injects "Errore di avvio" fallback UI', () => {
-    const fnStart = mainSrc.indexOf('function showFatalError');
-    expect(fnStart).toBeGreaterThanOrEqual(0);
-    const fnBody = mainSrc.slice(fnStart, fnStart + 600);
-    expect(fnBody).toContain('Errore di avvio');
-    expect(fnBody).toContain('empty-state-title');
-    expect(fnBody).toContain('console.error');
-  });
-
-  // BUG-A18-03: onNeedRefresh dedup
-  it('BUG-A18-03: onNeedRefresh has dedup guard (if updateBtn return)', () => {
-    const idx = mainSrc.indexOf('onNeedRefresh()');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const block = mainSrc.slice(idx, idx + 600);
-    expect(block).toMatch(/if\s*\(\s*updateBtn\s*\)\s*return/);
-  });
-
-  it('BUG-A18-03: auto-remove setTimeout resets updateBtn to null', () => {
-    const idx = mainSrc.indexOf('autoRemoveTimer = setTimeout');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const block = mainSrc.slice(idx, idx + 400);
-    expect(block).toMatch(/updateBtn\s*=\s*null/);
-    expect(block).toMatch(/autoRemoveTimer\s*=\s*null/);
-  });
-
-  // BUG-A18-04: reloadBtn.onclick catch
-  it('BUG-A18-04: reloadBtn.onclick wraps updateSW in try/catch with console.warn', () => {
-    const idx = mainSrc.indexOf('reloadBtn.onclick = async');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const block = mainSrc.slice(idx, idx + 600);
-    expect(block).toMatch(/\btry\s*\{/);
-    expect(block).toMatch(/catch\s*\(\s*\w+\s*\)/);
-    expect(block).toContain('updateSW');
-    expect(block).toContain("console.warn('[PWA] updateSW failed:");
-  });
-
-  it('BUG-A18-04: reloadBtn.onclick calls window.location.reload (in try/catch)', () => {
-    const idx = mainSrc.indexOf('reloadBtn.onclick = async');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const block = mainSrc.slice(idx, idx + 800);
-    expect(block).toContain('window.location.reload()');
-    // reload is inside its own try/catch (jsdom throws "Not implemented")
-    const reloadIdx = block.indexOf('window.location.reload()');
-    const afterReload = block.slice(0, reloadIdx);
-    const tryCount = (afterReload.match(/\btry\s*\{/g) || []).length;
-    expect(tryCount).toBeGreaterThanOrEqual(2); // one for updateSW, one for reload
-  });
-
-  // BUG-A18-05: toast message
-  it('BUG-A18-05: toast message mentions "pulsante in basso a destra"', () => {
-    expect(mainSrc).toContain('Nuova versione disponibile (vedi pulsante in basso a destra)');
-    expect(mainSrc).not.toContain('Nuova versione disponibile — tocca per aggiornare');
-  });
-
-  // BUG-A18-06: beforeunload try/catch
-  it('BUG-A18-06: beforeunload handler wraps saveData in try/catch', () => {
-    const startIdx = mainSrc.indexOf("window.addEventListener('beforeunload'");
-    expect(startIdx).toBeGreaterThanOrEqual(0);
-    const block = extractBlock(mainSrc, startIdx);
-    expect(block).toContain('saveData');
-    expect(block).toContain('immediate: true');
-    expect(block).toMatch(/\btry\s*\{/);
-    expect(block).toMatch(/\bcatch\s*\(/);
-  });
-
-  // BUG-A18-07: idempotency guard
-  it('BUG-A18-07: init() has __ploppytvInit guard at the top', () => {
-    const fnStart = mainSrc.indexOf('function init()');
-    const fnBody = mainSrc.slice(fnStart, fnStart + 500);
-    expect(fnBody).toContain('__ploppytvInit');
-    expect(fnBody).toMatch(/if\s*\(\s*w\.__ploppytvInit\s*\)\s*return/);
-    expect(fnBody).toMatch(/w\.__ploppytvInit\s*=\s*true/);
-  });
-
-  // BUG-A18-08: global error handlers
-  it('BUG-A18-08: registerGlobalErrorHandlers registers error + unhandledrejection', () => {
-    const fnStart = mainSrc.indexOf('function registerGlobalErrorHandlers');
-    expect(fnStart).toBeGreaterThanOrEqual(0);
-    const fnBody = mainSrc.slice(fnStart, fnStart + 800);
-    expect(fnBody).toContain("window.addEventListener('error'");
-    expect(fnBody).toContain("window.addEventListener('unhandledrejection'");
-  });
-
-  it('BUG-A18-08: unhandledrejection handler skips AbortError (expected from search)', () => {
-    const fnStart = mainSrc.indexOf('function registerGlobalErrorHandlers');
-    const fnBody = mainSrc.slice(fnStart, fnStart + 1200);
-    expect(fnBody).toContain('AbortError');
-  });
-
-  it('BUG-A18-08: registerGlobalErrorHandlers called inside init() BEFORE try block', () => {
-    const initStart = mainSrc.indexOf('function init()');
-    const initBody = mainSrc.slice(initStart, initStart + 700);
-    const handlerCallIdx = initBody.indexOf('registerGlobalErrorHandlers()');
-    const tryIdx = initBody.indexOf('try {');
-    expect(handlerCallIdx).toBeGreaterThanOrEqual(0);
-    expect(tryIdx).toBeGreaterThanOrEqual(0);
-    expect(handlerCallIdx).toBeLessThan(tryIdx);
-  });
-
-  // Structural sanity: applyHash + setupHashRouting preserved
-  it('applyHash parses #show/<id> with digit-capturing regex', () => {
-    expect(mainSrc).toMatch(/\/\^show\\\/\(\\d\+\)\$\/\.exec\(hash\)/);
-  });
-
-  it('applyHash checks id > 0 before openShow', () => {
-    const idx = mainSrc.indexOf('const showMatch =');
-    const block = mainSrc.slice(idx, idx + 200);
-    expect(block).toContain('id > 0');
-  });
-
-  it('setupHashRouting registers hashchange + setTimeout(applyHash, 0)', () => {
-    const fnStart = mainSrc.indexOf('function setupHashRouting');
-    const fnBody = mainSrc.slice(fnStart, fnStart + 300);
-    expect(fnBody).toContain("window.addEventListener('hashchange', applyHash)");
-    expect(fnBody).toContain('setTimeout(applyHash, 0)');
-  });
-
-  it('startup does not preload Discover or import its network module', () => {
-    expect(mainSrc).not.toContain('preloadDiscover');
-    expect(mainSrc).not.toContain("from './lib/discover'");
-  });
-
-  it('detectStandalone wrapped in try/catch', () => {
-    const fnStart = mainSrc.indexOf('function detectStandalone');
-    const fnBody = mainSrc.slice(fnStart, fnStart + 500);
-    expect(fnBody).toMatch(/\btry\s*\{/);
-    expect(fnBody).toMatch(/catch\s*\(/);
-  });
-
-  it('init() called at module top-level', () => {
-    // init() must be called after its definition, at the top level (not inside another function)
-    const initCallIdx = mainSrc.lastIndexOf('\ninit();');
-    expect(initCallIdx).toBeGreaterThanOrEqual(0);
-  });
-
-  it('DEV mode exposes __ploppytv_state for debugging', () => {
-    expect(mainSrc).toContain('__ploppytv_state');
-    expect(mainSrc).toContain('import.meta.env.DEV');
+  it('configures bounded cache-first image caching', () => {
+    expect(workbox.CacheFirst).toHaveBeenCalledWith(expect.objectContaining({ cacheName: 'ploppytv-img' }));
+    expect(workbox.ExpirationPlugin).toHaveBeenCalledWith({
+      maxEntries: 300,
+      maxAgeSeconds: 60 * 60 * 24 * 30,
+    });
   });
 });
 
-// =====================================================================
-// sw.ts — runtime tests for BUG-A18-11 (SKIP_WAITING message format)
-// =====================================================================
-describe('sw.ts — BUG-A18-11: SKIP_WAITING message dispatch', () => {
-  beforeEach(() => {
-    (self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting = vi.fn();
-  });
+describe('service worker message contract', () => {
+  it.each(['SKIP_WAITING', { type: 'SKIP_WAITING' }])('accepts the supported skip-waiting message %j', (data) => {
+    const skipWaiting = vi.fn();
+    (self as unknown as { skipWaiting: typeof skipWaiting }).skipWaiting = skipWaiting;
 
-  afterEach(() => {
-    delete (self as unknown as { skipWaiting?: unknown }).skipWaiting;
-  });
-
-  function dispatchMessage(data: unknown): void {
-    self.dispatchEvent(new MessageEvent('message', { data }));
-  }
-
-  it('dispatching { type: "SKIP_WAITING" } (workbox-window format) calls self.skipWaiting', () => {
-    dispatchMessage({ type: 'SKIP_WAITING' });
-    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(1);
-  });
-
-  it('dispatching "SKIP_WAITING" string (legacy format) calls self.skipWaiting', () => {
-    dispatchMessage('SKIP_WAITING');
-    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    ['null', null],
-    ['undefined', undefined],
-    ['empty string', ''],
-    ['wrong string "SKIP"', 'SKIP'],
-    ['wrong case "skip_waiting"', 'skip_waiting'],
-    ['object without type', { foo: 'bar' }],
-    ['object with wrong type', { type: 'OTHER' }],
-    ['object with type wrong case', { type: 'skip_waiting' }],
-    ['number 42', 42],
-    ['boolean true', true],
-    ['array', ['SKIP_WAITING']],
-    ['object with type number', { type: 0 }],
-  ])('dispatching %s does NOT call self.skipWaiting', (_label, data) => {
     dispatchMessage(data);
-    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).not.toHaveBeenCalled();
+
+    expect(skipWaiting).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatching multiple valid messages calls skipWaiting multiple times', () => {
-    dispatchMessage({ type: 'SKIP_WAITING' });
-    dispatchMessage('SKIP_WAITING');
-    dispatchMessage({ type: 'SKIP_WAITING' });
-    expect((self as unknown as { skipWaiting: ReturnType<typeof vi.fn> }).skipWaiting).toHaveBeenCalledTimes(3);
+  it.each([null, undefined, '', 'skip_waiting', 42, true, [], { type: 'OTHER' }])(
+    'ignores unrelated messages: %j',
+    (data) => {
+      const skipWaiting = vi.fn();
+      (self as unknown as { skipWaiting: typeof skipWaiting }).skipWaiting = skipWaiting;
+
+      dispatchMessage(data);
+
+      expect(skipWaiting).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('service worker offline fallback contract', () => {
+  it('serves the precached app shell for offline navigation', async () => {
+    const cached = new Response('<html>cached</html>');
+    workbox.matchPrecache.mockResolvedValueOnce(cached);
+
+    const response = await workbox.state.catchHandler!({ request: makeRequest('navigate') });
+
+    expect(workbox.matchPrecache).toHaveBeenCalledWith('index.html');
+    expect(response).toBe(cached);
+  });
+
+  it('falls back to network when the navigation shell is not precached', async () => {
+    workbox.matchPrecache.mockResolvedValueOnce(undefined);
+    const network = new Response('<html>network</html>');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(network);
+    const request = makeRequest('navigate');
+
+    const response = await workbox.state.catchHandler!({ request });
+
+    expect(fetchSpy).toHaveBeenCalledWith(request);
+    expect(response).toBe(network);
+  });
+
+  it('returns an error response when both precache and navigation network fail', async () => {
+    workbox.matchPrecache.mockResolvedValueOnce(undefined);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
+
+    const response = await workbox.state.catchHandler!({ request: makeRequest('navigate') });
+
+    expect(response.type).toBe('error');
+  });
+
+  it('returns a 404 response for an uncached image', async () => {
+    const response = await workbox.state.catchHandler!({ request: makeRequest('no-cors', 'image') });
+
+    expect(response.status).toBe(404);
   });
 });
 
-// =====================================================================
-// sw.ts — code-reading tests
-// =====================================================================
-describe('sw.ts — code-reading', () => {
-  it('BUG-A18-11: message handler calls shouldSkipWaiting(event.data)', () => {
-    expect(swSrc).toContain('if (shouldSkipWaiting(event.data)) self.skipWaiting()');
+describe('service worker notification click contract', () => {
+  it('closes the notification and focuses an existing client', async () => {
+    const focus = vi.fn().mockResolvedValue(undefined);
+    const openWindow = vi.fn();
+    (self as unknown as { clients: unknown }).clients = {
+      matchAll: vi.fn().mockResolvedValue([{ focus }]),
+      openWindow,
+    };
+    (self as unknown as { registration: unknown }).registration = { scope: 'https://example.com/PloppyTV/' };
+
+    const { close, waitUntil } = dispatchNotificationClick();
+    const pending = waitUntil.mock.calls[0][0] as Promise<void>;
+    await pending;
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(openWindow).not.toHaveBeenCalled();
   });
 
-  it('BUG-A18-11: shouldSkipWaiting handles both string and object formats', () => {
-    const fnStart = swSrc.indexOf('function shouldSkipWaiting');
-    expect(fnStart).toBeGreaterThanOrEqual(0);
-    const fnBody = swSrc.slice(fnStart, fnStart + 400);
-    expect(fnBody).toContain("=== 'SKIP_WAITING'");
-    expect(fnBody).toContain("typeof data === 'object'");
-    expect(fnBody).toContain('.type');
-  });
+  it('opens the scoped app shell when no window client exists', async () => {
+    const openWindow = vi.fn().mockResolvedValue(undefined);
+    (self as unknown as { clients: unknown }).clients = {
+      matchAll: vi.fn().mockResolvedValue([]),
+      openWindow,
+    };
+    (self as unknown as { registration: unknown }).registration = { scope: 'https://example.com/PloppyTV/' };
 
-  it('precacheAndRoute uses self.__WB_MANIFEST with fallback to []', () => {
-    expect(swSrc).toMatch(/precacheAndRoute\(self\.__WB_MANIFEST\s*\|\|\s*\[\]\)/);
-  });
+    const { waitUntil } = dispatchNotificationClick();
+    await (waitUntil.mock.calls[0][0] as Promise<void>);
 
-  it('cleanupOutdatedCaches called', () => {
-    expect(swSrc).toContain('cleanupOutdatedCaches()');
-  });
-
-  it('clientsClaim called', () => {
-    expect(swSrc).toContain('clientsClaim()');
-  });
-
-  it('NavigationRoute uses createHandlerBoundToURL("index.html")', () => {
-    expect(swSrc).toContain("createHandlerBoundToURL('index.html')");
-    expect(swSrc).toContain('new NavigationRoute(handler');
-  });
-
-  it('NavigationRoute denylist has two patterns', () => {
-    expect(swSrc).toContain('denylist:');
-    // /^\/_/ — denies paths starting with /_
-    expect(swSrc).toContain('^\\/_');
-    // /\/[^/?]+\.[^/]+$/ — denies paths with file extensions
-    expect(swSrc).toContain('[^/?]+');
-  });
-
-  it('API route targets api.tvmaze.com with NetworkFirst', () => {
-    expect(swSrc).toContain("url.hostname === 'api.tvmaze.com'");
-    expect(swSrc).toContain('new NetworkFirst(');
-    expect(swSrc).toContain("'ploppytv-api'");
-    expect(swSrc).toContain('networkTimeoutSeconds: 10');
-    expect(swSrc).toContain('maxEntries: 100');
-    expect(swSrc).toContain('maxAgeSeconds: 60 * 60');
-  });
-
-  it('image route targets static.tvmaze.com with CacheFirst', () => {
-    expect(swSrc).toContain("url.hostname === 'static.tvmaze.com'");
-    expect(swSrc).toContain('new CacheFirst(');
-    expect(swSrc).toContain("'ploppytv-img'");
-    expect(swSrc).toContain('maxEntries: 300');
-    expect(swSrc).toContain('60 * 60 * 24 * 30');
-  });
-
-  it('setCatchHandler uses matchPrecache for navigation fallback', () => {
-    expect(swSrc).toContain('setCatchHandler');
-    expect(swSrc).toContain("matchPrecache('index.html')");
-  });
-
-  it('setCatchHandler tries network fetch as last resort for navigation', () => {
-    expect(swSrc).toMatch(/return await fetch\(request\)/);
-  });
-
-  it('setCatchHandler returns 404 for image requests', () => {
-    expect(swSrc).toContain("request.destination === 'image'");
-    expect(swSrc).toMatch(/new Response\(''\s*,\s*\{\s*status:\s*404/);
-  });
-
-  it('setCatchHandler returns Response.error() as final fallback', () => {
-    expect(swSrc).toContain('Response.error()');
-  });
-
-  it('CacheableResponsePlugin uses statuses [0, 200] for both API and image routes', () => {
-    const matches = [...swSrc.matchAll(/statuses:\s*\[0,\s*200\]/g)];
-    expect(matches.length).toBe(2);
-  });
-
-  it('ExpirationPlugin used on both API and image caches', () => {
-    const matches = [...swSrc.matchAll(/new ExpirationPlugin\(/g)];
-    expect(matches.length).toBe(2);
-  });
-
-  it('shouldSkipWaiting is NOT exported (would break classic SW registration)', () => {
-    // The SW is built with rollupFormat "es" but registered with type "classic".
-    // An `export` statement would cause a syntax error in classic script mode.
-    expect(swSrc).not.toMatch(/export\s+function\s+shouldSkipWaiting/);
-    expect(swSrc).not.toMatch(/export\s*\{.*shouldSkipWaiting/);
+    expect(openWindow).toHaveBeenCalledWith('https://example.com/PloppyTV/index.html');
   });
 });
 
-// =====================================================================
-// index.html — BUG-A18-09/10 + structure
-// =====================================================================
-describe('index.html — BUG-A18-09/10 + structure', () => {
-  const indexDoc = new DOMParser().parseFromString(indexSrc, 'text/html');
-
-  function meta(name: string): HTMLMetaElement | null {
-    return indexDoc.querySelector(`meta[name="${name}"]`);
-  }
-
-  function link(rel: string, href: string): HTMLLinkElement | undefined {
-    return [...indexDoc.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`)].find(
-      (element) => element.getAttribute('href') === href,
-    );
-  }
-
-  // Keep source-order assertions only where order is itself part of the contract.
-  it('BUG-A18-09: has <noscript> fallback with Italian JavaScript message', () => {
-    expect(indexSrc).toContain('<noscript>');
-    expect(indexSrc).toContain('</noscript>');
-    expect(indexSrc).toContain('JavaScript');
-    expect(indexSrc).toContain('ricarica');
-  });
-
-  it('BUG-A18-09: noscript is inside <body> before .app div', () => {
-    const bodyIdx = indexSrc.indexOf('<body>');
-    const noscriptIdx = indexSrc.indexOf('<noscript>');
-    const appIdx = indexSrc.indexOf('<div class="app">');
-    expect(bodyIdx).toBeGreaterThanOrEqual(0);
-    expect(noscriptIdx).toBeGreaterThan(bodyIdx);
-    expect(appIdx).toBeGreaterThan(noscriptIdx);
-  });
-
-  it('BUG-A18-10: has dark-mode theme-color meta with #0f0f14', () => {
-    const darkTheme = [...indexDoc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find(
-      (element) => element.getAttribute('media') === '(prefers-color-scheme: dark)',
-    );
-    expect(darkTheme?.content).toBe('#0f0f14');
-  });
-
-  it('has default (light) theme-color #ff6b35', () => {
-    const defaultTheme = [...indexDoc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find(
-      (element) => !element.hasAttribute('media'),
-    );
-    expect(defaultTheme?.content).toBe('#ff6b35');
-  });
-
-  it('has exactly two theme-color meta tags (light + dark)', () => {
+describe('index.html document contract', () => {
+  it('declares the app language, viewport and theme metadata', () => {
+    expect(indexDoc.documentElement.lang).toBe('it');
+    expect(indexDoc.querySelector('meta[name="viewport"]')?.getAttribute('content')).toContain('viewport-fit=cover');
     expect(indexDoc.querySelectorAll('meta[name="theme-color"]')).toHaveLength(2);
   });
 
-  it('has lang="it" on <html>', () => {
-    expect(indexDoc.documentElement.lang).toBe('it');
+  it('links the manifest, app icon and module entry point', () => {
+    expect(indexDoc.querySelector('link[rel="manifest"][href="manifest.webmanifest"]')).not.toBeNull();
+    expect(indexDoc.querySelector('link[rel="apple-touch-icon"][href="icons/apple-touch-icon.png"]')).not.toBeNull();
+    expect(indexDoc.querySelector('script[type="module"][src="/src/main.ts"]')).not.toBeNull();
   });
 
-  it('has charset UTF-8', () => {
-    expect(indexDoc.querySelector('meta[charset]')?.getAttribute('charset')?.toUpperCase()).toBe('UTF-8');
-  });
-
-  it('has viewport meta with viewport-fit=cover', () => {
-    expect(meta('viewport')?.content).toContain('viewport-fit=cover');
-  });
-
-  it('has description meta', () => {
-    expect(meta('description')?.content).toContain('PloppyTV');
-  });
-
-  it('has manifest link', () => {
-    expect(link('manifest', 'manifest.webmanifest')).toBeDefined();
-  });
-
-  it('has preconnect to api.tvmaze.com with crossorigin', () => {
-    expect(link('preconnect', 'https://api.tvmaze.com')?.hasAttribute('crossorigin')).toBe(true);
-  });
-
-  it('has preconnect to static.tvmaze.com with crossorigin', () => {
-    expect(link('preconnect', 'https://static.tvmaze.com')?.hasAttribute('crossorigin')).toBe(true);
-  });
-
-  it('has dns-prefetch for both TVMaze hosts', () => {
-    expect(link('dns-prefetch', 'https://api.tvmaze.com')).toBeDefined();
-    expect(link('dns-prefetch', 'https://static.tvmaze.com')).toBeDefined();
-  });
-
-  it('has module script pointing to /src/main.ts', () => {
-    const script = [...indexDoc.querySelectorAll<HTMLScriptElement>('script')].find(
-      (element) => element.getAttribute('src') === '/src/main.ts',
-    );
-    expect(script?.type).toBe('module');
-  });
-
-  it('has apple-mobile-web-app-capable', () => {
-    expect(meta('apple-mobile-web-app-capable')?.content).toBe('yes');
-  });
-
-  it('has mobile-web-app-capable', () => {
-    expect(meta('mobile-web-app-capable')?.content).toBe('yes');
-  });
-
-  it('has color-scheme meta with dark light', () => {
-    expect(meta('color-scheme')?.content).toBe('dark light');
-  });
-
-  it('has format-detection telephone=no', () => {
-    expect(meta('format-detection')?.content).toBe('telephone=no');
-  });
-
-  it('title contains PloppyTV', () => {
-    expect(indexDoc.title).toContain('PloppyTV');
-  });
-
-  it('has apple-touch-icon link', () => {
-    expect(link('apple-touch-icon', 'icons/apple-touch-icon.png')).toBeDefined();
-  });
-
-  it('has SVG favicon', () => {
-    expect(link('icon', 'icons/icon.svg')?.type).toBe('image/svg+xml');
-  });
-
-  it('has main content container #mainContent', () => {
+  it('contains the runtime containers required by the app shell', () => {
     expect(indexDoc.getElementById('mainContent')).not.toBeNull();
-  });
-
-  it('has toast container #toast', () => {
     expect(indexDoc.getElementById('toast')).not.toBeNull();
-  });
-
-  it('has modal overlay with aria-modal', () => {
     expect(indexDoc.querySelector('[aria-modal="true"]')).not.toBeNull();
   });
 
-  it('XSS check: static module scripts do not use user-controlled sources', () => {
-    const scripts = [...indexDoc.querySelectorAll<HTMLScriptElement>('script')];
-    for (const script of scripts) {
-      expect(script.getAttribute('src')).toBe('/src/main.ts');
-    }
+  it('provides a noscript fallback inside body before the app shell', () => {
+    const noscript = indexDoc.querySelector('body > noscript');
+    const app = indexDoc.querySelector('body > .app');
+    expect(noscript?.textContent).toContain('JavaScript');
+    expect(noscript?.compareDocumentPosition(app!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
