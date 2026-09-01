@@ -21,58 +21,36 @@ jobs:
 
           path = Path('tests/probe_main.test.ts')
           src = path.read_text()
-          src = src.replace("import { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';\n", '')
+          src = src.replace("import { readFileSync } from 'node:fs';\n", '')
+          src = src.replace("import { resolve } from 'node:path';\n", '')
 
-          old = '''  it('FIX-18-06: beforeunload handler wraps saveData in try/catch (code-reading — runtime throws no longer escape as uncaught exceptions)', () => {
-            const src = readFileSync(resolve(__dirname, '../src/main.ts'), 'utf8');
-            // The beforeunload listener is now a multi-statement block with try/catch.
-            // Match the full `window.addEventListener('beforeunload', () => { ... })`
-            // call, accounting for nested braces.
-            const startIdx = src.indexOf("window.addEventListener('beforeunload'");
-            expect(startIdx, 'beforeunload listener not found').toBeGreaterThanOrEqual(0);
-            // Find the matching closing paren by brace counting from the first `{`.
-            const firstBrace = src.indexOf('{', startIdx);
-            let depth = 0;
-            let endIdx = -1;
-            for (let i = firstBrace; i < src.length; i++) {
-              const c = src[i];
-              if (c === '{') depth++;
-              else if (c === '}') {
-                depth--;
-                if (depth === 0) {
-                  // Skip trailing whitespace; the next ')' closes the addEventListener call.
-                  const closeParen = src.indexOf(')', i);
-                  endIdx = closeParen >= 0 ? closeParen + 1 : i + 1;
-                  break;
-                }
-              }
-            }
-            expect(endIdx, 'could not parse beforeunload block').toBeGreaterThan(startIdx);
-            const block = src.slice(startIdx, endIdx);
-            expect(block).toContain('saveData');
-            expect(block).toContain('immediate: true');
-            // FIX: try/catch is now present.
-            expect(block).toMatch(/\\btry\\s*\\{/);
-            expect(block).toMatch(/\\bcatch\\s*\\(/);
-          });'''
+          marker = "  it('FIX-18-06: beforeunload handler wraps saveData in try/catch"
+          start = src.find(marker)
+          if start < 0:
+              raise SystemExit('source-reading beforeunload test not found')
+          end_marker = '\n  });'
+          end = src.find(end_marker, start)
+          if end < 0:
+              raise SystemExit('end of source-reading beforeunload test not found')
+          end += len(end_marker)
 
-          new = '''  it('FIX-18-06: beforeunload contains save failures instead of leaking them', async () => {
-            const error = new Error('save failed');
-            mockSaveData.mockImplementation(() => {
-              throw error;
-            });
-            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+          new = '\n'.join([
+              "  it('FIX-18-06: beforeunload contains save failures instead of leaking them', async () => {",
+              "    const error = new Error('save failed');",
+              "    mockSaveData.mockImplementation(() => {",
+              "      throw error;",
+              "    });",
+              "    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});",
+              "",
+              "    await import('../src/main');",
+              "",
+              "    expect(() => fireBeforeunload()).not.toThrow();",
+              "    expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });",
+              "    expect(warnSpy).toHaveBeenCalledWith('[PloppyTV] saveData on beforeunload failed:', error);",
+              "  });",
+          ])
 
-            await import('../src/main');
-
-            expect(() => fireBeforeunload()).not.toThrow();
-            expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });
-            expect(warnSpy).toHaveBeenCalledWith('[PloppyTV] saveData on beforeunload failed:', error);
-          });'''
-
-          if old not in src:
-              raise SystemExit('expected source-reading test block not found')
-          path.write_text(src.replace(old, new))
+          path.write_text(src[:start] + new + src[end:])
           PY
       - name: Commit test rewrite
         run: |
