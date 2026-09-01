@@ -85,6 +85,14 @@ async function flushFrame(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe('renderer contracts', () => {
   it('routes every top-level view to its owning renderer', async () => {
     const store = await import('../src/lib/store');
@@ -153,6 +161,44 @@ describe('renderer contracts', () => {
     await flushFrame();
     renderer.render();
     expect(rafSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not bind a superseded asynchronous view render', async () => {
+    const pendingCalendar = deferred<void>();
+    renderCalendarSpy.mockImplementationOnce(() => pendingCalendar.promise);
+
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+
+    store.setState({ currentShowId: null, currentView: 'calendar' });
+    renderer.render();
+    await flushFrame();
+    expect(renderCalendarSpy).toHaveBeenCalledTimes(1);
+    expect(bindCalendarSpy).not.toHaveBeenCalled();
+
+    store.setState({ currentShowId: null, currentView: 'dashboard' });
+    renderer.render();
+    await flushFrame();
+    expect(renderDashboardSpy).toHaveBeenCalled();
+
+    pendingCalendar.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(bindCalendarSpy).not.toHaveBeenCalled();
+  });
+
+  it('binds delegated actions only once across repeated initialization', async () => {
+    const renderer = await import('../src/components/renderer');
+    const main = document.getElementById('mainContent')!;
+    const addSpy = vi.spyOn(main, 'addEventListener');
+
+    renderer.initRenderer();
+    renderer.initRenderer();
+    renderer.initRenderer();
+
+    const clickAdds = addSpy.mock.calls.filter(([type]) => type === 'click');
+    expect(clickAdds).toHaveLength(1);
   });
 
   it('turns a rejected view chunk into recoverable UI', async () => {
