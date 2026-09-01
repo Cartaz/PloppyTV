@@ -16,8 +16,6 @@
 //
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 // =====================================================================
 // Window-listener tracking — vi.resetModules() does NOT remove listeners
@@ -676,37 +674,18 @@ describe('main.ts — beforeunload', () => {
     // are not persisted on close, which is acceptable for a best-effort save.
   });
 
-  it('FIX-18-06: beforeunload handler wraps saveData in try/catch (code-reading — runtime throws no longer escape as uncaught exceptions)', () => {
-    const src = readFileSync(resolve(__dirname, '../src/main.ts'), 'utf8');
-    // The beforeunload listener is now a multi-statement block with try/catch.
-    // Match the full `window.addEventListener('beforeunload', () => { ... })`
-    // call, accounting for nested braces.
-    const startIdx = src.indexOf("window.addEventListener('beforeunload'");
-    expect(startIdx, 'beforeunload listener not found').toBeGreaterThanOrEqual(0);
-    // Find the matching closing paren by brace counting from the first `{`.
-    const firstBrace = src.indexOf('{', startIdx);
-    let depth = 0;
-    let endIdx = -1;
-    for (let i = firstBrace; i < src.length; i++) {
-      const c = src[i];
-      if (c === '{') depth++;
-      else if (c === '}') {
-        depth--;
-        if (depth === 0) {
-          // Skip trailing whitespace; the next ')' closes the addEventListener call.
-          const closeParen = src.indexOf(')', i);
-          endIdx = closeParen >= 0 ? closeParen + 1 : i + 1;
-          break;
-        }
-      }
-    }
-    expect(endIdx, 'could not parse beforeunload block').toBeGreaterThan(startIdx);
-    const block = src.slice(startIdx, endIdx);
-    expect(block).toContain('saveData');
-    expect(block).toContain('immediate: true');
-    // FIX: try/catch is now present.
-    expect(block).toMatch(/\btry\s*\{/);
-    expect(block).toMatch(/\bcatch\s*\(/);
+  it('FIX-18-06: beforeunload contains save failures instead of leaking them', async () => {
+    const error = new Error('save failed');
+    mockSaveData.mockImplementation(() => {
+      throw error;
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await import('../src/main');
+
+    expect(() => fireBeforeunload()).not.toThrow();
+    expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });
+    expect(warnSpy).toHaveBeenCalledWith('[PloppyTV] saveData on beforeunload failed:', error);
   });
 });
 
