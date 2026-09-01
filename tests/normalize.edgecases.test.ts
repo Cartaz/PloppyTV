@@ -37,8 +37,22 @@ describe('normalizeShow — persisted-data invariants', () => {
       id: 1,
       seasons: {
         1: [
-          { num: 1, watched: true, airdate: '2024-06-15', name: '<b>Pilot</b>', runtime: 42 },
-          { num: 2, watched: 'true', airdate: '2024-02-30', name: 123, runtime: 0 },
+          {
+            num: 1,
+            watched: true,
+            airdate: '2024-06-15',
+            name: '<b>Pilot</b>',
+            runtime: 42,
+            note: '<b>spoiler</b>',
+          },
+          {
+            num: 2,
+            watched: 'true',
+            airdate: '2024-02-30',
+            name: 123,
+            runtime: 0,
+            note: '<script>evil()</script>',
+          },
           { num: 3, watched: 1, runtime: Infinity },
           { num: 4, watched: 'false' },
           { num: 5, watched: 0 },
@@ -53,8 +67,15 @@ describe('normalizeShow — persisted-data invariants', () => {
 
     expect(show!.seasons[1]).toHaveLength(5);
     expect(show!.seasons[1].map((ep) => ep.watched)).toEqual([true, true, true, false, false]);
-    expect(show!.seasons[1][0]).toMatchObject({ id: 0, airdate: '2024-06-15', name: 'Pilot', runtime: 42 });
+    expect(show!.seasons[1][0]).toMatchObject({
+      id: 0,
+      airdate: '2024-06-15',
+      name: 'Pilot',
+      runtime: 42,
+      note: 'spoiler',
+    });
     expect(show!.seasons[1][1]).toMatchObject({ airdate: null, name: null, runtime: null });
+    expect(show!.seasons[1][1].note).toBeUndefined();
     expect(show!.seasons[1][2].runtime).toBeNull();
   });
 
@@ -86,7 +107,7 @@ describe('normalizeShow — persisted-data invariants', () => {
     expect(show!.totalSeasons).toBe(2);
   });
 
-  it('sanitizes text and applies domain defaults', () => {
+  it('sanitizes text, tags and applies domain defaults', () => {
     const before = Date.now();
     const show = normalizeShow({
       id: 1,
@@ -94,6 +115,7 @@ describe('normalizeShow — persisted-data invariants', () => {
       status: '<b></b>',
       network: '<i></i>',
       summary: '<p>Hello</p><script>bad()</script>',
+      tags: ['<b>Rewatch</b>', 'rewatch', '<script>evil()</script>'],
       runtime: Infinity,
       addedAt: -1,
       list: 'invalid',
@@ -105,6 +127,7 @@ describe('normalizeShow — persisted-data invariants', () => {
       status: 'N/D',
       network: 'N/D',
       summary: 'Hello',
+      tags: ['Rewatch'],
       runtime: 45,
       list: 'towatch',
       manualList: true,
