@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { updateShowListStatus } from '../src/lib/store';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  emitChange,
+  getState,
+  openShow,
+  setState,
+  subscribe,
+  switchView,
+  updateShowListStatus,
+} from '../src/lib/store';
 import { makeShowWithSeasons, markWatchedFirst } from './helpers';
 
 describe('updateShowListStatus contracts', () => {
@@ -54,5 +62,50 @@ describe('updateShowListStatus contracts', () => {
     updateShowListStatus(show);
 
     expect(show.list).toBe('towatch');
+  });
+});
+
+describe('store environment and navigation contracts', () => {
+  it('delivers changes through setTimeout when requestAnimationFrame is unavailable', async () => {
+    const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
+    const original = w.requestAnimationFrame;
+    delete w.requestAnimationFrame;
+    const listener = vi.fn();
+    const unsubscribe = subscribe(listener);
+
+    try {
+      emitChange();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(listener).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+      if (original) w.requestAnimationFrame = original;
+    }
+  });
+
+  it('opens a show without requiring window.scrollTo', () => {
+    const w = window as unknown as { scrollTo?: (x: number, y: number) => void };
+    const original = w.scrollTo;
+    delete w.scrollTo;
+
+    try {
+      expect(() => openShow(42)).not.toThrow();
+      expect(getState().currentShowId).toBe(42);
+      expect(getState().currentSeason).toBe(1);
+    } finally {
+      if (original) w.scrollTo = original;
+    }
+  });
+
+  it('preserves calendar offset inside calendar and resets it when leaving', () => {
+    setState({ currentView: 'dashboard', currentShowId: 42, calendarWeekOffset: 3 });
+
+    switchView('calendar');
+    expect(getState().currentView).toBe('calendar');
+    expect(getState().currentShowId).toBeNull();
+    expect(getState().calendarWeekOffset).toBe(3);
+
+    switchView('library');
+    expect(getState().calendarWeekOffset).toBe(0);
   });
 });
