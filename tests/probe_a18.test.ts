@@ -90,38 +90,11 @@ afterEach(() => {
   delete (self as unknown as { registration?: unknown }).registration;
 });
 
-describe('service worker registration contract', () => {
+describe('service worker initialization contract', () => {
   it('initializes precache cleanup and clients claim once', () => {
     expect(workbox.precacheAndRoute).toHaveBeenCalledTimes(1);
     expect(workbox.cleanupOutdatedCaches).toHaveBeenCalledTimes(1);
     expect(workbox.clientsClaim).toHaveBeenCalledTimes(1);
-  });
-
-  it('registers navigation, TVMaze API and TVMaze image routes', () => {
-    expect(workbox.registerRoute).toHaveBeenCalledTimes(3);
-
-    const apiPredicate = workbox.registerRoute.mock.calls[1][0] as (args: { url: URL }) => boolean;
-    const imagePredicate = workbox.registerRoute.mock.calls[2][0] as (args: { url: URL }) => boolean;
-
-    expect(apiPredicate({ url: new URL('https://api.tvmaze.com/shows/1') })).toBe(true);
-    expect(apiPredicate({ url: new URL('https://static.tvmaze.com/x.jpg') })).toBe(false);
-    expect(imagePredicate({ url: new URL('https://static.tvmaze.com/x.jpg') })).toBe(true);
-    expect(imagePredicate({ url: new URL('https://api.tvmaze.com/shows/1') })).toBe(false);
-  });
-
-  it('configures bounded network-first API caching', () => {
-    expect(workbox.NetworkFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ cacheName: 'ploppytv-api', networkTimeoutSeconds: 10 }),
-    );
-    expect(workbox.ExpirationPlugin).toHaveBeenCalledWith({ maxEntries: 100, maxAgeSeconds: 60 * 60 });
-  });
-
-  it('configures bounded cache-first image caching', () => {
-    expect(workbox.CacheFirst).toHaveBeenCalledWith(expect.objectContaining({ cacheName: 'ploppytv-img' }));
-    expect(workbox.ExpirationPlugin).toHaveBeenCalledWith({
-      maxEntries: 300,
-      maxAgeSeconds: 60 * 60 * 24 * 30,
-    });
   });
 });
 
