@@ -327,14 +327,20 @@ describe('Section 2: Dati corrotti in localStorage', () => {
     expect(showToast).toHaveBeenCalledWith('Dati corrotti. Usa Importa per ripristinare.', 'error');
   });
 
-  it('future version (>SCHEMA_VERSION) → backup recovery', () => {
+  it('future version (>SCHEMA_VERSION) → read-only without destructive recovery', () => {
     const backupShows = [{ id: 1, name: 'Backup', seasons: {} }];
     mem.store.set(BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: backupShows, savedAt: 1000 }));
     putSavedData(mem, [{ id: 99, name: 'Future' }], 2000, SCHEMA_VERSION + 5);
 
     loadData();
-    expect(getState().shows[0]?.id).toBe(1); // backup loaded, not future data
-    expect(showToast).toHaveBeenCalledWith('Versione dati non supportata. Ripristinato backup.', 'warning');
+    expect(getState().shows).toEqual([]);
+    expect(getState()._storageDisabled).toBe(true);
+    expect(JSON.parse(mem.store.get(STORAGE_KEY)!).version).toBe(SCHEMA_VERSION + 5);
+    expect(JSON.parse(mem.store.get(BACKUP_KEY)!).shows[0].id).toBe(1);
+    expect(showToast).toHaveBeenCalledWith(
+      'Versione dati non supportata. Aggiorna l’app per accedere ai dati; salvataggio disabilitato.',
+      'error',
+    );
   });
 
   it('shows non-array (string) → empty state, no crash', () => {

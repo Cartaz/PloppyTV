@@ -326,36 +326,18 @@ export function buildShowFromTvmaze(tvmazeShow: TvmazeShow, episodes: TvmazeEpis
   };
 }
 
-/**
- * Riconcilia le liste degli show in base al progresso di visione.
- *
- * BUG-02-01 / C1 (FIXED): `manualList` viene rispettato — se true, lo show
- * non viene declassato/promosso automaticamente. Quando avviene un
- * auto-promotion a completed, `manualList` viene resettato a false.
- *
- * Allineato con `updateShowListStatus` (store.ts):
- *  - watched === totalEpisodes (>0) → completed (clears manualList)
- *  - watched > 0 && list === towatch → watching
- *  - watched === 0 && list === watching → towatch (NEW, aligned)
- *  - totalEpisodes === 0 && list === completed && !manualList → towatch
- */
+/** Applica la stessa regola di progresso a caricamento, import e azioni utente. */
 export function reconcileAllLists(shows: Show[]): void {
-  for (const show of shows) {
-    const watched = getWatchedCount(show);
-    // Auto-promotion a completed (clears manualList).
-    if (show.totalEpisodes > 0 && watched === show.totalEpisodes) {
-      show.list = 'completed';
-      show.manualList = false;
-      continue;
-    }
-    // manualList blocca i cambiamenti automatici successivi.
-    if (show.manualList) continue;
-    if (watched > 0 && show.list === 'towatch') {
-      show.list = 'watching';
-    } else if (watched === 0 && (show.list === 'watching' || show.list === 'completed')) {
-      // NEW: allineato a updateShowListStatus — demote a towatch quando
-      // watched=0 (sia da watching che da completed, con o senza episodi).
-      show.list = 'towatch';
-    }
+  for (const show of shows) updateShowListStatus(show);
+}
+
+/** Riconcilia una lista dopo il caricamento o una modifica del progresso. */
+export function updateShowListStatus(show: Show): void {
+  const watched = getWatchedCount(show);
+  if (show.totalEpisodes > 0 && watched === show.totalEpisodes) {
+    show.list = 'completed';
+    show.manualList = false;
+  } else if (!show.manualList) {
+    show.list = watched > 0 ? 'watching' : 'towatch';
   }
 }

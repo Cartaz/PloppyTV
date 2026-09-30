@@ -126,10 +126,13 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
   });
 
   it('non-string genre elements (numbers, objects, null) → filtered out, no crash', () => {
-    const s = makeShowWithSeasons({ 1: 2 }, {
-      id: 1,
-      genres: [42, { evil: true }, null, 'Drama', 'Crime'] as unknown as string[],
-    });
+    const s = makeShowWithSeasons(
+      { 1: 2 },
+      {
+        id: 1,
+        genres: [42, { evil: true }, null, 'Drama', 'Crime'] as unknown as string[],
+      },
+    );
     markWatchedFirst(s, 1, 2);
     // Without the fix, the sort's `a[0].localeCompare(b[0])` would throw
     // TypeError because numbers don't have localeCompare.
@@ -139,10 +142,13 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
   });
 
   it('all-non-string genres → falls back to "Senza genere"', () => {
-    const s = makeShowWithSeasons({ 1: 2 }, {
-      id: 1,
-      genres: [42, null, { x: 1 }] as unknown as string[],
-    });
+    const s = makeShowWithSeasons(
+      { 1: 2 },
+      {
+        id: 1,
+        genres: [42, null, { x: 1 }] as unknown as string[],
+      },
+    );
     markWatchedFirst(s, 1, 2);
     const r = computeStats([s]);
     expect(r.topGenres).toHaveLength(1);
@@ -307,7 +313,9 @@ describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + n
       onmessage: null as ((e: MessageEvent) => void) | null,
     };
     originalWorker = globalThis.Worker;
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => mockWorker) as unknown as typeof Worker;
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
+      return mockWorker;
+    }) as unknown as typeof Worker;
   });
 
   afterEach(() => {
@@ -349,10 +357,7 @@ describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + n
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await computeStatsAsync(shows);
     // The postMessage-failure path logs a specific warning.
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('postMessage failed'),
-      expect.anything(),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('postMessage failed'), expect.anything());
     // Advance past WORKER_TIMEOUT_MS — the timeout should have been cleared,
     // so the 'stats timeout' warning is NOT logged.
     await vi.advanceTimersByTimeAsync(3000);
@@ -403,7 +408,9 @@ describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no ha
       onmessage: null as ((e: MessageEvent) => void) | null,
     };
     originalWorker = globalThis.Worker;
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => mockWorker) as unknown as typeof Worker;
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
+      return mockWorker;
+    }) as unknown as typeof Worker;
   });
 
   afterEach(() => {
@@ -422,7 +429,7 @@ describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no ha
 
   it('worker null (constructor throws) + computeStats throws → rejects (not hangs)', async () => {
     // Force the no-worker fallback path
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
     const { computeStatsAsync } = await importClient();

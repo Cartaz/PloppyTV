@@ -24,6 +24,7 @@ const VIEW_MODULES = [
   '../src/views/stats',
   '../src/views/library',
   '../src/views/yearReview',
+  '../src/views/showDetail',
 ];
 
 beforeEach(() => {
@@ -220,5 +221,152 @@ describe('renderer contracts', () => {
     expect(main.querySelector('[data-action="reloadPage"]')).not.toBeNull();
     expect(main.querySelector('[onclick]')).toBeNull();
     expect(showToastSpy).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it.each([
+    ['dashboard', '../src/views/dashboard'],
+    ['watching', '../src/views/showList'],
+    ['discover', '../src/views/discover'],
+    ['calendar', '../src/views/calendar'],
+    ['stats', '../src/views/stats'],
+    ['library', '../src/views/library'],
+    ['yearreview', '../src/views/yearReview'],
+    ['unknown-view', '../src/views/dashboard'],
+    ['detail', '../src/views/showDetail'],
+  ])('recovers from a failed chunk for %s', async (view, path) => {
+    vi.doMock(path, () => {
+      throw new Error('offline chunk');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+    store.setState({ currentView: view, currentShowId: view === 'detail' ? 1 : null });
+    renderer.render();
+    await flushFrame();
+    expect(document.querySelector('[data-action="reloadPage"]')).not.toBeNull();
+    expect(showToastSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['watching', '../src/views/showList'],
+    ['discover', '../src/views/discover'],
+    ['calendar', '../src/views/calendar'],
+    ['stats', '../src/views/stats'],
+    ['library', '../src/views/library'],
+    ['yearreview', '../src/views/yearReview'],
+    ['detail', '../src/views/showDetail'],
+  ])('ignores a failed chunk after leaving %s', async (view, path) => {
+    let reject!: (reason: Error) => void;
+    vi.doMock(
+      path,
+      () =>
+        new Promise((_resolve, rej) => {
+          reject = rej;
+        }),
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+    const main = document.getElementById('mainContent')!;
+    store.setState({ currentView: view, currentShowId: view === 'detail' ? 1 : null });
+    renderer.render();
+    await flushFrame();
+    store.setState({ currentView: 'dashboard', currentShowId: null });
+    renderDashboardSpy.mockImplementationOnce(() => {
+      main.textContent = 'Current dashboard';
+    });
+    renderer.render();
+    await flushFrame();
+    reject(new Error('late chunk failure'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(main.textContent).toBe('Current dashboard');
+    expect(showToastSpy).not.toHaveBeenCalled();
+  });
+
+  it('recovers from an exception thrown while rendering a loaded view', async () => {
+    renderDashboardSpy.mockImplementationOnce(() => {
+      throw new Error('view failure');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+    store.setState({ currentView: 'dashboard', currentShowId: null });
+    renderer.render();
+    await flushFrame();
+    expect(document.querySelector('[data-action="reloadPage"]')).not.toBeNull();
+  });
+
+  it.each([
+    ['watching', '../src/views/showList', 'renderShowList'],
+    ['discover', '../src/views/discover', 'renderDiscover'],
+    ['calendar', '../src/views/calendar', 'renderCalendar'],
+    ['stats', '../src/views/stats', 'renderStats'],
+    ['library', '../src/views/library', 'renderLibrary'],
+    ['yearreview', '../src/views/yearReview', 'renderYearReview'],
+    ['detail', '../src/views/showDetail', 'renderShowDetail'],
+  ])('ignores a successfully loaded chunk after leaving %s', async (view, path, renderName) => {
+    const chunk = deferred<Record<string, unknown>>();
+    const obsoleteRenderer = vi.fn();
+    vi.doMock(path, () => chunk.promise);
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+    store.setState({ currentView: view, currentShowId: view === 'detail' ? 1 : null });
+    renderer.render();
+    await flushFrame();
+    store.setState({ currentView: 'dashboard', currentShowId: null });
+    renderer.render();
+    await flushFrame();
+    chunk.resolve({ [renderName]: obsoleteRenderer, resetBoundGuard: vi.fn() });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(obsoleteRenderer).not.toHaveBeenCalled();
+    expect(renderDashboardSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles delegated navigation and rejects invalid show IDs', async () => {
+    const store = await import('../src/lib/store');
+    const renderer = await import('../src/components/renderer');
+    renderer.initRenderer();
+    const main = document.getElementById('mainContent')!;
+    main.innerHTML =
+      '<button data-action="switchView" data-view="library">Library</button>' +
+      '<button data-action="switchView">Missing view</button><button data-action="closeShow">Back</button>' +
+      '<button data-action="openShow" data-show-id="invalid">Invalid</button><button>Other</button>';
+    store.setState({ currentView: 'dashboard', currentShowId: 1 });
+    main.querySelector<HTMLButtonElement>('[data-view]')!.click();
+    expect(store.getState().currentView).toBe('library');
+    main.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.click());
+    expect(store.getState().currentShowId).toBeNull();
+    expect(store.getState().currentView).toBe('library');
+  });
+
+  it('tolerates a missing main element and can initialize after it appears', async () => {
+    document.getElementById('mainContent')!.remove();
+    const renderer = await import('../src/components/renderer');
+    expect(() => renderer.initRenderer()).not.toThrow();
+    renderer.render();
+    await flushFrame();
+    expect(renderDashboardSpy).not.toHaveBeenCalled();
+    document.body.insertAdjacentHTML('beforeend', '<main id="mainContent"></main>');
+    renderer.initRenderer();
+    renderer.render();
+    await flushFrame();
+    expect(renderDashboardSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])('binds show detail only when the series still exists (%s)', async (exists) => {
+    const store = await import('../src/lib/store');
+    const bind = vi.fn();
+    vi.doMock('../src/views/showDetail', () => ({
+      resetBoundGuard: vi.fn(),
+      renderShowDetail: () => {
+        if (!exists) store.closeShow();
+      },
+      bindShowDetailEvents: bind,
+    }));
+    const renderer = await import('../src/components/renderer');
+    store.setState({ currentShowId: 1 });
+    renderer.render();
+    await flushFrame();
+    expect(bind).toHaveBeenCalledTimes(exists ? 1 : 0);
   });
 });

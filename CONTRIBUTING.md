@@ -6,15 +6,15 @@ Questa guida descrive come setuppare l'ambiente, quali convenzioni seguire e com
 
 ## 1. Prerequisiti
 
-- **Node.js 18+** (consigliato 20 LTS). PloppyTV usa Vite 5 e TypeScript 5; versioni più vecchie di Node possono non supportare tutte le feature ECMAScript usate.
-- **npm 9+** (incluso con Node 18+). Non usiamo pnpm/yarn per mantenere un solo lockfile.
+- **Node.js 22 LTS**, la stessa versione usata in CI. PloppyTV usa Vite 6, TypeScript 5 e Vitest 4.
+- **npm 10+** (incluso con Node 22). Non usiamo pnpm/yarn per mantenere un solo lockfile.
 - Un editor con supporto TypeScript e ESLint (VS Code consigliato, ma qualsiasi editor va bene).
 
 Verifica la tua versione di Node:
 
 ```bash
-node --version   # v18.x o superiore
-npm --version    # 9.x o superiore
+node --version   # v22.x
+npm --version    # 10.x o superiore
 ```
 
 ## 2. Setup del progetto
@@ -50,7 +50,7 @@ Il primo `npm install` attiva anche `husky` (tramite lo script `prepare`) per in
 | `npm run format:check` | Prettier in modalità check (CI) |
 | `npm run test` | Esegue la suite Vitest una volta |
 | `npm run test:watch` | Vitest in watch mode durante lo sviluppo |
-| `npm run test:coverage` | Vitest + coverage report (soglia minima 30%) |
+| `npm run test:coverage` | Vitest + coverage gate (soglie in `vitest.config.ts`) |
 
 ## 4. Struttura del progetto
 
@@ -188,7 +188,7 @@ Per saltare il hook una tantum (NON raccomandato, solo per emergenze): `git comm
 Le PR vengono riviste dall'autore del progetto. I criteri principali:
 
 - **Type safety**: nessun `any` non giustificato, nessun cast pericoloso.
-- **Test**: nuova logica in `src/lib/` deve avere test. Coverage non deve scendere sotto il 30%.
+- **Test**: nuova logica in `src/lib/` deve avere test. Le soglie di copertura sono definite unicamente in `vitest.config.ts`.
 - **Performance**: evita re-render inutili, attenzione a listener non rimossi, preferisci event delegation.
 - **Privacy**: nessuna chiamata network aggiuntiva verso servizi non documentati in `PRIVACY.md`.
 - **A11y**: keyboard navigation, ARIA dove appropriato, contrasto colore.
@@ -224,7 +224,7 @@ Le feature devono rispettare i principi in `PRIVACY.md`: local-first, no backend
 
 ## 9. Traduzioni
 
-Attualmente l'app è in italiano. La roadmap P2 introdurrà i18n IT + EN. Se vuoi contribuire con una traduzione, aspetta che il framework i18n sia mergiato (vedi issue #N quando disponibile) — tradurre stringhe sparse ora creerebbe conflitti.
+Il framework i18n supporta IT + EN. Le traduzioni sono in `src/locales/it.json` e `src/locales/en.json`: mantieni gli stessi identificatori e placeholder nei due dizionari e usa `t()` al boundary UI. Alcune stringhe storiche sono ancora in italiano.
 
 ## 10. Code of conduct
 

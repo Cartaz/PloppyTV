@@ -1,7 +1,7 @@
 // Persistenza localStorage con backup + gestione quota + multi-tab sync
 //
 // Multi-tab strategy: optimistic concurrency control (CAS). Ogni tab mantiene
-// la revisione del documento che ha caricato: presenza della chiave + savedAt.
+// la revisione del documento che ha caricato: contenuto esatto del documento.
 // Prima di scrivere, la revisione corrente viene riletta da localStorage. Se
 // differisce dalla baseline, la scrittura viene rifiutata e il chiamante può
 // invitare l'utente a ricaricare. La presenza fa parte della revisione: anche
@@ -34,46 +34,17 @@ export function isStorageOK(): boolean {
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-type StorageRevision = { present: false } | { present: true; savedAt: number | null };
+// Il documento esatto è la revisione: due scritture nello stesso
+// millisecondo (o legacy senza savedAt) restano distinguibili, senza cambiare
+// lo schema persistito. null rappresenta la chiave assente.
+let _lastRevision: string | null = null;
 
-let _lastRevision: StorageRevision = { present: false };
-
-function _validSavedAt(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
-
-function _revisionFromRaw(raw: string | null): StorageRevision {
-  if (raw === null) return { present: false };
+function _readStorageRevision(): { raw: string | null } | null {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const savedAt =
-      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>).savedAt
-        : undefined;
-    return { present: true, savedAt: _validSavedAt(savedAt) };
-  } catch {
-    // La chiave esiste anche se il documento è corrotto. Questo è importante
-    // per distinguere una corruzione da una cancellazione concorrente.
-    return { present: true, savedAt: null };
-  }
-}
-
-function _readStorageRevision(): StorageRevision | null {
-  try {
-    return _revisionFromRaw(localStorage.getItem(STORAGE_KEY));
+    return { raw: localStorage.getItem(STORAGE_KEY) };
   } catch {
     return null;
   }
-}
-
-function _sameRevision(a: StorageRevision, b: StorageRevision): boolean {
-  if (a.present !== b.present) return false;
-  if (!a.present || !b.present) return true;
-  return a.savedAt === b.savedAt;
-}
-
-function _setRevisionFromRaw(raw: string | null): void {
-  _lastRevision = _revisionFromRaw(raw);
 }
 
 /**
@@ -83,11 +54,14 @@ function _setRevisionFromRaw(raw: string | null): void {
  * - senza `immediate`: schedula un debounce di 300ms e ritorna `void`, perché
  *   il risultato della persistenza non è ancora disponibile al chiamante.
  *
- * CAS multi-tab: se la revisione corrente (presenza + `savedAt`) differisce
+ * CAS multi-tab: se la revisione corrente (contenuto esatto) differisce
  * da quella caricata dal tab, la scrittura viene rifiutata.
  */
 export function saveData(opts?: { immediate?: boolean }): boolean | void {
-  if (opts && opts.immediate) return _saveDataNow();
+  if (opts && opts.immediate) {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    return _saveDataNow();
+  }
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(_saveDataNow, 300);
   return;
@@ -99,7 +73,7 @@ function _saveDataNow(): boolean {
   if (state._storageDisabled || !_storageOK) return false;
 
   const currentRevision = _readStorageRevision();
-  if (currentRevision === null || !_sameRevision(currentRevision, _lastRevision)) {
+  if (currentRevision === null || currentRevision.raw !== _lastRevision) {
     showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
     return false;
   }
@@ -132,21 +106,18 @@ function _saveDataNow(): boolean {
   try {
     const prev = localStorage.getItem(STORAGE_KEY);
     if (prev) {
-      // BUG-A4-02: valida che `prev` sia JSON valido prima di backarlo up.
-      // Altrimenti, dopo un corruption-recovery path in loadData (dove
-      // STORAGE_KEY contiene ancora il raw corrotto quando saveData viene
-      // chiamato), BACKUP_KEY verrebbe sovrascritto con JSON corrotto,
-      // distruggendo la safety net per le future corruzioni.
+      // Un backup deve essere un documento utilizzabile, non soltanto JSON
+      // sintatticamente valido. Il recovery non deve sostituire la safety net
+      // con il documento non valido che sta riparando.
       try {
-        JSON.parse(prev);
-        localStorage.setItem(BACKUP_KEY, prev);
+        if (canonicalizeDataDocument(JSON.parse(prev)).ok) localStorage.setItem(BACKUP_KEY, prev);
       } catch {
         // prev è corrotto (o setItem fallito) — skip backup, non clobberare
         // il backup valido eventualmente già presente in BACKUP_KEY.
       }
     }
     localStorage.setItem(STORAGE_KEY, serialized);
-    _lastRevision = { present: true, savedAt: newSavedAt };
+    _lastRevision = serialized;
     return true;
   } catch (e: unknown) {
     const err = e as { name?: string; code?: number; message?: string };
@@ -154,7 +125,7 @@ function _saveDataNow(): boolean {
       // Re-check CAS prima del recovery senza poster: tra il primo controllo
       // e il write fallito un altro tab potrebbe aver scritto o cancellato.
       const recoverRevision = _readStorageRevision();
-      if (recoverRevision === null || !_sameRevision(recoverRevision, expectedRevision)) {
+      if (recoverRevision === null || recoverRevision.raw !== expectedRevision) {
         showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
         return false;
       }
@@ -166,7 +137,7 @@ function _saveDataNow(): boolean {
           savedAt: newSavedAt,
         } satisfies SavedData);
         localStorage.setItem(STORAGE_KEY, strippedSerialized);
-        _lastRevision = { present: true, savedAt: newSavedAt };
+        _lastRevision = strippedSerialized;
         showToast('Salvato senza immagini (spazio limitato).', 'warning');
         return true;
       } catch {
@@ -239,15 +210,15 @@ export function loadData(): void {
     showToast('Archiviazione non disponibile.', 'error');
     return;
   }
-  if (!raw) {
-    _lastRevision = { present: false };
+  if (raw === null) {
+    _lastRevision = null;
     setShows([]);
     return;
   }
 
   // Baseline del documento effettivamente letto. I path di recovery possono
   // sostituire questo snapshot, ma non uno modificato nel frattempo.
-  _setRevisionFromRaw(raw);
+  _lastRevision = raw;
 
   let parsed: unknown;
   try {
@@ -276,6 +247,15 @@ export function loadData(): void {
     const unsupported = canonical.code === 'unsupported-version';
     if (unsupported) {
       console.warn('[PloppyTV] Schema version futura:', canonical.version, '— atteso', SCHEMA_VERSION);
+      // Una versione futura è valida per una build più recente, non corrotta.
+      // Bloccare le scritture evita che recovery o beforeunload la distruggano.
+      setStorageDisabled(true);
+      setShows([]);
+      showToast(
+        'Versione dati non supportata. Aggiorna l’app per accedere ai dati; salvataggio disabilitato.',
+        'error',
+      );
+      return;
     } else {
       console.warn('[PloppyTV] Documento storage non valido:', canonical.code);
     }
@@ -283,23 +263,13 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast(
-        unsupported
-          ? 'Versione dati non supportata. Ripristinato backup.'
-          : 'Dati non validi. Ripristinato backup precedente.',
-        'warning',
-      );
+      showToast('Dati non validi. Ripristinato backup precedente.', 'warning');
       saveData({ immediate: true });
       return;
     }
 
     setShows([]);
-    showToast(
-      unsupported
-        ? 'Versione dati non supportata. Usa Importa per ripristinare.'
-        : 'Dati non validi. Usa Importa per ripristinare.',
-      'error',
-    );
+    showToast('Dati non validi. Usa Importa per ripristinare.', 'error');
     return;
   }
 
@@ -331,7 +301,7 @@ if (typeof window !== 'undefined') {
         }
         // Nessun show locale → safe to wipe.
         setShows([]);
-        _lastRevision = { present: false };
+        _lastRevision = null;
         emitChange();
         return;
       }
@@ -353,7 +323,6 @@ if (typeof window !== 'undefined') {
         console.warn('[PloppyTV] storage event con version passata:', sourceVersion);
       }
       const newShows = canonical.document.shows;
-      const newSavedAt = _validSavedAt((parsed as Record<string, unknown>).savedAt);
 
       // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
       // sovrascrivere lo stato. Mostra toast e lascia _lastRevision al valore
@@ -374,7 +343,7 @@ if (typeof window !== 'undefined') {
       }
 
       setShows(newShows);
-      _lastRevision = { present: true, savedAt: newSavedAt };
+      _lastRevision = ev.newValue;
       emitChange();
     } catch (e) {
       console.warn('Sync multi-tab fallita:', e);

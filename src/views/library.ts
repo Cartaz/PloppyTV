@@ -319,8 +319,19 @@ function bindLibraryEvents(main: HTMLElement): void {
     textInput.addEventListener('input', () => {
       if (textDebounce) clearTimeout(textDebounce);
       textDebounce = setTimeout(() => {
+        // Il filtro appartiene all'input che l'ha schedulato. Navigazione o
+        // un altro render possono averlo già rimosso: non toccare il nuovo DOM.
+        if (!textInput.isConnected) return;
+        const focused = document.activeElement === textInput;
+        const start = textInput.selectionStart;
+        const end = textInput.selectionEnd;
         _filters.text = textInput.value.trim();
         renderLibrary(main);
+        if (focused) {
+          const nextInput = main.querySelector<HTMLInputElement>('#libTextFilter');
+          nextInput?.focus();
+          nextInput?.setSelectionRange(start, end);
+        }
       }, 200);
     });
   }

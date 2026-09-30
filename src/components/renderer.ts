@@ -83,26 +83,31 @@ export function render(): void {
  * catch diventa unhandled rejection e l'UI resta bricked. Con catch
  * mostriamo un fallback UI + toast.
  */
+function renderError(main: HTMLElement, error: unknown, token: number): void {
+  // Anche gli errori sono risultati asincroni: un chunk della vista precedente
+  // non deve sovrascrivere quella corrente quando fallisce in ritardo.
+  if (token !== _renderToken) return;
+  console.error('[renderer] chunk load failed:', error);
+  main.innerHTML =
+    '<div class="empty-state">' +
+    '<div class="empty-state-title">' +
+    t('toast.renderError') +
+    '</div>' +
+    '<div class="empty-state-text">' +
+    t('toast.renderError.desc') +
+    '</div>' +
+    '<button class="btn btn-primary" data-action="reloadPage" style="margin-top:12px;">' +
+    t('actions.reload') +
+    '</button></div>';
+  showToast(t('toast.chunkError'), 'error');
+}
+
 async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promise<T | null> {
+  const token = _renderToken;
   try {
     return await chunkPromise;
-  } catch (e) {
-    console.error('[renderer] chunk load failed:', e);
-    // Le stringhe del fallback appartengono all'i18n come il resto della UI:
-    // il renderer decide quando mostrare l'errore, non in quale lingua.
-    main.innerHTML =
-      '<div class="empty-state">' +
-      '<div class="empty-state-title">' +
-      t('toast.renderError') +
-      '</div>' +
-      '<div class="empty-state-text">' +
-      t('toast.renderError.desc') +
-      '</div>' +
-      '<button class="btn btn-primary" data-action="reloadPage" style="margin-top:12px;">' +
-      t('actions.reload') +
-      '</button>' +
-      '</div>';
-    showToast(t('toast.chunkError'), 'error');
+  } catch (error) {
+    renderError(main, error, token);
     return null;
   }
 }
@@ -114,102 +119,106 @@ async function _doRender(): Promise<void> {
   if (!main) return;
   const state = getState();
 
-  // Aggiorna nav active
-  document.querySelectorAll<HTMLElement>('.nav-item[data-view]').forEach((el) => {
-    el.classList.toggle('active', el.dataset.view === state.currentView && !state.currentShowId);
-  });
+  try {
+    // Aggiorna nav active
+    document.querySelectorAll<HTMLElement>('.nav-item[data-view]').forEach((el) => {
+      el.classList.toggle('active', el.dataset.view === state.currentView && !state.currentShowId);
+    });
 
-  if (state.currentShowId) {
-    const mod = await safeImport(import('../views/showDetail'), main);
-    if (myToken !== _renderToken) return;
-    if (!mod) return;
-    // CRITICAL FIX (C5): reset bound guard PRIMA del bind, così non accumuliamo
-    // listener ad ogni re-render. Il modulo è cached, quindi l'oggetto `mod`
-    // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
-    mod.resetBoundGuard();
-    mod.renderShowDetail(main);
-    // BUG-A17-08 (FIXED): se renderShowDetail ha bailato (closeShow ha nullato
-    // currentShowId perché il show non esiste), NON chiamare bindShowDetailEvents.
-    // Prima il renderer bindava incondizionatamente, legando listener al DOM
-    // della vista precedente (renderShowDetail ritorna senza modificare
-    // main.innerHTML quando il show non esiste → listener su DOM stale).
-    if (!getState().currentShowId) return;
-    mod.bindShowDetailEvents(main);
-    return;
-  }
+    if (state.currentShowId) {
+      const mod = await safeImport(import('../views/showDetail'), main);
+      if (myToken !== _renderToken) return;
+      if (!mod) return;
+      // CRITICAL FIX (C5): reset bound guard PRIMA del bind, così non accumuliamo
+      // listener ad ogni re-render. Il modulo è cached, quindi l'oggetto `mod`
+      // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
+      mod.resetBoundGuard();
+      mod.renderShowDetail(main);
+      // BUG-A17-08 (FIXED): se renderShowDetail ha bailato (closeShow ha nullato
+      // currentShowId perché il show non esiste), NON chiamare bindShowDetailEvents.
+      // Prima il renderer bindava incondizionatamente, legando listener al DOM
+      // della vista precedente (renderShowDetail ritorna senza modificare
+      // main.innerHTML quando il show non esiste → listener su DOM stale).
+      if (!getState().currentShowId) return;
+      mod.bindShowDetailEvents(main);
+      return;
+    }
 
-  switch (state.currentView) {
-    case 'dashboard': {
-      const mod = await safeImport(import('../views/dashboard'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.renderDashboard(main);
-      break;
+    switch (state.currentView) {
+      case 'dashboard': {
+        const mod = await safeImport(import('../views/dashboard'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.renderDashboard(main);
+        break;
+      }
+      case 'watching':
+      case 'towatch':
+      case 'completed': {
+        const mod = await safeImport(import('../views/showList'), main);
+        const titles: Record<'watching' | 'towatch' | 'completed', string> = {
+          watching: t('nav.watching'),
+          towatch: t('nav.towatch'),
+          completed: t('nav.completed'),
+        };
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.renderShowList(
+          main,
+          state.currentView as 'watching' | 'towatch' | 'completed',
+          titles[state.currentView as 'watching' | 'towatch' | 'completed'],
+        );
+        break;
+      }
+      case 'discover': {
+        const mod = await safeImport(import('../views/discover'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.resetBoundGuard();
+        mod.renderDiscover(main);
+        mod.bindDiscoverEvents(main);
+        break;
+      }
+      case 'calendar': {
+        const mod = await safeImport(import('../views/calendar'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.resetBoundGuard();
+        await mod.renderCalendar(main);
+        if (myToken !== _renderToken) return;
+        mod.bindCalendarEvents(main);
+        break;
+      }
+      case 'stats': {
+        const mod = await safeImport(import('../views/stats'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        await mod.renderStats(main);
+        break;
+      }
+      case 'library': {
+        const mod = await safeImport(import('../views/library'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.renderLibrary(main);
+        break;
+      }
+      case 'yearreview': {
+        const mod = await safeImport(import('../views/yearReview'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.renderYearReview(main);
+        break;
+      }
+      default: {
+        const mod = await safeImport(import('../views/dashboard'), main);
+        if (myToken !== _renderToken) return;
+        if (!mod) return;
+        mod.renderDashboard(main);
+      }
     }
-    case 'watching':
-    case 'towatch':
-    case 'completed': {
-      const mod = await safeImport(import('../views/showList'), main);
-      const titles: Record<'watching' | 'towatch' | 'completed', string> = {
-        watching: t('nav.watching'),
-        towatch: t('nav.towatch'),
-        completed: t('nav.completed'),
-      };
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.renderShowList(
-        main,
-        state.currentView as 'watching' | 'towatch' | 'completed',
-        titles[state.currentView as 'watching' | 'towatch' | 'completed'],
-      );
-      break;
-    }
-    case 'discover': {
-      const mod = await safeImport(import('../views/discover'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.resetBoundGuard();
-      mod.renderDiscover(main);
-      mod.bindDiscoverEvents(main);
-      break;
-    }
-    case 'calendar': {
-      const mod = await safeImport(import('../views/calendar'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.resetBoundGuard();
-      await mod.renderCalendar(main);
-      if (myToken !== _renderToken) return;
-      mod.bindCalendarEvents(main);
-      break;
-    }
-    case 'stats': {
-      const mod = await safeImport(import('../views/stats'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      await mod.renderStats(main);
-      break;
-    }
-    case 'library': {
-      const mod = await safeImport(import('../views/library'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.renderLibrary(main);
-      break;
-    }
-    case 'yearreview': {
-      const mod = await safeImport(import('../views/yearReview'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.renderYearReview(main);
-      break;
-    }
-    default: {
-      const mod = await safeImport(import('../views/dashboard'), main);
-      if (myToken !== _renderToken) return;
-      if (!mod) return;
-      mod.renderDashboard(main);
-    }
+  } catch (error) {
+    renderError(main, error, myToken);
   }
 }
 

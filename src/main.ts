@@ -35,6 +35,7 @@ import { initI18n, subscribeI18n } from './lib/i18n';
 import { initKeyboard } from './lib/keyboard';
 import { initNotifications } from './lib/notifications';
 import { registerSW } from 'virtual:pwa-register';
+import { safeId } from './lib/utils';
 
 // ===== Hash routing minimale per PWA shortcuts e deep link =====
 // PWA shortcuts in vite.config.ts puntano a ./index.html#dashboard, #discover,
@@ -65,7 +66,7 @@ function applyHash(): void {
   // Deep link a show: #show/<id>
   const showMatch = /^show\/(\d+)$/.exec(hash);
   if (showMatch) {
-    const id = Number(showMatch[1]);
+    const id = safeId(showMatch[1]);
     if (id > 0 && state.currentShowId !== id) {
       openShow(id);
     }
@@ -113,8 +114,9 @@ function showFatalError(err: unknown): void {
         '<div class="empty-state">' +
         '<div class="empty-state-title">Errore di avvio</div>' +
         '<div class="empty-state-text">Si è verificato un errore imprevisto. Ricarica la pagina per riprovare.</div>' +
-        '<button class="btn btn-primary" style="margin-top:12px;" onclick="location.reload()">Ricarica</button>' +
+        '<button class="btn btn-primary" style="margin-top:12px;">Ricarica</button>' +
         '</div>';
+      main.querySelector('button')?.addEventListener('click', () => window.location.reload());
     }
   } catch {
     // ignore — DOM non disponibile

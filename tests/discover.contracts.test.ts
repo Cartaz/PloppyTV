@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-let loadDiscoverSpy: ReturnType<typeof vi.fn>;
-let invalidateDiscoverCacheSpy: ReturnType<typeof vi.fn>;
-let resetDiscoverLoadSpy: ReturnType<typeof vi.fn>;
-let findShowInDiscoverGroupsSpy: ReturnType<typeof vi.fn>;
-let addShowToListSpy: ReturnType<typeof vi.fn>;
-let showModalSpy: ReturnType<typeof vi.fn>;
-let showToastSpy: ReturnType<typeof vi.fn>;
+let loadDiscoverSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let invalidateDiscoverCacheSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let resetDiscoverLoadSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let findShowInDiscoverGroupsSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let addShowToListSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let showModalSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let showToastSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
 
 const show = {
   id: 42,
@@ -115,9 +115,6 @@ describe('discover interaction contracts', () => {
     await addAction?.onClick?.();
 
     expect(addShowToListSpy).not.toHaveBeenCalled();
-    expect(showToastSpy).toHaveBeenCalledWith(
-      'Serie non trovata nella cache, usa la ricerca',
-      'error',
-    );
+    expect(showToastSpy).toHaveBeenCalledWith('Serie non trovata nella cache, usa la ricerca', 'error');
   });
 });

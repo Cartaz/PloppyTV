@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-let showModalSpy: ReturnType<typeof vi.fn>;
-let showToastSpy: ReturnType<typeof vi.fn>;
-let notificationsSupportedSpy: ReturnType<typeof vi.fn>;
-let notificationsEnabledSpy: ReturnType<typeof vi.fn>;
-let enableNotificationsSpy: ReturnType<typeof vi.fn>;
-let disableNotificationsSpy: ReturnType<typeof vi.fn>;
-let isPwaStandaloneSpy: ReturnType<typeof vi.fn>;
-let getNextNotifiableEpisodeSpy: ReturnType<typeof vi.fn>;
+let showModalSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let showToastSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let notificationsSupportedSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let notificationsEnabledSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let enableNotificationsSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let disableNotificationsSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let isPwaStandaloneSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
+let getNextNotifiableEpisodeSpy: ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
 
 beforeEach(() => {
   vi.resetModules();
@@ -121,10 +121,7 @@ describe('header contracts', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('[notifications] Not in standalone mode');
     expect(enableNotificationsSpy).toHaveBeenCalledTimes(1);
-    expect(showToastSpy).toHaveBeenCalledWith(
-      'notifications.scheduled — Example Show S2E4',
-      'success',
-    );
+    expect(showToastSpy).toHaveBeenCalledWith('notifications.scheduled — Example Show S2E4', 'success');
   });
 
   it('surfaces permission denial without reporting notifications as enabled', async () => {

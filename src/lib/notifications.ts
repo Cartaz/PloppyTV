@@ -28,7 +28,10 @@ let _rescheduleListener: (() => void) | null = null;
 function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (raw) return JSON.parse(raw) as Prefs;
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Prefs;
+    }
   } catch {
     // ignore
   }
@@ -37,9 +40,7 @@ function loadPrefs(): Prefs {
 
 function savePrefs(prefs: Prefs): void {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    Object.assign(existing, prefs);
+    const existing = { ...loadPrefs(), ...prefs };
     localStorage.setItem(PREFS_KEY, JSON.stringify(existing));
   } catch {
     // ignore

@@ -97,6 +97,41 @@ afterEach(async () => {
 });
 
 describe('notification contracts', () => {
+  it('does not request permission when the notification API is unavailable', async () => {
+    Reflect.deleteProperty(globalThis, 'Notification');
+    const notifications = await import('../src/lib/notifications');
+    expect(await notifications.enableNotifications()).toBe(false);
+    expect(localStorage.getItem(PREFS_KEY)).toBeNull();
+  });
+
+  it('enables notifications in standalone mode while preserving language', async () => {
+    setStandalone(true);
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ lang: 'en' }));
+    const notifications = await import('../src/lib/notifications');
+    expect(await notifications.enableNotifications()).toBe(true);
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toEqual({ lang: 'en', notificationsEnabled: true });
+  });
+
+  it('handles a rejected browser permission prompt without enabling notifications', async () => {
+    const { requestPermission } = installNotification('default');
+    requestPermission.mockRejectedValueOnce(new Error('permission prompt unavailable'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const notifications = await import('../src/lib/notifications');
+    expect(await notifications.enableNotifications()).toBe(false);
+    expect(notifications.notificationsEnabled()).toBe(false);
+  });
+
+  it('falls back to desktop delivery when no service worker registration exists', async () => {
+    vi.setSystemTime(new Date(2026, 8, 1, 22, 0, 0));
+    const notification = installNotification('granted');
+    enablePreference();
+    storeState.shows = [eligibleShow(7, 'Desktop fallback', '2026-09-02')];
+    installServiceWorker(async () => undefined);
+    const { scheduleNotifications } = await import('../src/lib/notifications');
+    scheduleNotifications();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(notification.records[0].title).toContain('Desktop fallback');
+  });
   it('detects notification support and both standalone signals', async () => {
     const notifications = await import('../src/lib/notifications');
 
@@ -183,7 +218,7 @@ describe('notification contracts', () => {
       deliveredTitle = title;
       deliveredOptions = options;
     });
-    installServiceWorker(async () => ({ showNotification } as unknown as ServiceWorkerRegistration));
+    installServiceWorker(async () => ({ showNotification }) as unknown as ServiceWorkerRegistration);
 
     const { scheduleNotifications } = await import('../src/lib/notifications');
     scheduleNotifications();
@@ -213,10 +248,7 @@ describe('notification contracts', () => {
 
     expect(notification.records).toHaveLength(1);
     expect(notification.records[0].title).toContain('Fallback Show');
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[notifications] service worker notification failed:',
-      expect.any(Error),
-    );
+    expect(warnSpy).toHaveBeenCalledWith('[notifications] service worker notification failed:', expect.any(Error));
   });
 
   it('keeps initialization idempotent and removes its reschedule listener on reset', async () => {
@@ -233,9 +265,7 @@ describe('notification contracts', () => {
     notifications.initNotifications();
     notifications.initNotifications();
     notifications.initNotifications();
-    expect(
-      addSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
-    ).toHaveLength(1);
+    expect(addSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications')).toHaveLength(1);
     expect(setTimeoutSpy).toHaveBeenCalledTimes(2);
 
     window.dispatchEvent(new Event('ploppytv:reschedule-notifications'));
@@ -243,9 +273,9 @@ describe('notification contracts', () => {
     expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     notifications._resetNotificationsForTesting();
-    expect(
-      removeSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications'),
-    ).toHaveLength(1);
+    expect(removeSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications')).toHaveLength(
+      1,
+    );
     expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -265,5 +295,27 @@ describe('notification contracts', () => {
       num: 1,
       airdate: '2026-09-02',
     });
+  });
+
+  it('ignores missing or invalid episode dates in the preview and scheduler', async () => {
+    installNotification('granted');
+    enablePreference();
+    const empty = eligibleShow(10, 'Empty', '2026-09-02');
+    empty.seasons = {};
+    const noDate = eligibleShow(11, 'No date', '2026-09-02');
+    noDate.seasons[1][0].airdate = null;
+    const invalid = eligibleShow(12, 'Invalid', '2026-02-30');
+    storeState.shows = [empty, noDate, invalid];
+    const notifications = await import('../src/lib/notifications');
+    expect(notifications.getNextNotifiableEpisode()).toBeNull();
+    const timerSpy = vi.spyOn(globalThis, 'setTimeout');
+    notifications.scheduleNotifications();
+    expect(timerSpy.mock.calls.map((call) => call[1])).toEqual([NOTIF_RESCHEDULE_INTERVAL_MS]);
+  });
+
+  it('keeps the earliest preview when subsequent series air later', async () => {
+    storeState.shows = [eligibleShow(1, 'First', '2026-09-02'), eligibleShow(2, 'Later', '2026-09-04')];
+    const { getNextNotifiableEpisode } = await import('../src/lib/notifications');
+    expect(getNextNotifiableEpisode()?.showName).toBe('First');
   });
 });

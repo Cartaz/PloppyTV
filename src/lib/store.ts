@@ -6,10 +6,7 @@
 //  - BUG-03-03: emitChange guarda RAF con fallback a setTimeout(...,0).
 //  - BUG-03-04: openShow guarda window.scrollTo (no throw se assente).
 //  - BUG-03-05 / H11: reconcileList DELETATO (dead code).
-//  - updateShowListStatus e reconcileAllLists (in normalize.ts) allineati:
-//    entrambi rispettano manualList, demoted watching→towatch su watched=0,
-//    demote completed→towatch su watched=0 (no manualList), clear manualList
-//    su auto-promotion a completed.
+//  - La regola di riconciliazione delle liste appartiene a normalize.ts.
 //
 // Agent A2 fixes:
 //  - BUG-A2-01: setShows valida l'input (null/undefined/non-array → []).
@@ -29,7 +26,7 @@
 //    qualsiasi valore; non-function avrebbe throwato a ogni emit).
 
 import type { ListName, Show } from '../types';
-import { getWatchedCount } from './utils';
+export { updateShowListStatus } from './normalize';
 
 export interface AppState {
   shows: Show[];
@@ -277,36 +274,6 @@ export function setStorageDisabled(v: boolean): void {
 
 export function setQuotaWarned(v: boolean): void {
   state._quotaWarned = v;
-}
-
-/**
- * Riconcilia il `list` di una serie basandosi sul conteggio episodi watched.
- * Usato dopo azioni utente (toggle, mark season).
- *
- * Rispetta `manualList`: una serie spostata manualmente non viene retrocessa.
- * Auto-promotion a `completed` resetta manualList=false.
- *
- * Allineato con `reconcileAllLists` in normalize.ts (entrambi rispettano
- * manualList, demote watching→towatch su watched=0, demote completed→towatch
- * su watched=0 senza manualList).
- */
-export function updateShowListStatus(show: Show): void {
-  const watchedCount = getWatchedCount(show);
-  if (show.totalEpisodes > 0 && watchedCount === show.totalEpisodes) {
-    show.list = 'completed';
-    show.manualList = false; // auto-promotion to completed clears manual override
-    return;
-  }
-  if (show.manualList) {
-    // Rispetta la scelta dell'utente: non retrocedere
-    return;
-  }
-  if (watchedCount > 0) {
-    if (show.list !== 'watching') show.list = 'watching';
-  } else {
-    // watched=0 → demote a towatch (sia da completed che da watching).
-    if (show.list === 'completed' || show.list === 'watching') show.list = 'towatch';
-  }
 }
 
 export type { ListName };
