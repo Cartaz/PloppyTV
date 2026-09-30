@@ -824,3 +824,63 @@ describe('main.ts — render/subscribe/loadData ordering', () => {
     expect(mockLoadData.mock.invocationCallOrder[0]).toBeLessThan(mockUpdateBadges.mock.invocationCallOrder[0]);
   });
 });
+
+describe('main error boundaries', () => {
+  beforeEach(() => {
+    resetMocks();
+    vi.resetModules();
+    vi.useFakeTimers();
+    document.body.innerHTML = '<main id="mainContent"></main>';
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([new Error('unexpected'), 'text rejection', null])('reports unexpected rejections (%s)', async (reason) => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await import('../src/main');
+    const handler = _tracked.find(({ type }) => type === 'unhandledrejection')!.listener;
+    handler({ reason });
+    expect(errorSpy).toHaveBeenCalledWith('[PloppyTV] unhandled rejection:', reason);
+    expect(mockShowToast).toHaveBeenCalledWith('Si è verificato un errore inatteso', 'error');
+  });
+
+  it('ignores expected cancellation and tolerates a failed error notification', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await import('../src/main');
+    const handler = _tracked.find(({ type }) => type === 'unhandledrejection')!.listener;
+    handler({ reason: { name: 'AbortError' } });
+    expect(errorSpy).not.toHaveBeenCalled();
+    mockShowToast.mockImplementationOnce(() => {
+      throw new Error('missing toast');
+    });
+    expect(() => handler({ reason: new Error('failure') })).not.toThrow();
+  });
+
+  it('logs global errors even when the event has only a message', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await import('../src/main');
+    const handler = _tracked.find(({ type }) => type === 'error')!.listener;
+    handler({ error: null, message: 'script failed' });
+    expect(errorSpy).toHaveBeenCalledWith('[PloppyTV] uncaught error:', 'script failed');
+  });
+
+  it('provides a reload control without inline script when initialization fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockInitRenderer.mockImplementationOnce(() => {
+      throw new Error('init failure');
+    });
+    await import('../src/main');
+    expect(document.getElementById('mainContent')!.textContent).toContain('Errore di avvio');
+    expect(document.querySelector('#mainContent button')).not.toBeNull();
+    expect(document.querySelector('#mainContent [onclick]')).toBeNull();
+  });
+
+  it('rejects unsafe integer show IDs in deep links', async () => {
+    setHash('#show/999999999999999999999999999999');
+    await import('../src/main');
+    vi.advanceTimersByTime(0);
+    expect(mockOpenShow).not.toHaveBeenCalled();
+  });
+});

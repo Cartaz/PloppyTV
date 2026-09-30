@@ -511,15 +511,15 @@ describe('refreshShowEpisodes', () => {
     expect(show.seasons[1].find((e) => e.num === 11)!.watched).toBe(false);
   });
 
-  it('refresh falls back to num match when id differs (backward compat)', async () => {
+  it('refresh falls back to num match when the legacy id is unknown', async () => {
     const show = makeShow({
       id: 42, list: 'watching', manualList: false,
       seasons: {
-        1: [{ num: 1, id: 999, watched: true, airdate: null, name: 'Old', runtime: 60 }],
+        1: [{ num: 1, id: 0, watched: true, airdate: null, name: 'Old', runtime: 60 }],
       },
     });
     setShows([show]);
-    // TVMaze returns same num but different id
+    // TVMaze supplies an ID for the legacy episode.
     vi.mocked(getShowEpisodes).mockResolvedValue([
       { id: 101, season: 1, number: 1, name: 'New Pilot', airdate: '2024-01-01', runtime: 60 },
     ]);

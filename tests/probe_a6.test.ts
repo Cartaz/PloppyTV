@@ -153,8 +153,8 @@ describe('BUG-A6-01: refreshShowEpisodes preserves rating and note', () => {
     show.seasons[1][0].watched = true;
     show.seasons[1][0].rating = 4;
     show.seasons[1][0].note = 'Note via num match';
-    // id does NOT match the TVMaze id (forces fallback to num match)
-    show.seasons[1][0].id = 999;
+    // Legacy episode without an ID uses the positional fallback.
+    show.seasons[1][0].id = 0;
     setShows([show]);
 
     vi.mocked(getShowEpisodes).mockResolvedValue([

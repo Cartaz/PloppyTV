@@ -399,7 +399,9 @@ describe('[client] computeStatsAsync', () => {
       onmessage: null as ((e: MessageEvent) => void) | null,
     };
     originalWorker = globalThis.Worker;
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => mockWorker) as unknown as typeof Worker;
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
+      return mockWorker;
+    }) as unknown as typeof Worker;
   });
 
   afterEach(() => {
@@ -455,7 +457,7 @@ describe('[client] computeStatsAsync', () => {
   });
 
   it('falls back immediately when Worker constructor throws', async () => {
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('Worker not supported');
     }) as unknown as typeof Worker;
     const { computeStatsAsync } = await importClient();
@@ -611,7 +613,7 @@ describe('[client] computeStatsAsync', () => {
   // produce the same result for the same input.
   it('fallback computeStats produces identical results to worker computeStats', async () => {
     // Force fallback by making Worker constructor throw
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
     const { computeStatsAsync } = await importClient();
@@ -657,7 +659,9 @@ describe('[client] computeCalendarAsync', () => {
       onmessage: null as ((e: MessageEvent) => void) | null,
     };
     originalWorker = globalThis.Worker;
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => mockWorker) as unknown as typeof Worker;
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
+      return mockWorker;
+    }) as unknown as typeof Worker;
   });
 
   afterEach(() => {
@@ -728,7 +732,7 @@ describe('[client] computeCalendarAsync', () => {
   // `safeWeekOffset` internally), so behavior is identical regardless of
   // worker availability — including for NaN/Infinity weekOffset.
   it('fallback calendar produces identical results to worker calendar', async () => {
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
     const { computeCalendarAsync } = await import('../src/worker/client');
@@ -763,7 +767,7 @@ describe('[client] computeCalendarAsync', () => {
   // `computeCalendar` from `./compute.ts`, which applies `safeWeekOffset`
   // internally → non-finite offsets collapse to 0 (current week).
   it('BUG-16-03: fallback path handles NaN/Infinity weekOffset (no Invalid Date)', async () => {
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
     const { computeCalendarAsync } = await import('../src/worker/client');
@@ -780,7 +784,7 @@ describe('[client] computeCalendarAsync', () => {
   });
 
   it('BUG-16-03: fallback path floors non-integer weekOffset (matches worker)', async () => {
-    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(() => {
+    (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
     const { computeCalendarAsync } = await import('../src/worker/client');

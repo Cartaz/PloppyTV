@@ -524,11 +524,14 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
     {
       label: 'Salva',
       style: 'btn-primary',
+      keepOpen: true,
       onClick: () => {
         const ta = document.getElementById('noteTextarea') as HTMLTextAreaElement | null;
         if (!ta) return;
-        setEpisodeNote(showId, season, epNum, ta.value);
-        showToast('Nota salvata', 'success');
+        if (setEpisodeNote(showId, season, epNum, ta.value)) {
+          closeModal();
+          showToast('Nota salvata', 'success');
+        }
       },
     },
   ]);

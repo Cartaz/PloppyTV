@@ -6,7 +6,7 @@ import { getState, setState, emitChange, replaceShow, removeShowFromState, updat
 import { saveData } from './storage';
 import { buildShowFromTvmaze } from './normalize';
 import { getShowEpisodes, ApiError } from './api';
-import { safeId, stripHtml, parseISODateLocal } from './utils';
+import { safeId } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { updateBadges } from '../components/header';
@@ -220,13 +220,6 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     return false;
   }
 
-  // Snapshot per rollback
-  const prevSeasons = JSON.parse(JSON.stringify(show.seasons)) as Show['seasons'];
-  const prevTotalEpisodes = show.totalEpisodes;
-  const prevTotalSeasons = show.totalSeasons;
-  const prevList = show.list;
-  const prevManual = show.manualList ?? false;
-
   try {
     const episodes = await getShowEpisodes(id);
     // BUG-A6-05: defensive — se la risposta API non è un array, abort (non crashare).
@@ -240,79 +233,58 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
       return false;
     }
-    // Mantiene watched state esistente, aggiorna name/airdate/runtime
-    // BUG-06-04: matched by TVMaze id (più stabile di num quando TVMaze renumber).
-    const newSeasons: Show['seasons'] = {};
-    let totalEpisodes = 0;
-    // BUG-A6-03: dedup per num dentro ogni stagione (allineato a buildShowFromTvmaze).
-    const seenNumsPerSeason: Record<number, Set<number>> = {};
-    for (const ep of episodes) {
-      if (ep.season == null || ep.season === 0) continue;
-      if (ep.number == null) continue;
-      const sn = safeId(ep.season);
-      if (!sn) continue;
-      const epId = safeId(ep.id);
-      const epNum = safeId(ep.number);
-      // BUG-A6-02: skip episodi con num=0 (allineato a buildShowFromTvmaze/normalizeShow).
-      // Prima venivano aggiunti con num:0, gonfiando totalEpisodes e rompendo la UI.
-      if (!epNum) continue;
-      if (!newSeasons[sn]) {
-        newSeasons[sn] = [];
-        seenNumsPerSeason[sn] = new Set();
+    // Un import, una rimozione o la sincronizzazione multi-tab può aver
+    // sostituito la serie durante la richiesta. La risposta appartiene solo
+    // all'istanza per cui è partita; non deve modificare la nuova istanza.
+    if (getState().shows.find((s) => s.id === id) !== show) return false;
+
+    // La normalizzazione dei metadati API ha un solo proprietario, condiviso
+    // con l'aggiunta iniziale. Anche un array non vuoto può non contenere
+    // nessun episodio utilizzabile: in quel caso preserviamo i dati esistenti.
+    const refreshed = buildShowFromTvmaze({ id }, episodes, show.list);
+    if (refreshed.totalEpisodes === 0 && show.totalEpisodes > 0) {
+      if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
+      return false;
+    }
+    const newSeasons = refreshed.seasons;
+    const existingById = new Map<number, Episode>();
+    for (const season of Object.values(show.seasons)) {
+      if (!Array.isArray(season)) continue;
+      for (const ep of season) {
+        if (ep && safeId(ep.id)) existingById.set(ep.id, ep);
       }
-      // BUG-A6-03: dedup — primo tenuto, duplicati saltati (allineato a buildShowFromTvmaze).
-      if (seenNumsPerSeason[sn].has(epNum)) continue;
-      seenNumsPerSeason[sn].add(epNum);
-      // BUG-06-04: prima prova match by id (stable TVMaze id).
-      let existingEp: Episode | undefined;
-      for (const seasonArr of Object.values(show.seasons)) {
-        if (!Array.isArray(seasonArr)) continue;
-        const found = seasonArr.find((e) => e && e.id === epId);
-        if (found) {
-          existingEp = found;
-          break;
+    }
+    for (const [season, seasonEpisodes] of Object.entries(newSeasons)) {
+      for (const ep of seasonEpisodes) {
+        let existing = ep.id > 0 ? existingById.get(ep.id) : undefined;
+        if (!existing) {
+          const positional = show.seasons[Number(season)]?.find((old) => old && old.num === ep.num);
+          // La posizione è un fallback per dati legacy senza ID. Due ID
+          // validi e diversi identificano episodi diversi, anche dopo renumber.
+          if (positional && (!ep.id || !safeId(positional.id))) existing = positional;
+        }
+        ep.watched = existing?.watched === true;
+        if (existing && typeof existing.rating === 'number' && Number.isFinite(existing.rating)) {
+          const rating = Math.round(existing.rating);
+          if (rating >= 1 && rating <= MAX_EPISODE_RATING) ep.rating = rating;
+        }
+        if (existing && typeof existing.note === 'string' && existing.note.length > 0) {
+          ep.note = existing.note.slice(0, MAX_EPISODE_NOTE_LENGTH);
         }
       }
-      // Fallback: match by num nella stessa stagione (backward compat).
-      if (!existingEp) {
-        const arr = show.seasons[sn];
-        if (Array.isArray(arr)) existingEp = arr.find((e) => e && e.num === epNum);
-      }
-      // BUG-A6-01: preserva rating e note dall'episodio esistente.
-      // Prima, il nuovo episodio copiava solo watched/airdate/name/runtime,
-      // perdendo rating e note personali dell'utente ad ogni refresh.
-      // BUG-A19-01: valida airdate con parseISODateLocal (strict) invece della
-      // regex loose /^\d{4}-\d{2}-\d{2}$/ che accettava date inesistenti come
-      // '2024-13-40' o '2024-02-30' (rollover). Allineato a normalize.ts.
-      // BUG-A19-02: stripHtml su ep.name (defense-in-depth, allineato a
-      // normalize.ts safeEpisodeName) — ep.name arriva dall'API TVMaze e potrebbe
-      // contenere HTML; senza strip, un renderer distratto genererebbe XSS.
-      const epName =
-        typeof ep.name === 'string' && stripHtml(ep.name).trim().length > 0
-          ? stripHtml(ep.name).trim().slice(0, 300)
-          : null;
-      const newEp: Episode = {
-        num: epNum,
-        id: epId,
-        watched: existingEp?.watched ?? false,
-        airdate: typeof ep.airdate === 'string' && parseISODateLocal(ep.airdate) !== null ? ep.airdate : null,
-        name: epName,
-        runtime: typeof ep.runtime === 'number' && ep.runtime > 0 ? ep.runtime : null,
-      };
-      if (existingEp && typeof existingEp.rating === 'number' && Number.isFinite(existingEp.rating)) {
-        const r = Math.round(existingEp.rating);
-        if (r >= 1 && r <= MAX_EPISODE_RATING) newEp.rating = r;
-      }
-      if (existingEp && typeof existingEp.note === 'string' && existingEp.note.length > 0) {
-        newEp.note = existingEp.note.slice(0, MAX_EPISODE_NOTE_LENGTH);
-      }
-      newSeasons[sn].push(newEp);
-      totalEpisodes++;
     }
 
+    // Il rollback appartiene alla modifica sincrona, dopo l'await: comprende
+    // anche gli edit dell'utente effettuati mentre l'API rispondeva.
+    const prevSeasons = show.seasons;
+    const prevTotalEpisodes = show.totalEpisodes;
+    const prevTotalSeasons = show.totalSeasons;
+    const prevList = show.list;
+    const prevManual = show.manualList;
+
     show.seasons = newSeasons;
-    show.totalEpisodes = totalEpisodes;
-    show.totalSeasons = Object.keys(newSeasons).length;
+    show.totalEpisodes = refreshed.totalEpisodes;
+    show.totalSeasons = refreshed.totalSeasons;
     updateShowListStatus(show);
 
     if (!saveData({ immediate: true })) {
@@ -400,15 +372,15 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
  * Imposta la nota privata di un episodio (max 500 char). Stringa vuota = rimuovi.
  * Salva immediatamente su localStorage con rollback in caso di fallimento.
  */
-export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): void {
+export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): boolean {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
   // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
-  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
+  if (!show || !show.seasons || typeof show.seasons !== 'object') return false;
   const seasonArr = show.seasons[seasonNum];
-  if (!Array.isArray(seasonArr)) return;
+  if (!Array.isArray(seasonArr)) return false;
   const ep = seasonArr.find((e) => e && e.num === epNum);
-  if (!ep) return;
+  if (!ep) return false;
 
   const trimmed = typeof note === 'string' ? note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim() : '';
   const newNote = trimmed.length > 0 ? trimmed : undefined;
@@ -418,9 +390,10 @@ export function setEpisodeNote(showId: number, seasonNum: number, epNum: number,
   if (!saveData({ immediate: true })) {
     ep.note = prevNote;
     showToast('Nota non salvata (storage error o modifiche in altro tab)', 'error');
-    return;
+    return false;
   }
   emitChange();
+  return true;
 }
 
 // ===== P2.3: Tag personalizzabili per serie =====
