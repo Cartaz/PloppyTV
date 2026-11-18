@@ -7,8 +7,8 @@ let _errorHandler: ((e: Event) => void) | null = null;
  * Inizializza il delegato globale per gli errori di caricamento <img>.
  * Idempotente: chiamate multiple non aggiungono listener duplicati.
  */
-export function initImageFallback(): void {
-  if (_initialized) return;
+export function initImageFallback(): () => void {
+  if (_initialized) return disposeImageFallback;
   _initialized = true;
   _errorHandler = (e: Event) => {
     const target = e.target as HTMLElement;
@@ -41,10 +41,11 @@ export function initImageFallback(): void {
     if (target.parentNode) target.parentNode.replaceChild(placeholder, target);
   };
   document.addEventListener('error', _errorHandler, true); // capture phase
+  return disposeImageFallback;
 }
 
-/** Rimuove il listener globale e resetta lo stato (solo per i test). */
-export function _resetImageFallbackForTesting(): void {
+/** Rimuove il listener globale (cleanup di initImageFallback). */
+function disposeImageFallback(): void {
   if (!_initialized || !_errorHandler) return;
   document.removeEventListener('error', _errorHandler, true);
   _errorHandler = null;

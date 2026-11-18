@@ -21,9 +21,7 @@ let _scheduledTimers: ReturnType<typeof setTimeout>[] = [];
 let _rescheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let _initialized = false;
 // Salviamo il riferimento al listener per poterlo
-// rimuovere in _resetNotificationsForTesting (e in futuro in un eventuale
-// destroyNotifications per HMR). Prima il listener era anonimo e accumulava
-// in test con module reload.
+// rimuovere in disposeNotifications.
 let _rescheduleListener: (() => void) | null = null;
 
 function loadPrefs(): Prefs {
@@ -224,8 +222,8 @@ export function scheduleNotifications(): void {
  * Se l'utente aveva già attivato le notifiche, le re-schedula.
  * Idempotente.
  */
-export function initNotifications(): void {
-  if (_initialized) return;
+export function initNotifications(): () => void {
+  if (_initialized) return disposeNotifications;
   _initialized = true;
 
   if (notificationsEnabled()) {
@@ -241,21 +239,14 @@ export function initNotifications(): void {
     }
   };
   window.addEventListener('ploppytv:reschedule-notifications', _rescheduleListener);
+  return disposeNotifications;
 }
 
-/**
- * Resetta lo stato delle notifiche (solo per testing). Rimuove il listener
- * window, cancella tutti i timer e resetta il flag _initialized.
- * NON usare in produzione.
- */
-export function _resetNotificationsForTesting(): void {
+/** Annulla i timer e rimuove il listener di re-scheduling (cleanup di initNotifications). */
+function disposeNotifications(): void {
   clearScheduledNotifications();
   if (_rescheduleListener) {
-    try {
-      window.removeEventListener('ploppytv:reschedule-notifications', _rescheduleListener);
-    } catch {
-      // ignore — window non disponibile o listener già rimosso
-    }
+    window.removeEventListener('ploppytv:reschedule-notifications', _rescheduleListener);
     _rescheduleListener = null;
   }
   _initialized = false;

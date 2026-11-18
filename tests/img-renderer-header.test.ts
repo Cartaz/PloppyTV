@@ -10,7 +10,7 @@
 //   interpolava extraStyle raw nel style attribute → XSS se conteneva ".
 // - BUG-A17-03 (High, FIXED): imageFallback loop infinito con fallbackSrc
 //   relativo. Ora usa flag data-fallback-src-tried invece di confronto stringa.
-// - BUG-A17-04 (Medium, FIXED): imageFallback _resetImageFallbackForTesting per cleanup.
+// - imageFallback: initImageFallback ritorna il dispose del listener.
 // - BUG-A17-05 (Medium, FIXED): renderer getMain ritorna null invece di crashare.
 // - BUG-A17-06 (Medium, FIXED): renderer usa safeId per data-show-id.
 // - BUG-A17-07 (Medium, FIXED): renderer safeImport usa data-action (CSP-safe).
@@ -25,7 +25,15 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { imgTag } from '../src/components/img';
-import { initImageFallback, _resetImageFallbackForTesting } from '../src/components/imageFallback';
+import { initImageFallback } from '../src/components/imageFallback';
+
+// Cleanup dei listener globali registrati dai test (initImageFallback ritorna il dispose).
+const disposers: Array<() => void> = [];
+function initFallback(): () => void {
+  const dispose = initImageFallback();
+  disposers.push(dispose);
+  return dispose;
+}
 
 // Paths that any test below may doMock — unmocked in beforeEach to prevent
 // cross-test pollution (vi.doMock registrations persist across resetModules).
@@ -68,8 +76,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Clean up imageFallback listener if still active.
-  _resetImageFallbackForTesting();
+  // Clean up imageFallback listeners registered by the test.
+  disposers.splice(0).forEach((dispose) => dispose());
   vi.clearAllMocks();
 });
 
@@ -199,7 +207,7 @@ describe('BUG-A17-02: imgTag escapes cls and extraStyle', () => {
 
 describe('BUG-A17-03: imageFallback no infinite loop with relative fallbackSrc', () => {
   beforeEach(() => {
-    initImageFallback();
+    initFallback();
   });
 
   it('relative fallbackSrc: first error sets src, second error → placeholder (no loop)', () => {
@@ -284,13 +292,12 @@ describe('BUG-A17-03: imageFallback no infinite loop with relative fallbackSrc',
 });
 
 // ============================================================
-// imageFallback.ts — BUG-A17-04: _resetImageFallbackForTesting cleanup
+// imageFallback.ts — dispose cleanup
 // ============================================================
 
-describe('BUG-A17-04: _resetImageFallbackForTesting removes listener', () => {
+describe('imageFallback dispose removes the listener', () => {
   it('after destroy, error events no longer trigger placeholder', () => {
-    initImageFallback();
-    _resetImageFallbackForTesting();
+    initFallback()(); // init + dispose
 
     const img = document.createElement('img');
     img.dataset.fallback = 'Destroyed';
@@ -304,9 +311,8 @@ describe('BUG-A17-04: _resetImageFallbackForTesting removes listener', () => {
   });
 
   it('init after destroy re-registers listener', () => {
-    initImageFallback();
-    _resetImageFallbackForTesting();
-    initImageFallback();
+    initFallback()(); // init + dispose
+    initFallback();
 
     const img = document.createElement('img');
     img.dataset.fallback = 'Re-init';
@@ -319,9 +325,9 @@ describe('BUG-A17-04: _resetImageFallbackForTesting removes listener', () => {
 
   it('double init does not add duplicate listeners', () => {
     const addSpy = vi.spyOn(document, 'addEventListener');
-    initImageFallback();
+    initFallback();
     const countAfterFirst = addSpy.mock.calls.filter(([t]) => t === 'error').length;
-    initImageFallback(); // no-op
+    initFallback(); // no-op
     const countAfterSecond = addSpy.mock.calls.filter(([t]) => t === 'error').length;
     expect(countAfterSecond).toBe(countAfterFirst);
     addSpy.mockRestore();
@@ -754,8 +760,6 @@ describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () =
   it('click on [data-lang="en"] calls setLocale("en") immediately', async () => {
     document.body.innerHTML = '<button id="langBtn"></button><div id="mainContent"></div>';
     const { initHeader } = await import('../src/components/header');
-    const { _resetI18nForTesting } = await import('../src/lib/i18n');
-    _resetI18nForTesting();
     initHeader();
 
     // Simulate: a language button is added to the DOM (as showModal would do).
@@ -774,8 +778,7 @@ describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () =
   it('click on [data-lang="it"] calls setLocale("it")', async () => {
     document.body.innerHTML = '<button id="langBtn"></button><div id="mainContent"></div>';
     const { initHeader } = await import('../src/components/header');
-    const { _resetI18nForTesting, setLocale } = await import('../src/lib/i18n');
-    _resetI18nForTesting();
+    const { setLocale } = await import('../src/lib/i18n');
     setLocale('en'); // start from en
     initHeader();
 
@@ -792,8 +795,7 @@ describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () =
   it('click on element without data-lang does not call setLocale', async () => {
     document.body.innerHTML = '<button id="langBtn"></button><div id="mainContent"></div>';
     const { initHeader } = await import('../src/components/header');
-    const { _resetI18nForTesting, setLocale, getLocale } = await import('../src/lib/i18n');
-    _resetI18nForTesting();
+    const { setLocale, getLocale } = await import('../src/lib/i18n');
     setLocale('it');
     initHeader();
 
@@ -808,8 +810,7 @@ describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () =
   it('click on [data-lang="fr"] (unsupported) does not call setLocale', async () => {
     document.body.innerHTML = '<button id="langBtn"></button><div id="mainContent"></div>';
     const { initHeader } = await import('../src/components/header');
-    const { _resetI18nForTesting, setLocale, getLocale } = await import('../src/lib/i18n');
-    _resetI18nForTesting();
+    const { setLocale, getLocale } = await import('../src/lib/i18n');
     setLocale('it');
     initHeader();
 
@@ -837,9 +838,6 @@ describe('BUG-A17-14: langBtn escapes locale codes in HTML', () => {
       const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
       return { ...actual, switchView: vi.fn() };
     });
-
-    const { _resetI18nForTesting } = await import('../src/lib/i18n');
-    _resetI18nForTesting();
 
     const { initHeader } = await import('../src/components/header');
     initHeader();

@@ -176,9 +176,6 @@ function resetMocks(): void {
     _discoverTab: 'popular',
   });
   mockGetState.mockImplementation(() => _state);
-  // FIX-18-08: init() now guards against double-init via a flag on window.
-  // Clear it so each test starts fresh.
-  delete (window as any).__ploppytvInit;
   // jsdom ha navigator.language = en-US: fissa l'italiano per i testi attesi.
   localStorage.setItem('ploppytv_prefs_v1', JSON.stringify({ lang: 'it' }));
 }
@@ -484,14 +481,6 @@ describe('main.ts — SW registration (prod)', () => {
     expect(typeof opts.onRegisterError).toBe('function');
   });
 
-  it('PROD: window.__ploppytvUpdateSW exposed and calls updateSW(true)', async () => {
-    await import('../src/main');
-    const w = window as unknown as { __ploppytvUpdateSW?: () => Promise<void> };
-    expect(typeof w.__ploppytvUpdateSW).toBe('function');
-    await w.__ploppytvUpdateSW!();
-    expect(mockUpdateSW).toHaveBeenCalledWith(true);
-  });
-
   it('PROD: onNeedRefresh shows toast + appends a reload button', async () => {
     await import('../src/main');
     const opts = mockRegisterSW.mock.calls[0][0];
@@ -692,7 +681,7 @@ describe('main.ts — standalone detection', () => {
   });
 });
 
-describe('main.ts — double init (HMR / re-import)', () => {
+describe('main.ts — module caching', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -708,29 +697,6 @@ describe('main.ts — double init (HMR / re-import)', () => {
     await import('../src/main');
     expect(mockInitModal).toHaveBeenCalledTimes(1);
     expect(mockInitRenderer).toHaveBeenCalledTimes(1);
-  });
-
-  it('FIX-18-08: idempotency guard — with vi.resetModules between imports, init still runs ONCE (no duplicate listeners)', async () => {
-    await import('../src/main');
-    vi.resetModules();
-    await import('../src/main');
-    // FIX: the __ploppytvInit flag on window survives vi.resetModules(), so
-    // the second import's init() call short-circuits immediately.
-    expect(mockInitModal).toHaveBeenCalledTimes(1);
-    expect(mockInitRenderer).toHaveBeenCalledTimes(1);
-    expect(mockLoadData).toHaveBeenCalledTimes(1);
-    expect(mockRender).toHaveBeenCalledTimes(1);
-  });
-
-  it('FIX-18-08: idempotency guard — applyHash fires ONCE on hashchange (single handler even after re-import)', async () => {
-    mockIsStorageOK.mockReturnValue(true);
-    await import('../src/main');
-    vi.resetModules();
-    await import('../src/main');
-    __setState({ currentView: 'dashboard', currentShowId: null });
-    setHash('#stats');
-    fireHashchange();
-    expect(mockSwitchView).toHaveBeenCalledTimes(1);
   });
 });
 

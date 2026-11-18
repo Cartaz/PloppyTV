@@ -194,9 +194,6 @@ function registerPWA(): void {
         }, 30000);
       },
     });
-    // Esponi updateSW per permettere reload programmatico
-    (window as unknown as { __ploppytvUpdateSW?: () => Promise<void> }).__ploppytvUpdateSW = () =>
-      updateSW ? updateSW(true) : Promise.resolve();
   } catch (e) {
     // registerSW non deve crashare init.
     console.warn('[PWA] registerSW threw:', e);
@@ -220,14 +217,6 @@ function detectStandalone(): void {
 
 // ===== INIT =====
 function init(): void {
-  // Idempotency guard. Il flag su window sopravvive a
-  // vi.resetModules() (HMR / re-import), così il secondo import non
-  // re-registra listener (hashchange, error, unhandledrejection)
-  // e non re-runna initX (evitando double-bind, double-save, ecc.).
-  const w = window as unknown as { __ploppytvInit?: boolean };
-  if (w.__ploppytvInit) return;
-  w.__ploppytvInit = true;
-
   // Registra gli error handler globali PRIMA di qualsiasi init
   // step che potrebbe lanciare. Così catturano anche errori durante init.
   registerGlobalErrorHandlers();

@@ -116,15 +116,6 @@ export function getAvailableLocales(): Locale[] {
   return [...SUPPORTED];
 }
 
-/**
- * Resetta lo stato i18n (solo per testing). NON usare in produzione.
- */
-export function _resetI18nForTesting(): void {
-  _current = 'it';
-  _prefsLoaded = false;
-  _listeners.clear();
-}
-
 export function subscribeI18n(fn: () => void): () => void {
   _listeners.add(fn);
   return () => _listeners.delete(fn);

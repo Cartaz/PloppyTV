@@ -9,20 +9,31 @@
 // Inoltre regression su XSS surface già coperta (show.name, tag, title, data-show-id),
 // edge case numerici (NaN progress, totalEpisodes=0), e interazioni chip filter.
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { renderDashboard, showCardHtml, bindKeydown } from '../src/views/dashboard';
-import { renderShowList, _resetShowListStateForTesting } from '../src/views/showList';
-import { setShows, getState } from '../src/lib/store';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type * as DashboardModule from '../src/views/dashboard';
+import type * as ShowListModule from '../src/views/showList';
+import type * as StoreModule from '../src/lib/store';
+
+// Moduli freschi a ogni test: lo stato interno (tag attivo della lista) riparte da zero.
+let renderDashboard: typeof DashboardModule.renderDashboard;
+let showCardHtml: typeof DashboardModule.showCardHtml;
+let bindKeydown: typeof DashboardModule.bindKeydown;
+let renderShowList: typeof ShowListModule.renderShowList;
+let setShows: typeof StoreModule.setShows;
+let getState: typeof StoreModule.getState;
 import type { Show } from '../src/types';
 import { makeShow, makeShowWithSeasons, makeEpisode, markWatchedFirst } from './helpers';
 
 let main: HTMLElement;
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  ({ renderDashboard, showCardHtml, bindKeydown } = await import('../src/views/dashboard'));
+  ({ renderShowList } = await import('../src/views/showList'));
+  ({ setShows, getState } = await import('../src/lib/store'));
   document.body.innerHTML = '<main id="main"></main>';
   main = document.getElementById('main') as HTMLElement;
   setShows([]);
-  _resetShowListStateForTesting();
 });
 
 // ---------- helpers ----------

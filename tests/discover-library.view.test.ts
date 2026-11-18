@@ -476,10 +476,7 @@ describe('Agent-A12 probe: library view', () => {
     vi.resetModules();
     storeMod = await import('../src/lib/store');
     libraryMod = await import('../src/views/library');
-    // Reset module-level _filters to defaults. vi.resetModules() alone is
-    // insufficient because the hoisted vi.mock factory for shows.ts may cache
-    // the original module, preventing library.ts from being re-evaluated.
-    libraryMod._resetLibraryFiltersForTesting();
+    libraryMod.clearLibraryFilters();
     storeMod.setState({
       shows: [],
       currentView: 'library',
