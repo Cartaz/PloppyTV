@@ -1,4 +1,4 @@
-// Agent 14 — probe tests for src/views/showDetail.ts
+// Test: src/views/showDetail.ts
 // Covers: poster fallback chain (bigImg replace bug), season tabs/episode list,
 // progress clamp, markSeason/refresh/move/remove event delegation, auto-refresh,
 // bindShowDetailEvents listener-accumulation (FIXED), edge cases in currentSeason logic,

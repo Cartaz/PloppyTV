@@ -1,5 +1,5 @@
-// Probe tests for src/lib/storage.ts — multi-tab CAS, quota, corruption recovery.
-// Agent 04 stress test. Mocks store/toast/modal/normalize; uses an in-memory
+// Test: src/lib/storage.ts — multi-tab CAS, quota, corruption recovery.
+// Mocks store/toast/modal/normalize; uses an in-memory
 // localStorage stub to fully control setItem behaviour (incl. QuotaExceeded).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

@@ -129,3 +129,44 @@ export async function getUpdatedShowIds(since: 'day' | 'week', signal?: AbortSig
     .map(Number)
     .filter((id) => Number.isSafeInteger(id) && id > 0);
 }
+
+export type ApiAction = 'search' | 'load' | 'refresh';
+
+const ERROR_MESSAGES: Record<
+  ApiAction,
+  { timeout: string; network: string; rateLimit: string; notFound?: string; parse?: string; fallback: string }
+> = {
+  search: {
+    timeout: 'Ricerca timeout. Verifica la connessione.',
+    network: 'Connessione internet non disponibile.',
+    rateLimit: 'Troppe ricerche. Attendi qualche secondo.',
+    parse: 'Risposta API non valida. Riprova.',
+    fallback: 'Errore nella ricerca. Riprova.',
+  },
+  load: {
+    timeout: 'Timeout caricamento. Riprova.',
+    network: 'Connessione internet non disponibile',
+    rateLimit: 'Troppe richieste. Attendi qualche secondo.',
+    notFound: 'Serie non trovata',
+    fallback: 'Errore caricamento serie',
+  },
+  refresh: {
+    timeout: 'Timeout aggiornamento. Riprova.',
+    network: 'Connessione internet non disponibile',
+    rateLimit: 'Troppe richieste. Attendi qualche secondo.',
+    notFound: 'Serie non trovata su TVMaze',
+    fallback: 'Errore aggiornamento serie',
+  },
+};
+
+/** Messaggio per l'utente di un errore di `apiGet`, secondo l'azione in corso. */
+export function apiErrorMessage(error: unknown, action: ApiAction): string {
+  const m = ERROR_MESSAGES[action];
+  const e = (error && typeof error === 'object' ? error : {}) as { name?: string; status?: number };
+  if (e.name === 'TimeoutError') return m.timeout;
+  if (e.name === 'NetworkError') return m.network;
+  if (e.status === 429) return m.rateLimit;
+  if (e.status === 404 && m.notFound) return m.notFound;
+  if ((e.name === 'ParseError' || e.name === 'SyntaxError') && m.parse) return m.parse;
+  return m.fallback;
+}

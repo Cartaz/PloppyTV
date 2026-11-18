@@ -22,7 +22,8 @@ export default defineConfig({
       manifest: {
         name: 'PloppyTV - Tracker Serie TV',
         short_name: 'PloppyTV',
-        description: 'Il tuo tracker personale per serie TV: tracking episodi, calendario, statistiche, scopri nuove serie.',
+        description:
+          'Il tuo tracker personale per serie TV: tracking episodi, calendario, statistiche, scopri nuove serie.',
         start_url: './index.html',
         scope: './',
         display: 'standalone',
@@ -41,9 +42,17 @@ export default defineConfig({
         // PWA id stabile per evitare che cambiando dominio la PWA venga reinstallata
         id: '/ploppytv/',
         shortcuts: [
-          { name: 'Dashboard', url: './index.html#dashboard', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          {
+            name: 'Dashboard',
+            url: './index.html#dashboard',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }],
+          },
           { name: 'Scopri', url: './index.html#discover', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Calendario', url: './index.html#calendar', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          {
+            name: 'Calendario',
+            url: './index.html#calendar',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }],
+          },
         ],
       },
       injectManifest: {

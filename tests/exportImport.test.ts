@@ -1,4 +1,4 @@
-// Agent 11 — probe tests for src/components/exportImport.ts (FIXED versions)
+// Test: src/components/exportImport.ts (FIXED versions)
 // Covers: BOM detection (UTF-8/UTF-16 LE/BE), JSON parse errors, dedup,
 // merge (smart, field-level), replace, rollback, export, version validation,
 // size limit, modal flow, Italian grammar, input.value reset.

@@ -1,9 +1,9 @@
-// Agent A9 probe: src/worker/stats.worker.ts + src/worker/compute.ts + src/worker/client.ts
+// Test: src/worker/stats.worker.ts + src/worker/compute.ts + src/worker/client.ts
 //
 // Strategy:
 //  - compute.ts (pure functions): test directly via import.
-//  - stats.worker.ts: test via self.onmessage harness (same as probe_worker.test.ts).
-//  - client.ts: test by mocking global Worker constructor (same as probe_worker.test.ts).
+//  - stats.worker.ts: test via self.onmessage harness (same as worker.client.test.ts).
+//  - client.ts: test by mocking global Worker constructor (same as worker.client.test.ts).
 //
 // Covers:
 //  - BUG-A9-01/02/03: safeShows filter (null/undefined/non-object entries, non-array input)

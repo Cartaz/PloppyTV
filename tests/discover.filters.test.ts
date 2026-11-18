@@ -1,5 +1,5 @@
-// Agent A7 — probe tests for NEW edge cases in src/lib/discover.ts
-// These tests are distinct from probe_discover.test.ts (BUG-07-xx) and cover
+// Test: NEW edge cases in src/lib/discover.ts
+// These tests are distinct from discover.groups.test.ts (BUG-07-xx) and cover
 // gaps the existing suite misses:
 //   BUG-A7-01: recentOnly includes shows premiered in the FUTURE.
 //   BUG-A7-02: progressRAF leaks — onProgress fires after fetch settles.

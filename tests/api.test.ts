@@ -1,4 +1,4 @@
-// Agent 05 — probe tests for src/lib/api.ts
+// Test: src/lib/api.ts
 // Verifies: external abort propagation, empty-body null contract, error typing,
 // timeout, rate-limit, parse-error, network-error. Mocks global fetch and uses
 // real AbortController (and fake timers for the timeout case).

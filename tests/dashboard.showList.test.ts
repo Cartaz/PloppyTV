@@ -1,4 +1,4 @@
-// Agent A10 — probe tests for src/views/dashboard.ts + src/views/showList.ts
+// Test: src/views/dashboard.ts + src/views/showList.ts
 //
 // Copre i bug trovati/fixati in questo round:
 //  - BUG-A10-01 [HIGH]: goldBtn click handler non re-bound su re-render.

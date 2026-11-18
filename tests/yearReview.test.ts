@@ -1,4 +1,4 @@
-// Probe tests for src/views/yearReview.ts (Task A14)
+// Test: src/views/yearReview.ts
 //
 // Covers:
 //   - computeYearStats edge cases (BUG-A14-01..04, 10, 14)

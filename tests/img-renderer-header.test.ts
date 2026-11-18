@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
-// Agent A17 — probe tests for img.ts, imageFallback.ts, renderer.ts, header.ts
+// Test: img.ts, imageFallback.ts, renderer.ts, header.ts
 //
 // Verifies (post-fix):
 // - BUG-A17-01 (Medium, FIXED): imgTag valida src con safeImageUrl — rifiuta

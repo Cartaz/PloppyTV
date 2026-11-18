@@ -1,8 +1,7 @@
-// Agent A19 probe: cross-cutting edge cases across storage / normalize / api /
+// Test: cross-cutting edge cases across storage / normalize / api /
 // shows / store / utils. End-to-end adversarial scenarios that exercise
 // multiple modules together — finding bugs that per-module tests miss.
 //
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_a19.test.ts
 //
 // Strategy:
 //  - Mock toast/modal/header (DOM-dependent; not under test).

@@ -1,7 +1,7 @@
 // Search box: input -> API TVMaze, fallback fuzzy, keyboard nav
 
 import type { ListName, TvmazeSearchResult } from '../types';
-import { searchShows } from '../lib/api';
+import { searchShows, apiErrorMessage } from '../lib/api';
 import { MAX_QUERY_LENGTH, MIN_SEARCH_INTERVAL_MS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal } from '../lib/utils';
 import { addShowToList } from '../lib/shows';
@@ -179,15 +179,9 @@ async function doSearch(query: string): Promise<void> {
       lastSearchResults = [];
     }
   } catch (e: unknown) {
-    const err = e as { name?: string; status?: number };
-    if (err.name === 'AbortError') return;
+    if ((e as { name?: string }).name === 'AbortError') return;
     if (mySeq !== searchSeq) return;
-    let msg = 'Errore nella ricerca. Riprova.';
-    if (err.name === 'TimeoutError') msg = 'Ricerca timeout. Verifica la connessione.';
-    else if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
-    else if (err.status === 429) msg = 'Troppe ricerche. Attendi qualche secondo.';
-    else if (err.name === 'ParseError' || err.name === 'SyntaxError') msg = 'Risposta API non valida. Riprova.';
-    _searchResults.innerHTML = '<div class="search-no-results">' + escapeHtml(msg) + '</div>';
+    _searchResults.innerHTML = '<div class="search-no-results">' + escapeHtml(apiErrorMessage(e, 'search')) + '</div>';
     lastSearchResults = [];
   }
 }

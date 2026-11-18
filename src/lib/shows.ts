@@ -5,7 +5,7 @@ import { ALLOWED_LISTS } from '../types';
 import { getState, setState, emitChange, replaceShow, removeShowFromState } from './store';
 import { saveData } from './storage';
 import { buildShowFromTvmaze, updateShowListStatus } from './normalize';
-import { getShowEpisodes } from './api';
+import { getShowEpisodes, apiErrorMessage } from './api';
 import { safeId } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
@@ -76,13 +76,7 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     }
     return show;
   } catch (e: unknown) {
-    const err = e as { name?: string; status?: number };
-    let msg = 'Errore caricamento serie';
-    if (err.name === 'TimeoutError') msg = 'Timeout caricamento. Riprova.';
-    else if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile';
-    else if (err.status === 429) msg = 'Troppe richieste. Attendi qualche secondo.';
-    else if (err.status === 404) msg = 'Serie non trovata';
-    showToast(msg, 'error');
+    showToast(apiErrorMessage(e, 'load'), 'error');
     console.error(e);
     return null;
   } finally {
@@ -302,13 +296,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     if (!opts?.silent) showToast('Dati serie aggiornati: ' + show.name, 'success');
     return true;
   } catch (e: unknown) {
-    const err = e as { name?: string; status?: number };
-    let msg = 'Errore aggiornamento serie';
-    if (err.name === 'TimeoutError') msg = 'Timeout aggiornamento. Riprova.';
-    else if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile';
-    else if (err.status === 429) msg = 'Troppe richieste. Attendi qualche secondo.';
-    else if (err.status === 404) msg = 'Serie non trovata su TVMaze';
-    if (!opts?.silent) showToast(msg, 'error');
+    if (!opts?.silent) showToast(apiErrorMessage(e, 'refresh'), 'error');
     console.error(e);
     return false;
   } finally {

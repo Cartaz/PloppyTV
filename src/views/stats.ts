@@ -168,7 +168,7 @@ export async function renderStats(main: HTMLElement): Promise<void> {
   // enforce the cross-view race check if we were actually on 'stats' with no
   // show detail open at the start — this preserves compatibility with tests
   // that call renderStats directly without setting currentView, and with
-  // stores that don't expose currentView (mocked, e.g. probe_stats.test.ts).
+  // stores that don't expose currentView (mocked).
   const startView = getState().currentView;
   const startShowId = getState().currentShowId;
   const wasStatsActive = startView === 'stats' && startShowId === null;

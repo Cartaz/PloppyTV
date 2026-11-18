@@ -1,4 +1,4 @@
-// Agent A15 — probe tests for src/components/modal.ts + src/components/toast.ts
+// Test: src/components/modal.ts + src/components/toast.ts
 //
 // Copre i BUG-A15-0X fixati in questo task:
 //  - BUG-A15-01: initModal double-bind guard (no duplicate ESC/Tab/click listeners)

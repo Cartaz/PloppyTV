@@ -1,5 +1,4 @@
-// Agent A12 — probe tests for src/views/discover.ts + src/views/library.ts
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_a12.test.ts
+// Test: src/views/discover.ts + src/views/library.ts
 //
 // Covers:
 //   discover.ts:

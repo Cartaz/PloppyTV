@@ -1,5 +1,4 @@
-// Agent A2 probe: edge-case & bug-hunt tests for src/lib/store.ts
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_a2.test.ts
+// Test: edge-case & bug-hunt tests for src/lib/store.ts
 //
 // Each test maps to a specific BUG-A2-XX fix in store.ts. Tests are written
 // to FAIL on the pre-fix code and PASS on the post-fix code.

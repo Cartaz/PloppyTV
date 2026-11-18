@@ -1,5 +1,4 @@
-// Agent 15 — probe tests for src/views/discover.ts
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_discoverview.test.ts
+// Test: src/views/discover.ts
 //
 // Covers: listener accumulation, double loadTab on tab switch, stuck-loading
 // (stale el after re-render), stale DOM ops, addDiscoverShow double render,

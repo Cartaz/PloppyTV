@@ -1,12 +1,14 @@
-// Agent 06 probe: stress-test src/lib/shows.ts actions.
+// Test: stress-test src/lib/shows.ts actions.
 // Mocks api/storage/toast/modal/header; uses real store/normalize/utils.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type * as ApiModule from '../src/lib/api';
 import type { Show, TvmazeEpisode, TvmazeShow } from '../src/types';
 
 // ===== Mocks (hoisted by vitest) =====
 
-vi.mock('../src/lib/api', () => ({
+vi.mock('../src/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiModule>()),
   getShowEpisodes: vi.fn(),
   ApiError: class ApiError extends Error {
     status?: number;

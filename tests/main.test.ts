@@ -1,4 +1,4 @@
-// Agent 18 — probe tests for src/main.ts
+// Test: src/main.ts
 // Stress test: init order, hash routing, SW registration + onNeedRefresh,
 // no save on unload, standalone detection, double-init.
 //

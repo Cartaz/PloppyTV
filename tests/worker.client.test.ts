@@ -1,4 +1,4 @@
-// Agent 08 probe tests: src/worker/stats.worker.ts + src/worker/client.ts
+// Test: src/worker/stats.worker.ts + src/worker/client.ts
 //
 // Strategy:
 //  - The worker module sets `self.onmessage` at import time. In jsdom self === window,

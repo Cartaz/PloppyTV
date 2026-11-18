@@ -1,4 +1,4 @@
-// Agent 07 — probe tests for src/lib/discover.ts
+// Test: src/lib/discover.ts
 // Verifies: FASE2 overfill, weight=0 exclusion, writeCache skip on failedPages,
 // readCache future-date non-expiry, malformed cache shape, findShowInDiscoverGroups
 // robustness, recentOnly date filter (incl. Mar 31 setMonth rollover).

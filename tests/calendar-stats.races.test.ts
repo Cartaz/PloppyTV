@@ -1,5 +1,4 @@
-// Agent A13 probe: race conditions, XSS, NaN edge cases in calendar.ts and stats.ts
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_a13.test.ts
+// Test: race conditions, XSS, NaN edge cases in calendar.ts and stats.ts
 //
 // Strategy:
 //  - Mock '../src/worker/client' so we can inject arbitrary results (incl. malformed).

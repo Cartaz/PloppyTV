@@ -1,4 +1,4 @@
-// Agent A11 — probe tests for src/views/showDetail.ts
+// Test: src/views/showDetail.ts
 // Covers: BUG-A11-01..10 (seasonAvgRating NaN/Infinity, episode sorting,
 // non-array tags/genres/seasons guards, openNoteEditor guards, openAddTagModal
 // suggestions guard, addTag modal keepOpen on failure, show.image non-string),

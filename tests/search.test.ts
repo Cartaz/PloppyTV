@@ -1,12 +1,14 @@
-// Agent 10 probe: stress-test src/components/search.ts
+// Test: stress-test src/components/search.ts
 // Mocks searchShows + addShowToList + showToast; drives search.ts via jsdom events.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type * as ApiModule from '../src/lib/api';
 
 // --- Mocks (vi.mock is hoisted; `mock*`-prefixed vars are allowed in factories) ---
 const mockSearchShows = vi.fn();
 const mockAddShowToList = vi.fn();
 
-vi.mock('../src/lib/api', () => ({
+vi.mock('../src/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiModule>()),
   searchShows: (...args: any[]) => mockSearchShows(...args),
   ApiError: class ApiError extends Error {
     override name: string;
@@ -642,5 +644,30 @@ describe('search.ts probe', () => {
     expect(imgs.length).toBe(1);
     expect(imgs[0].tagName).toBe('IMG');
     expect((imgs[0] as HTMLImageElement).getAttribute('src')).toBe('https://static.tvmaze.com/uploads/poster.jpg');
+  });
+});
+
+describe('search error messages and rate limiting', () => {
+  beforeEach(async () => {
+    setupDom();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    mockSearchShows.mockReset();
+    vi.resetModules();
+    (await import('../src/components/search')).initSearch();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    [{ name: 'TimeoutError' }, 'Ricerca timeout. Verifica la connessione.'],
+    [{ name: 'NetworkError' }, 'Connessione internet non disponibile.'],
+    [{ name: 'RateLimitError', status: 429 }, 'Troppe ricerche. Attendi qualche secondo.'],
+    [{ name: 'ParseError' }, 'Risposta API non valida. Riprova.'],
+    [{ name: 'ApiError', status: 500 }, 'Errore nella ricerca. Riprova.'],
+  ])('shows a specific message for %o', async (error, message) => {
+    mockSearchShows.mockRejectedValue(Object.assign(new Error('x'), error));
+    fireInput('breaking');
+    await vi.advanceTimersByTimeAsync(400);
+    expect(resultsEl().textContent).toBe(message);
   });
 });

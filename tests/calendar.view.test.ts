@@ -1,5 +1,4 @@
-// Agent 16 probe: stress-test src/views/calendar.ts
-// Run: cd /home/z/my-project/PloppyTV && npx vitest run tests/probe_calendar.test.ts
+// Test: stress-test src/views/calendar.ts
 //
 // Strategy:
 //  - Mock computeCalendarAsync via vi.mock so we can inject arbitrary week/afterWeek/weekStart/weekEnd

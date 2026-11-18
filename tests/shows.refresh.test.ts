@@ -1,4 +1,4 @@
-// Agent A6 probe: stress-test src/lib/shows.ts after bug fixes.
+// Test: stress-test src/lib/shows.ts after bug fixes.
 // Covers: refreshShowEpisodes (rating/note preservation, dedup, num=0, empty
 // response, non-array response, corrupted seasons), toggleEpisode / markSeason /
 // setEpisodeRating / setEpisodeNote (corrupted seasons guards), removeShowTag
@@ -6,12 +6,14 @@
 // (invalid list), plus a few extra edge cases.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type * as ApiModule from '../src/lib/api';
 import type { Show, TvmazeEpisode, TvmazeShow } from '../src/types';
 import { makeShow, makeShowWithSeasons, markWatchedFirst } from './helpers';
 
 // ===== Mocks (hoisted by vitest) =====
 
-vi.mock('../src/lib/api', () => ({
+vi.mock('../src/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiModule>()),
   getShowEpisodes: vi.fn(),
   ApiError: class ApiError extends Error {
     status?: number;
