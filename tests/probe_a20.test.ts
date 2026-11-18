@@ -242,7 +242,6 @@ describe('A20 — XSS via summary TVMaze (end-to-end render)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -265,7 +264,6 @@ describe('A20 — XSS via summary TVMaze (end-to-end render)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -285,7 +283,6 @@ describe('A20 — XSS via summary TVMaze (end-to-end render)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -383,7 +380,6 @@ describe('A20 — XSS via note/tag/show.name (end-to-end)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -404,7 +400,6 @@ describe('A20 — XSS via note/tag/show.name (end-to-end)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -433,7 +428,6 @@ describe('A20 — XSS via note/tag/show.name (end-to-end)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -462,7 +456,6 @@ describe('A20 — XSS via note/tag/show.name (end-to-end)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -484,7 +477,6 @@ describe('A20 — XSS via note/tag/show.name (end-to-end)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -521,7 +513,6 @@ describe('A20 — XSS via attribute quote injection', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -543,7 +534,6 @@ describe('A20 — XSS via attribute quote injection', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -561,7 +551,6 @@ describe('A20 — XSS via attribute quote injection', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -645,7 +634,6 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -672,7 +660,6 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -693,7 +680,6 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -716,7 +702,6 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -731,7 +716,6 @@ describe('A20 — NaN/negatives/Infinity numeric edges', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -774,7 +758,6 @@ describe('A20 — Episode 0 / season 0 / duplicates', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -798,7 +781,6 @@ describe('A20 — Episode 0 / season 0 / duplicates', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -820,7 +802,6 @@ describe('A20 — Episode 0 / season 0 / duplicates', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -880,7 +861,6 @@ describe('A20 — Type confusion (string instead of number/boolean)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     // Should not throw.
     expect(() => {
@@ -902,7 +882,6 @@ describe('A20 — Type confusion (string instead of number/boolean)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     expect(() => {
       showDetailMod.renderShowDetail(main);
@@ -924,7 +903,6 @@ describe('A20 — Type confusion (string instead of number/boolean)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -981,7 +959,6 @@ describe('A20 — Extreme strings (length stress)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     expect(() => {
       showDetailMod.renderShowDetail(main);
@@ -1002,7 +979,6 @@ describe('A20 — Extreme strings (length stress)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     expect(() => {
       showDetailMod.renderShowDetail(main);
@@ -1022,7 +998,6 @@ describe('A20 — Extreme strings (length stress)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     expect(() => {
       showDetailMod.renderShowDetail(main);
@@ -1111,7 +1086,6 @@ describe('A20 — Unicode/emoji/CJK/RTL/zero-width', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -1133,7 +1107,6 @@ describe('A20 — Unicode/emoji/CJK/RTL/zero-width', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -1195,7 +1168,6 @@ describe('A20 — Combined XSS (summary + tag + note + name)', () => {
     });
     storeMod.setShows([show]);
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     const main = document.getElementById('mainContent')!;
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
@@ -1252,7 +1224,6 @@ describe('A20 — Combined XSS (summary + tag + note + name)', () => {
 
     // Then render showDetail.
     storeMod.setState({ currentShowId: 1, currentSeason: 1 });
-    showDetailMod.resetBoundGuard();
     showDetailMod.renderShowDetail(main);
     showDetailMod.bindShowDetailEvents(main);
     assertNoXss();

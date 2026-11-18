@@ -12,14 +12,6 @@ export default defineConfig({
     cssCodeSplit: true,
     sourcemap: false,
     minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        // Chunk splitting: separa vendor runtime dalle viste
-        manualChunks: {
-          'tvmaze-api': ['./src/lib/api.ts'],
-        },
-      },
-    },
   },
   plugins: [
     VitePWA({

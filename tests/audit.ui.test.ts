@@ -5,7 +5,7 @@ import { loadData, saveData } from '../src/lib/storage';
 import { PREFS_KEY } from '../src/lib/constants';
 import { notificationsEnabled, disableNotifications } from '../src/lib/notifications';
 import { renderLibrary, _resetLibraryFiltersForTesting } from '../src/views/library';
-import { bindShowDetailEvents, renderShowDetail, resetBoundGuard } from '../src/views/showDetail';
+import { bindShowDetailEvents, renderShowDetail } from '../src/views/showDetail';
 import { closeAllModals, initModal, isModalOpen } from '../src/components/modal';
 
 document.body.innerHTML =
@@ -79,7 +79,6 @@ it('keeps an unsaved note editor open without a success message', () => {
   expect(saveData()).toBe(true);
   setState({ currentShowId: 1 });
   renderShowDetail(main);
-  resetBoundGuard();
   bindShowDetailEvents(main);
   main.querySelector<HTMLButtonElement>('[data-action="editNote"]')!.click();
   const textarea = document.getElementById('noteTextarea') as HTMLTextAreaElement;
@@ -100,7 +99,6 @@ it('closes the note editor only after a successful save', () => {
   expect(saveData()).toBe(true);
   setState({ currentShowId: 1 });
   renderShowDetail(main);
-  resetBoundGuard();
   bindShowDetailEvents(main);
   main.querySelector<HTMLButtonElement>('[data-action="editNote"]')!.click();
   (document.getElementById('noteTextarea') as HTMLTextAreaElement).value = 'Saved note';

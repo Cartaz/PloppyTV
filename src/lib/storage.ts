@@ -78,7 +78,7 @@ export function saveData(): boolean {
     return false;
   }
 
-  // BUG-04-07: size threshold uses UTF-8 byte length (TextEncoder), non char count.
+  // Size threshold uses UTF-8 byte length (TextEncoder), non char count.
   const sizeKB = Math.round(new TextEncoder().encode(serialized).length / 1024);
   if (sizeKB > 4500 && !state._quotaWarned) {
     showToast('Attenzione: dati vicini al limite (' + sizeKB + 'KB). Usa Esporta per backup.', 'warning');
@@ -152,10 +152,6 @@ function _loadCanonicalBackup(): Show[] | null {
   return result.ok && result.document.shows.length > 0 ? result.document.shows : null;
 }
 
-/**
- * BUG-04-08: rimuove tutte le chiavi `ploppytv_corrupted_*` forensi da localStorage.
- * Chiamato dopo un loadData valido per evitare accumulo di chiavi inutili.
- */
 function _cleanupCorruptedKeys(): void {
   try {
     const keysToRemove: string[] = [];
@@ -182,7 +178,7 @@ export function loadData(): void {
     setStorageDisabled(true);
     return;
   }
-  // BUG-A4-01: localStorage.getItem può lanciare SecurityError in modalità
+  // localStorage.getItem può lanciare SecurityError in modalità
   // privata (Safari) o dopo revoca mid-session dei permessi storage. Senza
   // questo wrap, loadData crasherebbe e il caller (main.ts) non recupererebbe.
   let raw: string | null;
@@ -265,7 +261,7 @@ export function loadData(): void {
     console.warn('[PloppyTV] Schema version passata:', sourceVersion, '— atteso', SCHEMA_VERSION);
   }
   setShows(canonical.document.shows);
-  // BUG-04-08: pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
+  // Pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
   _cleanupCorruptedKeys();
 }
 
@@ -276,12 +272,12 @@ if (typeof window !== 'undefined') {
     try {
       const state = getState();
 
-      // BUG-04-03: storage event con newValue=null (altro tab ha cancellato).
+      // Storage event con newValue=null (altro tab ha cancellato).
       // Se ci sono shows locali, NON wipe — mostra toast.
       if (ev.newValue === null) {
         if (state.shows.length > 0) {
           showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
-          // BUG-04-04: NON avanza _lastRevision (resta al valore pre-event).
+          // NON avanza _lastRevision (resta al valore pre-event).
           return;
         }
         // Nessun show locale → safe to wipe.
@@ -309,7 +305,7 @@ if (typeof window !== 'undefined') {
       }
       const newShows = canonical.document.shows;
 
-      // H5 / BUG-04-04: se c'è una modale aperta, NON sovrascrivere lo stato.
+      // Se c'è una modale aperta, NON sovrascrivere lo stato.
       // Mostriamo un toast che invita a ricaricare a modale chiusa.
       // NON avanza _lastRevision (così i salvataggi successivi falliscono per CAS).
       if (isModalOpen()) {

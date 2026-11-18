@@ -20,7 +20,7 @@ interface Prefs {
 let _scheduledTimers: ReturnType<typeof setTimeout>[] = [];
 let _rescheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let _initialized = false;
-// BUG-A8-09 (FIXED): salviamo il riferimento al listener per poterlo
+// Salviamo il riferimento al listener per poterlo
 // rimuovere in _resetNotificationsForTesting (e in futuro in un eventuale
 // destroyNotifications per HMR). Prima il listener era anonimo e accumulava
 // in test con module reload.
@@ -234,7 +234,7 @@ export function initNotifications(): void {
 
   // Re-schedula quando lo stato cambia (es. aggiunta/rimozione serie, toggle episodio)
   // Usiamo un evento custom per evitare import circolari con store.ts
-  // BUG-A8-09 (FIXED): salviamo il riferimento per poterlo rimuovere.
+  // Salviamo il riferimento per poterlo rimuovere.
   _rescheduleListener = () => {
     if (notificationsEnabled()) {
       scheduleNotifications();

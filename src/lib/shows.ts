@@ -2,10 +2,10 @@
 
 import type { Episode, ListName, Show, TvmazeShow } from '../types';
 import { ALLOWED_LISTS } from '../types';
-import { getState, setState, emitChange, replaceShow, removeShowFromState, updateShowListStatus } from './store';
+import { getState, setState, emitChange, replaceShow, removeShowFromState } from './store';
 import { saveData } from './storage';
-import { buildShowFromTvmaze } from './normalize';
-import { getShowEpisodes, ApiError } from './api';
+import { buildShowFromTvmaze, updateShowListStatus } from './normalize';
+import { getShowEpisodes } from './api';
 import { safeId } from './utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
@@ -24,7 +24,7 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     showToast('ID serie non valido', 'error');
     return null;
   }
-  // BUG-A6-10: valida `list` — un valore non in ALLOWED_LISTS causerebbe
+  // Valida `list` — un valore non in ALLOWED_LISTS causerebbe
   // `buildShowFromTvmaze` a fare fallback a 'towatch', ma poi la riga
   // `if (list !== 'towatch') show.manualList = true` imposterebbe manualList=true,
   // lasciando lo stato inconsistente (list='towatch', manualList=true).
@@ -133,7 +133,7 @@ export function moveShowToList(showId: number, list: ListName): void {
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
   show.list = list;
-  // BUG-06-01: towatch NON imposta manualList (permette promozione naturale).
+  // Towatch NON imposta manualList (permette promozione naturale).
   // watching e completed impostano manualList=true (blocca retrocessione).
   show.manualList = list !== 'towatch';
   if (!saveData()) {
@@ -151,7 +151,7 @@ export function moveShowToList(showId: number, list: ListName): void {
 export function toggleEpisode(showId: number, seasonNum: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
   // Prima, `!show.seasons[seasonNum]` lanciava TypeError se show.seasons era undefined.
   if (!show || !show.seasons || typeof show.seasons !== 'object') return;
   const seasonArr = show.seasons[seasonNum];
@@ -177,7 +177,7 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
 export function markSeasonWatched(showId: number, seasonNum: number, watched: boolean): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
   if (!show || !show.seasons || typeof show.seasons !== 'object') return;
   const seasonArr = show.seasons[seasonNum];
   if (!Array.isArray(seasonArr)) return;
@@ -213,7 +213,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
 
   const state = getState();
   const show = state.shows.find((s) => s.id === id);
-  // BUG-A6-06: guard show.seasons — su dati corrotti potrebbe essere null/array.
+  // Guard show.seasons — su dati corrotti potrebbe essere null/array.
   // Prima, `JSON.parse(JSON.stringify(show.seasons))` su undefined lanciava SyntaxError.
   if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) {
     _refreshInFlight.delete(id);
@@ -222,12 +222,12 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
 
   try {
     const episodes = await getShowEpisodes(id);
-    // BUG-A6-05: defensive — se la risposta API non è un array, abort (non crashare).
+    // Defensive — se la risposta API non è un array, abort (non crashare).
     if (!Array.isArray(episodes)) {
       if (!opts?.silent) showToast('Risposta API non valida', 'error');
       return false;
     }
-    // BUG-A6-04: se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
+    // Se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
     // i dati utente (potrebbe essere un glitch temporaneo dell'API o un 200 OK vuoto).
     if (episodes.length === 0 && Object.keys(show.seasons).length > 0) {
       if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
@@ -337,7 +337,7 @@ export function showNeedsEpisodeNames(show: Show): boolean {
 export function setEpisodeRating(showId: number, seasonNum: number, epNum: number, rating: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
   if (!show || !show.seasons || typeof show.seasons !== 'object') return;
   const seasonArr = show.seasons[seasonNum];
   if (!Array.isArray(seasonArr)) return;
@@ -375,7 +375,7 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
 export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): boolean {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A6-07: guard show.seasons (corrupted state) e Array.isArray per seasonArr.
+  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
   if (!show || !show.seasons || typeof show.seasons !== 'object') return false;
   const seasonArr = show.seasons[seasonNum];
   if (!Array.isArray(seasonArr)) return false;
@@ -409,7 +409,7 @@ export function addShowTag(showId: number, tag: string): boolean {
   const trimmed = typeof tag === 'string' ? tag.trim().slice(0, MAX_TAG_LENGTH) : '';
   if (trimmed.length === 0) return false;
 
-  // BUG-A6-09: defensive — show.tags potrebbe non essere un array su dati corrotti.
+  // Defensive — show.tags potrebbe non essere un array su dati corrotti.
   const tags = Array.isArray(show.tags) ? show.tags : [];
   // Dedup case-insensitive: se "Estate" esiste, "estate" non viene aggiunto.
   const lower = trimmed.toLowerCase();
@@ -440,8 +440,8 @@ export function addShowTag(showId: number, tag: string): boolean {
 export function removeShowTag(showId: number, tag: string): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A6-08: tag non-string causerebbe TypeError su toLowerCase().
-  // BUG-A6-09: show.tags non-array causerebbe TypeError su filter()/length.
+  // Tag non-string causerebbe TypeError su toLowerCase().
+  // Show.tags non-array causerebbe TypeError su filter()/length.
   if (!show || !Array.isArray(show.tags) || show.tags.length === 0) return;
   if (typeof tag !== 'string') return;
   const lower = tag.toLowerCase();
@@ -507,11 +507,8 @@ export function getAllUserTags(): string[] {
   const state = getState();
   const set = new Set<string>();
   for (const show of state.shows) {
-    // BUG-A6-09: defensive — show.tags potrebbe non essere un array su dati corrotti.
+    // Defensive — show.tags potrebbe non essere un array su dati corrotti.
     if (Array.isArray(show.tags)) for (const t of show.tags) if (typeof t === 'string') set.add(t);
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
-
-// Re-export alias per compatibilità
-export { ApiError };

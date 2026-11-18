@@ -1,14 +1,4 @@
 // Vista dettaglio show con episodi
-//
-// FIXES applicati:
-//  - BUG-14-01: resetBoundGuard + bindShowDetailEvents — removeEventListener
-//    del vecchio handler prima di bindarne uno nuovo (no accumulation).
-//  - BUG-14-02: progress bar clamped a [0, 100] (no >100% su dati corrotti).
-//  - BUG-14-03: bigImg URL replace usa regex /\/medium_(portrait|landscape)\//
-//    invece di string.replace('medium', ...) (no match su filename "medium").
-//  - BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
-//  - H17 a11y: episode-item e season-tab hanno role/tabindex/aria-*;
-//    keydown listener (Enter/Space) triggera click.
 
 import { getState, switchSeason, closeShow } from '../lib/store';
 import { safeId, escapeHtml, escapeAttr, getWatchedCount, formatDate } from '../lib/utils';
@@ -28,19 +18,9 @@ import { showModal, closeModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
 
-let _boundShowDetail = false;
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
 let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 let _showDetailMain: HTMLElement | null = null;
-
-/**
- * Resetta la guardia di idempotenza. Deve essere chiamato dal renderer
- * PRIMA di bindShowDetailEvents per evitare accumulo di listener ad ogni
- * re-render. Vedi bug C5/T1.
- */
-export function resetBoundGuard(): void {
-  _boundShowDetail = false;
-}
 
 // ===== P2 helper: star rating HTML per episodio =====
 function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
@@ -89,7 +69,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 }
 
 // ===== P2 helper: tag management HTML =====
-// BUG-A11-03 (FIXED): Array.isArray guard — `show.tags ?? []` lascia passare
+// Array.isArray guard — `show.tags ?? []` lascia passare
 // stringhe/oggetti non-array (dati corrotti); `for (const t of "string")`
 // iterava i caratteri, rendendo ogni carattere come un tag separato.
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
@@ -115,7 +95,7 @@ function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
 }
 
 // ===== P2 helper: media rating stagione =====
-// BUG-A11-01 (FIXED): `typeof e.rating === 'number'` lasciava passare NaN e
+// `typeof e.rating === 'number'` lasciava passare NaN e
 // Infinity (`typeof NaN === 'number'` è true). sum diventava NaN →
 // "⌀ NaN★" renderizzato. Ora filtra solo numeri finiti e positivi.
 function seasonAvgRating(eps: Array<{ rating?: number }>): string {
@@ -133,14 +113,14 @@ export function renderShowDetail(main: HTMLElement): void {
   const showId = safeId(state.currentShowId);
   const show = state.shows.find((s) => s.id === showId);
   if (!show) {
-    // H13: usa closeShow() invece di mutare currentShowId direttamente,
+    // Usa closeShow() invece di mutare currentShowId direttamente,
     // così emitChange viene triggerato e la nav si aggiorna.
     closeShow();
     return;
   }
   if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
 
-  // BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
+  // Filter season keys con regex /^\d+$/ (stretta, no "1.5").
   const seasons = Object.keys(show.seasons)
     .filter((k) => /^\d+$/.test(k))
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
@@ -152,7 +132,7 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 
   const watched = getWatchedCount(show);
-  // BUG-14-02: clamp progress a [0, 100] per gestire watched > totalEpisodes.
+  // Clamp progress a [0, 100] per gestire watched > totalEpisodes.
   const rawProgress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const progress = Math.max(0, Math.min(100, rawProgress));
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
@@ -167,8 +147,8 @@ export function renderShowDetail(main: HTMLElement): void {
 
   html += '<div class="detail-header">';
   // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
-  // BUG-14-03: regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
-  // BUG-A11-05 (FIXED): typeof guard su show.image — se corrotto a non-string
+  // Regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
+  // Typeof guard su show.image — se corrotto a non-string
   // (numero/oggetto), `.replace` avrebbe throwato TypeError. normalize valida,
   // ma defense-in-depth contro dati importati malevoli/corrotti.
   const bigImg =
@@ -217,7 +197,7 @@ export function renderShowDetail(main: HTMLElement): void {
     ' episodi</span>' +
     '</div>' +
     '<div class="detail-genres">' +
-    // BUG-A11-07 (FIXED): Array.isArray guard — `show.genres.map` avrebbe
+    // Array.isArray guard — `show.genres.map` avrebbe
     // throwato TypeError se genres era non-array (corrupted state).
     (Array.isArray(show.genres) ? show.genres : [])
       .map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>')
@@ -318,7 +298,7 @@ export function renderShowDetail(main: HTMLElement): void {
       '" data-watched="0">Segna tutti come non visti</button>' +
       '</div>';
     const eps = show.seasons[state.currentSeason];
-    // BUG-A11-04 (FIXED): Array.isArray guard — `|| []` lasciava passare
+    // Array.isArray guard — `|| []` lasciava passare
     // stringhe/oggetti non-array; `for (const ep of "string")` iterava i
     // caratteri rendendo un episode-item rotto per ogni carattere.
     const epsArr = Array.isArray(eps) ? eps : [];
@@ -328,7 +308,7 @@ export function renderShowDetail(main: HTMLElement): void {
       html += '<div class="season-rating-avg">Rating medio stagione' + avgLabel + '</div>';
     }
     html += '<div class="episode-list">';
-    // BUG-A11-02 (FIXED): sort episodes by num prima del render.
+    // Sort episodes by num prima del render.
     // `for (const ep of eps)` iterava in ordine di storage; se gli episodi
     // erano memorizzati out-of-order (refresh TVMaze, import backup), venivano
     // mostrati nell'ordine sbagliato. Inconsistente con findNextEpisode
@@ -340,7 +320,7 @@ export function renderShowDetail(main: HTMLElement): void {
       return an - bn;
     });
     for (const ep of sortedEps) {
-      // BUG-A11-06 (FIXED): salta ep null/undefined nell'array (corrupted data).
+      // Salta ep null/undefined nell'array (corrupted data).
       if (!ep) continue;
       const epTitle = ep.name
         ? escapeHtml(ep.name)
@@ -393,15 +373,10 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 }
 
-// Bind eventi via event delegation sul main content.
-// CRITICAL FIX (C5/T1 + BUG-14-01): guardia _boundShowDetail + removeEventListener
-// del vecchio handler prima di bindarne uno nuovo. Il renderer chiama
-// resetBoundGuard() prima del bind, così ad ogni cambio vista la guardia è
-// false e il listener viene aggiunto una sola volta per quella vista.
+// Bind eventi via event delegation sul main content. Idempotente: rimuove
+// l'handler del render precedente prima di aggiungere quello nuovo.
 export function bindShowDetailEvents(main: HTMLElement): void {
-  if (_boundShowDetail) return;
-  _boundShowDetail = true;
-  // BUG-14-01: removeEventListener del vecchio handler (solo se stesso stesso main).
+  // removeEventListener del vecchio handler (solo se stesso stesso main).
   if (_showDetailClickHandler && _showDetailMain === main) {
     main.removeEventListener('click', _showDetailClickHandler);
   }
@@ -486,7 +461,7 @@ export function bindShowDetailEvents(main: HTMLElement): void {
 function openNoteEditor(showId: number, season: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A11-08 (FIXED): guard show.seasons (corrupted state) e Array.isArray
+  // Guard show.seasons (corrupted state) e Array.isArray
   // per seasons[season]. Prima, `!show.seasons[season]` throwava TypeError se
   // show.seasons era undefined; e se seasons[season] era non-array (string),
   // `.find()` throwava.
@@ -558,7 +533,7 @@ function openAddTagModal(showId: number): void {
   // Suggerisci tag già usati in altre serie (autocomplete visivo)
   const allTags = new Set<string>();
   for (const s of state.shows) {
-    // BUG-A11-09 (FIXED): Array.isArray guard + typeof guard sui singoli tag.
+    // Array.isArray guard + typeof guard sui singoli tag.
     // `s.tags && ...` lasciava passare stringhe/oggetti non-array; `for...of`
     // su una stringa iterava i caratteri, aggiungendoli come suggerimenti.
     if (Array.isArray(s.tags) && s.id !== showId) {
@@ -591,7 +566,7 @@ function openAddTagModal(showId: number): void {
     {
       label: 'Aggiungi',
       style: 'btn-primary',
-      // BUG-A11-10 (FIXED): keepOpen=true + closeModal manuale on success.
+      // keepOpen=true + closeModal manuale on success.
       // Prima il modal si chiudeva SEMPRE (anche su fallimento: tag duplicato,
       // max raggiunto, errore storage), costringendo l'utente a riaprirlo per
       // riprovare. Ora il modal resta aperto su fallimento (addShowTag mostra

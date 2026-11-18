@@ -186,12 +186,9 @@ describe('Agent-15 probe: discover view', () => {
       const addSpy = vi.spyOn(main, 'addEventListener');
       const removeSpy = vi.spyOn(main, 'removeEventListener');
 
-      // Simulate 3 re-renders (each: resetBoundGuard + bindDiscoverEvents)
-      discoverMod.resetBoundGuard();
+      // Simulate 3 re-renders (each: bindDiscoverEvents)
       discoverMod.bindDiscoverEvents(main);
-      discoverMod.resetBoundGuard();
       discoverMod.bindDiscoverEvents(main);
-      discoverMod.resetBoundGuard();
       discoverMod.bindDiscoverEvents(main);
 
       // FIX: addEventListener('click') called 3 times, removeEventListener('click')
@@ -209,9 +206,7 @@ describe('Agent-15 probe: discover view', () => {
       await flushMicro();
 
       // Simulate 2 more re-renders (would have been 3 listeners pre-fix).
-      discoverMod.resetBoundGuard();
       discoverMod.bindDiscoverEvents(main);
-      discoverMod.resetBoundGuard();
       discoverMod.bindDiscoverEvents(main);
 
       // Spy on setDiscoverTab to count handler invocations.

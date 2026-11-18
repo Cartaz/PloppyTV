@@ -16,7 +16,7 @@
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { showModal, closeModal, closeAllModals, initModal, isModalOpen } from '../src/components/modal';
-import { showToast, dismissToast } from '../src/components/toast';
+import { showToast } from '../src/components/toast';
 
 // DOM speculare a index.html (modal + toast) + outside button per focus-restore.
 const MODAL_HTML = `
@@ -38,8 +38,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   closeAllModals();
-  dismissToast();
-  // Reset toast class/text (dismissToast rimuove solo 'show')
+  // Reset toast class/text
   const toast = document.getElementById('toast')!;
   toast.className = 'toast';
   toast.textContent = '';
@@ -368,53 +367,6 @@ describe('BUG-A15-06: aria-labelledby condizionato al titolo', () => {
     showModal('B', '<p>b</p>', [{ label: 'OK' }]);
     closeAllModals();
     expect(document.getElementById('modal')!.hasAttribute('aria-labelledby')).toBe(false);
-  });
-});
-
-// =====================================================================
-// BUG-A15-07: dismissToast API
-// =====================================================================
-describe('BUG-A15-07: dismissToast API', () => {
-  it('dismissToast rimuove la classe show', () => {
-    vi.useFakeTimers();
-    showToast('Hello', 'success');
-    const toast = document.getElementById('toast')!;
-    expect(toast.classList.contains('show')).toBe(true);
-    dismissToast();
-    expect(toast.classList.contains('show')).toBe(false);
-  });
-
-  it('dismissToast cancella il timer pendente (no late hide)', () => {
-    vi.useFakeTimers();
-    showToast('Hello', 'success');
-    dismissToast();
-    // Avanza oltre il timer originale (3s). Se non fosse cancellato,
-    // il callback girerebbe (innocuo, ma indica leak). Verifica no-throw.
-    expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
-    const toast = document.getElementById('toast')!;
-    expect(toast.classList.contains('show')).toBe(false);
-  });
-
-  it('dismissToast su toast non visibile è no-op', () => {
-    expect(() => dismissToast()).not.toThrow();
-  });
-
-  it('dismissToast con elemento toast mancante è no-op', () => {
-    const saved = document.getElementById('toast')!;
-    saved.remove();
-    expect(() => dismissToast()).not.toThrow();
-    document.body.appendChild(saved);
-  });
-
-  it('showToast dopo dismissToast ripristina correttamente', () => {
-    vi.useFakeTimers();
-    showToast('First', 'success');
-    dismissToast();
-    showToast('Second', 'error');
-    const toast = document.getElementById('toast')!;
-    expect(toast.textContent).toBe('Second');
-    expect(toast.classList.contains('show')).toBe(true);
-    expect(toast.classList.contains('error')).toBe(true);
   });
 });
 

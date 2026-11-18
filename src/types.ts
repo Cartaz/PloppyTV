@@ -87,12 +87,6 @@ export interface ExportedData {
   exportedAt: string;
 }
 
-export interface NextEpisode {
-  season: number;
-  num: number;
-  airdate: string | null;
-}
-
 export interface CalendarEpisode {
   showId: number;
   showName: string;

@@ -19,7 +19,7 @@ vi.mock('../src/worker/client', () => ({
 }));
 
 import { computeCalendarAsync } from '../src/worker/client';
-import { renderCalendar, bindCalendarEvents, resetBoundGuard } from '../src/views/calendar';
+import { renderCalendar, bindCalendarEvents } from '../src/views/calendar';
 import { getState, setState, changeCalendarWeek } from '../src/lib/store';
 
 // ===== Helpers =====
@@ -393,7 +393,6 @@ describe('Agent-16 calendar: defense-in-depth — null check on parseISODateLoca
 describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
   it('clicking prev button decrements calendarWeekOffset by 1', async () => {
     const main = makeMain();
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const prevBtn = main.querySelector('[data-action="changeWeek"][data-delta="-1"]') as HTMLElement;
@@ -403,7 +402,6 @@ describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
 
   it('clicking next button increments calendarWeekOffset by 1', async () => {
     const main = makeMain();
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const nextBtn = main.querySelector('[data-action="changeWeek"][data-delta="1"]') as HTMLElement;
@@ -414,7 +412,6 @@ describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
   it('clicking reset button sets calendarWeekOffset to 0', async () => {
     const main = makeMain();
     setState({ calendarWeekOffset: 5 });
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const resetBtn = main.querySelector('[data-action="resetWeek"]') as HTMLElement;
@@ -423,26 +420,24 @@ describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
     expect(getState().calendarWeekOffset).toBe(0);
   });
 
-  it('bindCalendarEvents guard works WITHOUT resetBoundGuard (no accumulation)', async () => {
+  it('repeated bindCalendarEvents on the same main leaves one active handler per event', async () => {
     const main = makeMain();
     const addSpy = vi.spyOn(main, 'addEventListener');
-    resetBoundGuard();
+    const removeSpy = vi.spyOn(main, 'removeEventListener');
     await renderCalendar(main);
     bindCalendarEvents(main);
-    bindCalendarEvents(main); // second call without reset → no-op due to _boundCalendar=true
-    bindCalendarEvents(main); // third call → also no-op
-    // FIX: bindCalendarEvents adds both 'click' and 'keydown' listeners (H17 a11y).
-    // Both are guarded by _boundCalendar, so only 2 addEventListener calls total.
-    const clickAdds = addSpy.mock.calls.filter(([t]) => t === 'click');
-    const keydownAdds = addSpy.mock.calls.filter(([t]) => t === 'keydown');
-    expect(clickAdds.length).toBe(1);
-    expect(keydownAdds.length).toBe(1);
+    bindCalendarEvents(main);
+    bindCalendarEvents(main);
+    const active = (type: string) =>
+      addSpy.mock.calls.filter(([t]) => t === type).length - removeSpy.mock.calls.filter(([t]) => t === type).length;
+    expect(active('click')).toBe(1);
+    expect(active('keydown')).toBe(1);
   });
 });
 
-describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundGuard+bind', () => {
-  it('BUG-16-01 (FIXED): resetBoundGuard+bindCalendarEvents removes old listener → 1 active', async () => {
-    // FIX H1/BUG-16-01: resetBoundGuard ora removeEventListener prima di bindare
+describe('Agent-16 calendar: no listener accumulation across re-binds', () => {
+  it('bindCalendarEvents removes the old listener → 1 active', async () => {
+    // bindCalendarEvents rimuove il listener precedente prima di aggiungerne uno nuovo.
     // un nuovo handler. Quindi N cicli → 1 listener attivo → 1 chiamata a
     // changeCalendarWeek per click (no drift triangolare).
     const main = makeMain();
@@ -450,14 +445,12 @@ describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundG
     const removeSpy = vi.spyOn(main, 'removeEventListener');
 
     // First render cycle
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const firstClickAdds = addSpy.mock.calls.filter(([t]) => t === 'click').length;
     expect(firstClickAdds).toBe(1);
 
     // Second render cycle (e.g. user clicked changeWeek → emitChange → re-render)
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     // FIX: addEventListener('click') 2 times, removeEventListener('click') 1 time.
@@ -475,7 +468,6 @@ describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundG
   it('BUG-16-01 (FIXED cont): after N render cycles, single click applies 1×delta', async () => {
     const main = makeMain();
     for (let i = 0; i < 5; i++) {
-      resetBoundGuard();
       await renderCalendar(main);
       bindCalendarEvents(main);
     }
@@ -490,7 +482,6 @@ describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundG
     // FIX: each click adds exactly 1 (no triangular drift).
     const main = makeMain();
     // Initial render
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
 
@@ -500,7 +491,6 @@ describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundG
     expect(getState().calendarWeekOffset).toBe(1);
 
     // Simulate the RAF callback that emitChange scheduled (re-render)
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
 
@@ -510,7 +500,6 @@ describe('Agent-16 calendar: BUG — listener accumulation FIXED via resetBoundG
     expect(getState().calendarWeekOffset).toBe(2);
 
     // Simulate re-render
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
 
@@ -526,7 +515,6 @@ describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () 
     // FIX BUG-16-02: changeCalendarWeek(Number(undefined)) → NaN. Ora il bind handler
     // ha un guard `if (!Number.isFinite(delta)) return;` → no-op, state resta 0.
     const main = makeMain();
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const prevBtn = main.querySelector('[data-action="changeWeek"]') as HTMLElement;
@@ -540,7 +528,6 @@ describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () 
   it('NaN state: "Oggi" button still rendered (NaN !== 0 is true)', async () => {
     const main = makeMain();
     setState({ calendarWeekOffset: NaN });
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const resetBtn = main.querySelector('[data-action="resetWeek"]') as HTMLElement;
@@ -550,7 +537,6 @@ describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () 
   it('NaN state recoverable via resetWeek click', async () => {
     const main = makeMain();
     setState({ calendarWeekOffset: NaN });
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const resetBtn = main.querySelector('[data-action="resetWeek"]') as HTMLElement;

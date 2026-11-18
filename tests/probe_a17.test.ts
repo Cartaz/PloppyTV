@@ -10,7 +10,7 @@
 //   interpolava extraStyle raw nel style attribute → XSS se conteneva ".
 // - BUG-A17-03 (High, FIXED): imageFallback loop infinito con fallbackSrc
 //   relativo. Ora usa flag data-fallback-src-tried invece di confronto stringa.
-// - BUG-A17-04 (Medium, FIXED): imageFallback destroyImageFallback per cleanup.
+// - BUG-A17-04 (Medium, FIXED): imageFallback _resetImageFallbackForTesting per cleanup.
 // - BUG-A17-05 (Medium, FIXED): renderer getMain ritorna null invece di crashare.
 // - BUG-A17-06 (Medium, FIXED): renderer usa safeId per data-show-id.
 // - BUG-A17-07 (Medium, FIXED): renderer safeImport usa data-action (CSP-safe).
@@ -25,7 +25,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { imgTag } from '../src/components/img';
-import { initImageFallback, destroyImageFallback } from '../src/components/imageFallback';
+import { initImageFallback, _resetImageFallbackForTesting } from '../src/components/imageFallback';
 
 // Paths that any test below may doMock — unmocked in beforeEach to prevent
 // cross-test pollution (vi.doMock registrations persist across resetModules).
@@ -69,7 +69,7 @@ beforeEach(() => {
 
 afterEach(() => {
   // Clean up imageFallback listener if still active.
-  destroyImageFallback();
+  _resetImageFallbackForTesting();
   vi.clearAllMocks();
 });
 
@@ -284,13 +284,13 @@ describe('BUG-A17-03: imageFallback no infinite loop with relative fallbackSrc',
 });
 
 // ============================================================
-// imageFallback.ts — BUG-A17-04: destroyImageFallback cleanup
+// imageFallback.ts — BUG-A17-04: _resetImageFallbackForTesting cleanup
 // ============================================================
 
-describe('BUG-A17-04: destroyImageFallback removes listener', () => {
+describe('BUG-A17-04: _resetImageFallbackForTesting removes listener', () => {
   it('after destroy, error events no longer trigger placeholder', () => {
     initImageFallback();
-    destroyImageFallback();
+    _resetImageFallbackForTesting();
 
     const img = document.createElement('img');
     img.dataset.fallback = 'Destroyed';
@@ -305,7 +305,7 @@ describe('BUG-A17-04: destroyImageFallback removes listener', () => {
 
   it('init after destroy re-registers listener', () => {
     initImageFallback();
-    destroyImageFallback();
+    _resetImageFallbackForTesting();
     initImageFallback();
 
     const img = document.createElement('img');
@@ -481,7 +481,6 @@ describe('BUG-A17-07: safeImport error UI uses data-action not inline onclick', 
 describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail bails', () => {
   it('openShow(non-existent) → renderShowDetail bails → bind NOT called', async () => {
     const bindSpy = vi.fn();
-    const resetGuardSpy = vi.fn();
     // Mock showDetail: renderShowDetail calls closeShow (simulating bail).
     vi.doMock('../src/views/showDetail', async () => {
       const store = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
@@ -491,7 +490,6 @@ describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail 
           store.closeShow();
         }),
         bindShowDetailEvents: bindSpy,
-        resetBoundGuard: resetGuardSpy,
       };
     });
     vi.doMock('../src/components/imageFallback', () => ({ initImageFallback: vi.fn() }));
@@ -512,18 +510,14 @@ describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail 
 
     // After fix: bindShowDetailEvents NOT called (currentShowId was nulled by closeShow).
     expect(bindSpy).not.toHaveBeenCalled();
-    // resetBoundGuard + renderShowDetail ARE called (they run before the guard).
-    expect(resetGuardSpy).toHaveBeenCalled();
   });
 
   it('openShow(existing) → renderShowDetail succeeds → bind called', async () => {
     const bindSpy = vi.fn();
-    const resetGuardSpy = vi.fn();
     vi.doMock('../src/views/showDetail', () => ({
       // Success: does NOT call closeShow — currentShowId stays set.
       renderShowDetail: vi.fn(),
       bindShowDetailEvents: bindSpy,
-      resetBoundGuard: resetGuardSpy,
     }));
     vi.doMock('../src/components/imageFallback', () => ({ initImageFallback: vi.fn() }));
     vi.doMock('../src/components/header', () => ({ updateBadges: vi.fn() }));

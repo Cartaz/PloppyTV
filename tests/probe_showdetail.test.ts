@@ -23,7 +23,7 @@ vi.mock('../src/lib/shows.ts', async (importOriginal) => {
   };
 });
 
-import { renderShowDetail, bindShowDetailEvents, resetBoundGuard } from '../src/views/showDetail';
+import { renderShowDetail, bindShowDetailEvents } from '../src/views/showDetail';
 import { getState, setState, subscribe } from '../src/lib/store';
 import { toggleEpisode, markSeasonWatched, refreshShowEpisodes, moveShowToList, removeShow } from '../src/lib/shows';
 
@@ -585,7 +585,6 @@ describe('bindShowDetailEvents — event delegation', () => {
   function setup(show: Show): HTMLElement {
     setState({ currentShowId: show.id, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     return main;
@@ -681,8 +680,8 @@ describe('bindShowDetailEvents — event delegation', () => {
 // bindShowDetailEvents — listener accumulation (HIGH severity bug, FIXED)
 // ============================================================================
 describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', () => {
-  it('after resetBoundGuard + re-bind on same main, only ONE active listener (FIXED)', () => {
-    // FIX H1/BUG-14-01: resetBoundGuard ora rimuove il listener precedente
+  it('re-bind on same main leaves only ONE active listener', () => {
+    // bindShowDetailEvents rimuove il listener precedente prima di aggiungerne uno nuovo.
     // prima che bindShowDetailEvents ne aggiunga uno nuovo. Quindi N cicli di
     // reset+bind → 1 listener attivo → 1 chiamata a toggleEpisode per click.
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
@@ -693,7 +692,6 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     const main = getMain();
 
     // First render+bind (initial openShow)
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
@@ -702,7 +700,6 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     expect(toggleEpisode).toHaveBeenCalledTimes(1);
 
     // Second render+bind (after a re-render triggered by emitChange)
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
@@ -712,7 +709,6 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     expect(toggleEpisode).toHaveBeenCalledTimes(2);
 
     // Third render+bind
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
@@ -729,11 +725,9 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     setState({ currentShowId: show.id, currentSeason: 1, shows: [show] });
     const main = getMain();
 
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
@@ -743,7 +737,7 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     expect(markSeasonWatched).toHaveBeenCalledTimes(1);
   });
 
-  it('without resetBoundGuard between binds, _boundShowDetail flag prevents accumulation', () => {
+  it('render + bind twice still toggles once per click', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
     show.seasons[1][1].name = 'Ep 2';
@@ -751,17 +745,16 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     const main = getMain();
 
     // First bind (sets flag)
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
-    // Second bind WITHOUT resetBoundGuard — flag is true, no-op.
+    // Second render+bind replaces the previous handler.
     renderShowDetail(main);
     bindShowDetailEvents(main);
 
     const item = document.querySelector('.episode-item') as HTMLElement;
     item.click();
-    // Only ONE listener bound (flag prevented second bind).
+    // Only ONE listener active.
     expect(toggleEpisode).toHaveBeenCalledTimes(1);
   });
 });
@@ -803,7 +796,6 @@ describe('H17 a11y — episode-item and season-tab keyboard accessible (FIXED)',
     show.seasons[1][0].name = 'Pilot';
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const item = document.querySelector('.episode-item') as HTMLElement;
@@ -815,7 +807,6 @@ describe('H17 a11y — episode-item and season-tab keyboard accessible (FIXED)',
     const show = makeShowWithSeasons({ 1: 1, 2: 1 }, { id: 1 });
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const tab2 = document.querySelector('.season-tab[data-season="2"]') as HTMLElement;
@@ -828,7 +819,6 @@ describe('H17 a11y — episode-item and season-tab keyboard accessible (FIXED)',
     show.seasons[1][0].name = 'Pilot';
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const item = document.querySelector('.episode-item') as HTMLElement;

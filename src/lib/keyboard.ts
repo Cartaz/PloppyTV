@@ -26,7 +26,7 @@ import { t } from './i18n';
 let _initialized = false;
 let _gPending = false;
 let _gTimer: ReturnType<typeof setTimeout> | null = null;
-// BUG-A8-08 (FIXED): salviamo il riferimento al keydown handler per poterlo
+// Salviamo il riferimento al keydown handler per poterlo
 // rimuovere in _resetKeyboardForTesting. Prima era anonimo e accumulava in
 // test con module reload.
 let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -119,7 +119,7 @@ export function initKeyboard(): void {
 
   _keyHandler = (e: KeyboardEvent) => {
     // Se c'è una modale aperta, lascia che il modal system gestisca ESC/Tab.
-    // BUG-A8-07 (FIXED): il commento precedente diceva "Permetti solo '?'
+    // Il commento precedente diceva "Permetti solo '?'
     // come override" ma il codice ritornava per TUTTI i tasti. Il codice è
     // corretto (la modale deve trappare tutti i tasti); il commento ora è
     // allineato al comportamento effettivo.
@@ -132,7 +132,7 @@ export function initKeyboard(): void {
       return;
     }
 
-    // BUG-A8-06 (FIXED): ignora shortcut quando sono premuti modificatori
+    // Ignora shortcut quando sono premuti modificatori
     // Ctrl/Cmd/Alt (Shift è ok perché necessario per '?'). Prima, tasti come
     // Ctrl+g (Mac: Cmd+g "Find Next") venivano intercettati: preventDefault
     // bloccava il shortcut del browser e `_gPending = true` innescava una

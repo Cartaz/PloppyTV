@@ -1,7 +1,7 @@
 // Pure compute functions shared by `stats.worker.ts` (worker context) and
 // `client.ts` (main-thread fallback). Single source of truth for
 // `computeStats` and `computeCalendar` — prevents drift between the worker
-// implementation and the fallback (BUG-08-03).
+// implementation and the fallback.
 //
 // PURITY CONTRACT:
 //   - NO `self`, `postMessage`, `Worker`, DOM-only or worker-only globals.
@@ -23,7 +23,7 @@ import { getWatchedCount, localISODate, safeNum, unwatchedEpisodesByAirdate, typ
  *
  * Applied INSIDE `computeCalendar` so the worker path and the main-thread
  * fallback path share the same defensive behavior. Previously
- * (BUG-16-03) only the worker's `onmessage` applied this guard, so a
+ * only the worker's `onmessage` applied this guard, so a
  * `NaN`/`Infinity` offset produced Invalid Date → "Errore caricamento" UI
  * when the worker was unavailable.
  */
@@ -32,8 +32,6 @@ export function safeWeekOffset(weekOffset: number): number {
 }
 
 /**
- * BUG-A9-01 / BUG-A9-02 / BUG-A9-03 (FIXED): defensive `shows` array guard.
- *
  * Both `computeStats` and `computeCalendar` are invoked with
  * `getState().shows` (the LIVE state reference, NOT the filtered
  * `getStateSnapshot()`). `getStateSnapshot()` filters null/non-object
@@ -47,7 +45,7 @@ export function safeWeekOffset(weekOffset: number): number {
  *     fallback calls `computeStats(shows)` AGAIN on the main thread →
  *     same crash. Because the crash happens inside an event handler
  *     (or setTimeout callback), it is NOT caught by the Promise
- *     constructor → the promise HANGS FOREVER (BUG-A9-06).
+ *     constructor → the promise HANGS FOREVER.
  *   - `computeCalendar`: `show.list !== 'watching'` on null throws
  *     TypeError → same hang cascade.
  *
@@ -62,7 +60,7 @@ function safeShows(shows: unknown): Show[] {
 }
 
 export function computeStats(shows: Show[]): StatsResult {
-  // BUG-A9-01 / BUG-A9-03: filter null/non-object entries and guard against
+  // Filter null/non-object entries and guard against
   // non-array input. See `safeShows` doc for the full rationale.
   const validShows = safeShows(shows);
   const totalShows = validShows.length;
@@ -92,7 +90,7 @@ export function computeStats(shows: Show[]): StatsResult {
   const genreStats: Record<string, { episodes: number; shows: Set<number> }> = {};
   for (const s of validShows) {
     const watched = getWatchedCount(s);
-    // BUG-A9-04 (FIXED): dedupe genres within a show AND filter to strings.
+    // Dedupe genres within a show AND filter to strings.
     //   - Duplicate genres (e.g. `['Drama', 'Drama']`) double-counted
     //     `episodes` (Set dedups `shows` by id, but `episodes += watched`
     //     ran per-iteration). Corrupt imports or TVMaze glitches could
@@ -152,10 +150,10 @@ export function computeCalendar(
   shows: Show[],
   weekOffset: number,
 ): { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string } {
-  // BUG-16-03: guard applied here (shared with worker) so non-finite / non-integer
+  // Guard applied here (shared with worker) so non-finite / non-integer
   // offsets don't produce Invalid Date when the worker is unavailable.
   const offset = safeWeekOffset(weekOffset);
-  // BUG-A9-02: filter null/non-object entries (same rationale as computeStats).
+  // Filter null/non-object entries (same rationale as computeStats).
   const validShows = safeShows(shows);
 
   const today = new Date();

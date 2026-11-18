@@ -1,13 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  emitChange,
-  getState,
-  openShow,
-  setState,
-  subscribe,
-  switchView,
-  updateShowListStatus,
-} from '../src/lib/store';
+import { emitChange, getState, openShow, setState, subscribe, switchView } from '../src/lib/store';
+import { updateShowListStatus } from '../src/lib/normalize';
 import { makeShowWithSeasons, markWatchedFirst } from './helpers';
 
 describe('updateShowListStatus contracts', () => {

@@ -108,7 +108,7 @@ function collectYears(shows: Array<{ premiered: string | null }>): string[] {
 
 function applyFilters(shows: Show[]): Show[] {
   return shows.filter((s) => {
-    // BUG-A12-06 (FIXED): s.name is typed `string`, but corrupted storage may
+    // s.name is typed `string`, but corrupted storage may
     // hold a non-string (null/number/object). `.toLowerCase()` would crash the
     // filter and the whole renderLibrary. Coerce to string defensively.
     const nameStr = typeof s.name === 'string' ? s.name : '';
@@ -133,7 +133,7 @@ function applyFilters(shows: Show[]): Show[] {
       if (!s.premiered || !s.premiered.startsWith(_filters.year)) return false;
     }
     // Tag
-    // BUG-A12-05 (FIXED): `tg` may be a non-string in a corrupted `tags` array
+    // `tg` may be a non-string in a corrupted `tags` array
     // (storage tampering or upstream bug). Calling `.toLowerCase()` on a
     // non-string throws TypeError, crashing the whole renderLibrary. Guard
     // with `typeof tg === 'string'`.
@@ -226,7 +226,7 @@ export function renderLibrary(main: HTMLElement): void {
   html += '</select></div>';
 
   // Network dropdown
-  // BUG-A12-07 (FIXED): render the dropdown if there are options OR a filter is
+  // Render the dropdown if there are options OR a filter is
   // currently set. Previously, if the user filtered by network X then deleted
   // every show with network X, the dropdown disappeared but the filter still
   // applied, leaving 0 results with no visible way to reset it (only
@@ -247,7 +247,7 @@ export function renderLibrary(main: HTMLElement): void {
   }
 
   // Year dropdown
-  // BUG-A12-07 (FIXED): same as network — render if options exist OR filter is set.
+  // Same as network — render if options exist OR filter is set.
   const renderYearFilter = years.length > 0 || _filters.year !== '';
   if (renderYearFilter) {
     html +=
@@ -263,7 +263,7 @@ export function renderLibrary(main: HTMLElement): void {
   }
 
   // Tag dropdown
-  // BUG-A12-07 (FIXED): same as network — render if options exist OR filter is set.
+  // Same as network — render if options exist OR filter is set.
   const renderTagFilter = tags.length > 0 || _filters.tag !== '';
   if (renderTagFilter) {
     html +=

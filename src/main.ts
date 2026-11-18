@@ -1,22 +1,4 @@
 // Entry point: inizializza tutti i moduli e avvia l'app
-//
-// FIXES applicati (Agent A18):
-//  - BUG-A18-01: registerSW wrappato in try/catch — se la registrazione SW
-//    lancia (navigator.serviceWorker rotto, virtual module buggy), init non
-//    crasha e l'app continua a funzionare senza PWA offline.
-//  - BUG-A18-02: init() body wrappato in try/catch con fallback UI.
-//  - BUG-A18-03: onNeedRefresh dedup — multiple chiamate mostrano un solo
-//    bottone "Aggiorna ora". Il flag dedup è resettato dopo l'auto-remove
-//    (30s) così un secondo update può mostrare un nuovo bottone.
-//  - BUG-A18-04: reloadBtn.onclick catcha reject di updateSW — reload
-//    avviene comunque, no unhandled rejection.
-//  - BUG-A18-05: toast message chiaro ("vedi pulsante in basso a destra")
-//    invece del precedente "tocca per aggiornare" (il toast non è cliccabile).
-//  - BUG-A18-07: idempotency guard via __ploppytvInit flag su window —
-//    sopravvive a vi.resetModules() (HMR / re-import), evitando listener
-//    duplication e double-init.
-//  - BUG-A18-08: global error handlers (window.error + unhandledrejection)
-//    catturano errori in async chunks (renderer imports, worker client).
 
 import './styles/main.css';
 import { getState, subscribe, switchView, openShow } from './lib/store';
@@ -77,7 +59,7 @@ function setupHashRouting(): void {
   setTimeout(applyHash, 0);
 }
 
-// BUG-A18-08: global error handlers per errori non catturati e rejection
+// Global error handlers per errori non catturati e rejection
 // non gestite. Questi catturano errori in async chunks (renderer imports,
 // worker client) che altrimenti diventerebbero failure silenti.
 function registerGlobalErrorHandlers(): void {
@@ -99,7 +81,7 @@ function registerGlobalErrorHandlers(): void {
   });
 }
 
-// BUG-A18-02: fallback UI quando init() fallisce. Mostra un messaggio
+// Fallback UI quando init() fallisce. Mostra un messaggio
 // user-friendly nel main content area + logga l'errore in console.
 function showFatalError(err: unknown): void {
   console.error('[PloppyTV] init failed:', err);
@@ -119,15 +101,15 @@ function showFatalError(err: unknown): void {
   }
 }
 
-// BUG-A18-01: PWA registration wrappata in try/catch. Se registerSW lancia
+// PWA registration wrappata in try/catch. Se registerSW lancia
 // (navigator.serviceWorker rotto, virtual module buggy), init non crasha.
-// BUG-A18-03: onNeedRefresh dedup — un solo bottone "Aggiorna ora" alla volta.
-// BUG-A18-04: reloadBtn.onclick catcha reject di updateSW.
-// BUG-A18-05: toast message chiaro.
+// onNeedRefresh dedup — un solo bottone "Aggiorna ora" alla volta.
+// reloadBtn.onclick catcha reject di updateSW.
+// Toast message chiaro.
 function registerPWA(): void {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   try {
-    // BUG-A18-03: track se un bottone è già visibile per evitare duplicati.
+    // Track se un bottone è già visibile per evitare duplicati.
     let updateBtn: HTMLButtonElement | null = null;
     let autoRemoveTimer: ReturnType<typeof setTimeout> | null = null;
     const updateSW = registerSW({
@@ -141,10 +123,10 @@ function registerPWA(): void {
       },
       onNeedRefresh() {
         // Nuova versione del SW disponibile (in stato waiting).
-        // BUG-A18-05: toast message chiaro — il toast non è cliccabile,
+        // Toast message chiaro — il toast non è cliccabile,
         // il bottone di aggiornamento è in basso a destra.
         showToast('Nuova versione disponibile (vedi pulsante in basso a destra)', 'warning');
-        // BUG-A18-03: dedup — se un bottone è già visibile, non aggiungerne un altro.
+        // Dedup — se un bottone è già visibile, non aggiungerne un altro.
         // Il toast è comunque re-mostrato ogni volta per ricordare all'utente.
         if (updateBtn) return;
         const reloadBtn = document.createElement('button');
@@ -153,12 +135,12 @@ function registerPWA(): void {
         reloadBtn.style.cssText =
           'position:fixed;bottom:20px;right:20px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.3);';
         reloadBtn.onclick = async () => {
-          // BUG-A18-03: cancella l'auto-remove timer visto che l'utente ha cliccato.
+          // Cancella l'auto-remove timer visto che l'utente ha cliccato.
           if (autoRemoveTimer) {
             clearTimeout(autoRemoveTimer);
             autoRemoveTimer = null;
           }
-          // BUG-A18-04: catch updateSW rejection — reload deve comunque avvenire.
+          // Catch updateSW rejection — reload deve comunque avvenire.
           try {
             if (updateSW) {
               await updateSW(true);
@@ -176,7 +158,7 @@ function registerPWA(): void {
         document.body.appendChild(reloadBtn);
         updateBtn = reloadBtn;
         // Auto-rimuovi dopo 30s se l'utente non clicca.
-        // BUG-A18-03 follow-up: reset del flag dedup così un successivo
+        // Reset del flag dedup così un successivo
         // onNeedRefresh può mostrare un nuovo bottone (es. secondo SW update).
         autoRemoveTimer = setTimeout(() => {
           if (updateBtn) {
@@ -191,7 +173,7 @@ function registerPWA(): void {
     (window as unknown as { __ploppytvUpdateSW?: () => Promise<void> }).__ploppytvUpdateSW = () =>
       updateSW ? updateSW(true) : Promise.resolve();
   } catch (e) {
-    // BUG-A18-01: registerSW non deve crashare init.
+    // registerSW non deve crashare init.
     console.warn('[PWA] registerSW threw:', e);
   }
 }
@@ -213,7 +195,7 @@ function detectStandalone(): void {
 
 // ===== INIT =====
 function init(): void {
-  // BUG-A18-07: idempotency guard. Il flag su window sopravvive a
+  // Idempotency guard. Il flag su window sopravvive a
   // vi.resetModules() (HMR / re-import), così il secondo import non
   // re-registra listener (hashchange, error, unhandledrejection)
   // e non re-runna initX (evitando double-bind, double-save, ecc.).
@@ -221,7 +203,7 @@ function init(): void {
   if (w.__ploppytvInit) return;
   w.__ploppytvInit = true;
 
-  // BUG-A18-08: registra gli error handler globali PRIMA di qualsiasi init
+  // Registra gli error handler globali PRIMA di qualsiasi init
   // step che potrebbe lanciare. Così catturano anche errori durante init.
   registerGlobalErrorHandlers();
 
@@ -277,7 +259,7 @@ function init(): void {
 
     detectStandalone();
   } catch (e) {
-    // BUG-A18-02: init() non deve lanciare. Mostra fallback UI + logga.
+    // init() non deve lanciare. Mostra fallback UI + logga.
     showFatalError(e);
   }
 }

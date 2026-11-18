@@ -20,7 +20,7 @@ vi.mock('../src/worker/client', () => ({
 }));
 
 import { computeCalendarAsync, computeStatsAsync } from '../src/worker/client';
-import { renderCalendar, bindCalendarEvents, resetBoundGuard } from '../src/views/calendar';
+import { renderCalendar, bindCalendarEvents } from '../src/views/calendar';
 import { renderStats } from '../src/views/stats';
 import { getState, setState } from '../src/lib/store';
 
@@ -1063,7 +1063,6 @@ describe('Regression: existing behavior preserved', () => {
   it('calendar: changeWeek button still decrements offset (regression)', async () => {
     const main = makeMain();
     setState({ currentView: 'calendar' });
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const prevBtn = main.querySelector('[data-action="changeWeek"][data-delta="-1"]') as HTMLElement;
@@ -1074,7 +1073,6 @@ describe('Regression: existing behavior preserved', () => {
   it('calendar: resetWeek button still works (regression)', async () => {
     const main = makeMain();
     setState({ currentView: 'calendar', calendarWeekOffset: 5 });
-    resetBoundGuard();
     await renderCalendar(main);
     bindCalendarEvents(main);
     const resetBtn = main.querySelector('[data-action="resetWeek"]') as HTMLElement;

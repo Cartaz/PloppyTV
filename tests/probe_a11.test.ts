@@ -75,7 +75,7 @@ vi.mock('../src/lib/shows.ts', async (importOriginal) => {
   };
 });
 
-import { renderShowDetail, bindShowDetailEvents, resetBoundGuard } from '../src/views/showDetail';
+import { renderShowDetail, bindShowDetailEvents } from '../src/views/showDetail';
 import { setState } from '../src/lib/store';
 import { toggleEpisode, setEpisodeRating, setEpisodeNote, addShowTag, removeShowTag } from '../src/lib/shows';
 import { showModal, closeModal } from '../src/components/modal';
@@ -406,7 +406,6 @@ describe('BUG-A11-08: openNoteEditor guards corrupted seasons', () => {
   function setupAndClickNote(show: Show): void {
     setState({ currentShowId: show.id, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="editNote"]') as HTMLElement | null;
@@ -448,7 +447,6 @@ describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
     (showB as unknown as { tags: unknown }).tags = 'Summer';
     setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
@@ -462,7 +460,6 @@ describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
     const showB = makeShow({ id: 2, tags: ['Summer', 'Rewatch'] });
     setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
@@ -478,7 +475,6 @@ describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
     (showB as unknown as { tags: any[] }).tags = ['Valid', 42, null, { x: 1 }, 'Also'];
     setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
@@ -499,7 +495,6 @@ describe('BUG-A11-10: addTag modal stays open on failure', () => {
     const show = makeShow({ id: 1, tags: [] });
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
@@ -570,7 +565,6 @@ describe('P2: star rating click → setEpisodeRating called', () => {
   function setup(show: Show): HTMLElement {
     setState({ currentShowId: show.id, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     return main;
@@ -634,7 +628,6 @@ describe('P2: note editor save → setEpisodeNote called', () => {
     show.seasons[1][0].name = 'Pilot';
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="editNote"]') as HTMLElement;
@@ -651,7 +644,6 @@ describe('P2: note editor save → setEpisodeNote called', () => {
     show.seasons[1][0].name = 'Pilot';
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="editNote"]') as HTMLElement;
@@ -668,7 +660,6 @@ describe('P2: note editor save → setEpisodeNote called', () => {
     show.seasons[1][0].note = 'Pre-existing note';
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="editNote"]') as HTMLElement;
@@ -686,7 +677,6 @@ describe('P2: tag remove click → removeShowTag called', () => {
     const show = makeShow({ id: 1, tags: ['Summer', 'Rewatch'] });
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btns = Array.from(document.querySelectorAll('[data-action="removeTag"]')) as HTMLElement[];
@@ -699,7 +689,6 @@ describe('P2: tag remove click → removeShowTag called', () => {
     const show = makeShow({ id: 1, tags: ['<script>alert(1)</script>'] });
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     const main = getMain();
-    resetBoundGuard();
     renderShowDetail(main);
     bindShowDetailEvents(main);
     const btn = document.querySelector('[data-action="removeTag"]') as HTMLElement;

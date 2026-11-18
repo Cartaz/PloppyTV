@@ -8,16 +8,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Show } from '../src/types';
 import {
   getState,
-  getStateSnapshot,
   setState,
   subscribe,
   emitChange,
   setShows,
   replaceShow,
   removeShowFromState,
-  updateShowListStatus,
 } from '../src/lib/store';
-import { makeShow, makeShowWithSeasons, markWatchedFirst } from './helpers';
+import { updateShowListStatus } from '../src/lib/normalize';
+import { makeShow } from './helpers';
 
 // Helper: reset dello store tra i test (lo store è un module-level singleton).
 function resetState(): void {
@@ -154,103 +153,6 @@ describe('BUG-A2-03: replaceShow validates invalid show / id', () => {
     replaceShow({ ...makeShow({ id: 100 }), name: 'Updated' });
     expect(getState().shows.length).toBe(1);
     expect(getState().shows[0].name).toBe('Updated');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BUG-A2-04 [HIGH] getStateSnapshot deep-clona tags e genres
-// ---------------------------------------------------------------------------
-describe('BUG-A2-04: getStateSnapshot deep-clones tags & genres', () => {
-  beforeEach(resetState);
-
-  it('snapshot.tags è un nuovo array (non shared con live)', () => {
-    const show = makeShow({ id: 1, tags: ['foo', 'bar'] });
-    setShows([show]);
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].tags).not.toBe(getState().shows[0].tags);
-  });
-
-  it('snapshot.genres è un nuovo array (non shared con live)', () => {
-    const show = makeShow({ id: 1, genres: ['Drama', 'Comedy'] });
-    setShows([show]);
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].genres).not.toBe(getState().shows[0].genres);
-  });
-
-  it('mutare snapshot.tags non leaka nel live state', () => {
-    const show = makeShow({ id: 1, tags: ['foo'] });
-    setShows([show]);
-    const snap = getStateSnapshot();
-    snap.shows[0].tags!.push('leaked');
-    expect(getState().shows[0].tags).toEqual(['foo']);
-  });
-
-  it('mutare snapshot.genres non leaka nel live state', () => {
-    const show = makeShow({ id: 1, genres: ['Drama'] });
-    setShows([show]);
-    const snap = getStateSnapshot();
-    snap.shows[0].genres.push('leaked');
-    expect(getState().shows[0].genres).toEqual(['Drama']);
-  });
-
-  it('tags undefined nello show → snapshot.tags resta undefined (no crash)', () => {
-    const show = makeShow({ id: 1 });
-    delete show.tags;
-    setShows([show]);
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].tags).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BUG-A2-05 [HIGH] getStateSnapshot gestisce seasons malformati
-// ---------------------------------------------------------------------------
-describe('BUG-A2-05: getStateSnapshot handles malformed seasons', () => {
-  beforeEach(resetState);
-
-  it('seasons=null non crasha (restituisce {} nel snapshot)', () => {
-    const show = makeShow({ id: 1 });
-    // @ts-expect-error — intentionally malformed
-    show.seasons = null;
-    setShows([show]);
-    expect(() => getStateSnapshot()).not.toThrow();
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].seasons).toEqual({});
-  });
-
-  it('seasons=undefined non crasha', () => {
-    const show = makeShow({ id: 1 });
-    // @ts-expect-error intentional invalid-type test input
-    show.seasons = undefined;
-    setShows([show]);
-    expect(() => getStateSnapshot()).not.toThrow();
-    expect(getStateSnapshot().shows[0].seasons).toEqual({});
-  });
-
-  it('seasons=array non crasha (trattato come non-object)', () => {
-    const show = makeShow({ id: 1 });
-    // @ts-expect-error intentional invalid-type test input
-    show.seasons = [['ep1']];
-    setShows([show]);
-    expect(() => getStateSnapshot()).not.toThrow();
-    expect(getStateSnapshot().shows[0].seasons).toEqual({});
-  });
-
-  it('seasons con value non-array → snapshot ha [] per quella season', () => {
-    const show = makeShow({ id: 1 });
-    // @ts-expect-error intentional invalid-type test input
-    show.seasons = { 1: 'not-an-array', 2: 42 };
-    setShows([show]);
-    const snap = getStateSnapshot();
-    expect(Array.isArray(snap.shows[0].seasons[1])).toBe(true);
-    expect(snap.shows[0].seasons[1]).toEqual([]);
-    expect(snap.shows[0].seasons[2]).toEqual([]);
-  });
-
-  it('state.shows non-array non crasha getStateSnapshot (defense-in-depth)', () => {
-    (getState() as { shows: unknown }).shows = null;
-    expect(() => getStateSnapshot()).not.toThrow();
-    expect(getStateSnapshot().shows).toEqual([]);
   });
 });
 
@@ -445,46 +347,6 @@ describe('BUG-A2-08: subscribe validates fn is a function', () => {
 describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
   beforeEach(resetState);
 
-  it('snapshot di show con tutti i campi (tags, genres, seasons) è totalmente isolato', () => {
-    const show = makeShowWithSeasons(
-      { 1: 3 },
-      {
-        id: 7,
-        tags: ['gold', 'rewatch'],
-        genres: ['Drama', 'Thriller'],
-        list: 'watching',
-        manualList: true,
-      },
-    );
-    markWatchedFirst(show, 1, 2);
-    setShows([show]);
-
-    const snap = getStateSnapshot();
-
-    // Tutti i livelli sono reference diverse
-    expect(snap.shows).not.toBe(getState().shows);
-    expect(snap.shows[0]).not.toBe(getState().shows[0]);
-    expect(snap.shows[0].tags).not.toBe(getState().shows[0].tags);
-    expect(snap.shows[0].genres).not.toBe(getState().shows[0].genres);
-    expect(snap.shows[0].seasons).not.toBe(getState().shows[0].seasons);
-    expect(snap.shows[0].seasons[1]).not.toBe(getState().shows[0].seasons[1]);
-    expect(snap.shows[0].seasons[1][0]).not.toBe(getState().shows[0].seasons[1][0]);
-
-    // Mutazioni sul snapshot non leakano.
-    // Episodio [1][2] è unwatched nel live (markWatchedFirst ha marcato solo 0,1).
-    // Mutiamo il snapshot a watched=true → il live deve restare false.
-    snap.shows[0].tags!.push('leaked');
-    snap.shows[0].genres.push('leaked');
-    snap.shows[0].seasons[1][2].watched = true;
-    snap.shows[0].list = 'completed';
-
-    const live = getState().shows[0];
-    expect(live.tags).toEqual(['gold', 'rewatch']);
-    expect(live.genres).toEqual(['Drama', 'Thriller']);
-    expect(live.seasons[1][2].watched).toBe(false);
-    expect(live.list).toBe('watching');
-  });
-
   it('replaceShow + removeShowFromState flow con id mistivalidi/invalidi', () => {
     // Setup con show validi
     setShows([makeShow({ id: 10 }), makeShow({ id: 20 }), makeShow({ id: 30 })]);
@@ -536,29 +398,6 @@ describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
     updateShowListStatus(s4);
     expect(s4.list).toBe('watching');
   });
-
-  it('snapshot con show parziale (campi mancanti) non crasha', () => {
-    const partial = {
-      id: 1,
-      name: 'Partial',
-      image: null,
-      status: 'Running',
-      premiered: null,
-      genres: [],
-      summary: '',
-      network: '',
-      runtime: 0,
-      list: 'towatch' as const,
-      // seasons mancante
-      totalSeasons: 0,
-      totalEpisodes: 0,
-      addedAt: 0,
-    };
-    setShows([partial as never]);
-    expect(() => getStateSnapshot()).not.toThrow();
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].seasons).toEqual({});
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -597,34 +436,5 @@ describe('BUG-A2 regression: existing behaviors preserved', () => {
     emitChange();
     await new Promise((r) => setTimeout(r, 60));
     expect(fn).toHaveBeenCalledTimes(1); // not called after unsub
-  });
-
-  it('snapshot preserva i valori dei campi scalari', () => {
-    const show = makeShowWithSeasons(
-      { 1: 2 },
-      {
-        id: 42,
-        name: 'Test',
-        list: 'watching',
-        manualList: true,
-        runtime: 60,
-        totalEpisodes: 2,
-        totalSeasons: 1,
-      },
-    );
-    markWatchedFirst(show, 1, 1);
-    setShows([show]);
-
-    const snap = getStateSnapshot();
-    expect(snap.shows[0].id).toBe(42);
-    expect(snap.shows[0].name).toBe('Test');
-    expect(snap.shows[0].list).toBe('watching');
-    expect(snap.shows[0].manualList).toBe(true);
-    expect(snap.shows[0].runtime).toBe(60);
-    expect(snap.shows[0].totalEpisodes).toBe(2);
-    expect(snap.shows[0].totalSeasons).toBe(1);
-    expect(snap.shows[0].seasons[1].length).toBe(2);
-    expect(snap.shows[0].seasons[1][0].watched).toBe(true);
-    expect(snap.shows[0].seasons[1][1].watched).toBe(false);
   });
 });

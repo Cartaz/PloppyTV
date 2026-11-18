@@ -1,17 +1,10 @@
 // Export/Import backup JSON
-//
-// FIXES applicati:
-//  - BUG-11-01: BOM detection UTF-8/UTF-16 LE/BE via readAsArrayBuffer + TextDecoder.
-//  - BUG-11-02: policy schema condivisa; legacy senza versione ammesso, versioni invalide/future rifiutate.
-//  - Unione: vedi src/lib/merge.ts (per episodio, nessun dato locale perso).
-//  - BUG-11-07: grammatica italiana singolare/plurale.
-//  - BUG-11-09: export JSON minified (no indent).
 
 import type { ExportedData } from '../types';
 import { SCHEMA_VERSION, MAX_IMPORT_SIZE } from '../lib/constants';
 import { getState, setShows, emitChange } from '../lib/store';
 import { mergeImportedShow } from '../lib/merge';
-import { saveData, isStorageOK } from '../lib/storage';
+import { saveData } from '../lib/storage';
 import { canonicalizeDataDocument } from '../lib/dataDocument';
 import { localISODate } from '../lib/utils';
 import { showToast } from './toast';
@@ -23,8 +16,6 @@ const SUPPORTS_EXPORT =
 
 /**
  * Decodifica un ArrayBuffer in stringa gestendo BOM UTF-8/UTF-16 LE/BE.
- * BUG-11-01: prima veniva usato readAsText(file,'utf-8') che mangle i file
- * UTF-16. Ora usiamo readAsArrayBuffer e detectiamo il BOM.
  */
 function decodeArrayBuffer(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -98,7 +89,7 @@ export function initExportImport(): void {
       showToast('Errore lettura file', 'error');
       input.value = '';
     };
-    // BUG-11-01: readAsArrayBuffer + BOM detection per supportare UTF-16.
+    // readAsArrayBuffer + BOM detection per supportare UTF-16.
     reader.onload = (ev) => {
       const buf = (ev.target?.result as ArrayBuffer) || new ArrayBuffer(0);
       let text: string;
@@ -115,12 +106,12 @@ export function initExportImport(): void {
         data = JSON.parse(text);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        // BUG-11-01: non menzionare più UTF-16 (ora gestito).
+        // Non menzionare più UTF-16 (ora gestito).
         showToast('File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido e non corrotto)', 'error');
         input.value = '';
         return;
       }
-      // BUG-A16-02: wrap post-parse logic in try/catch. Se canonicalizeDataDocument
+      // Wrap post-parse logic in try/catch. Se canonicalizeDataDocument
       // (o qualsiasi altra operazione sincrona dopo il parse) lancia per
       // un input malformato inatteso (defense-in-depth — canonicalizeDataDocument è
       // ben guarded ma un bug futuro o un oggetto Proxy-like potrebbe
@@ -158,7 +149,7 @@ export function initExportImport(): void {
           input.value = '';
           return;
         }
-        // BUG-11-07: grammatica italiana singolare/plurale.
+        // Grammatica italiana singolare/plurale.
         const skipMsg =
           skipped > 0
             ? ' (' +
@@ -198,7 +189,7 @@ export function initExportImport(): void {
             }
             updateBadges();
             emitChange();
-            // BUG-11-07: grammatica italiana.
+            // Grammatica italiana.
             const addedWord = pluralize(added, 'Importata', 'Importate');
             const nuoveWord = pluralize(added, 'nuova', 'nuove');
             const aggiornateWord = pluralize(updated, 'aggiornata', 'aggiornate');
@@ -213,7 +204,7 @@ export function initExportImport(): void {
         const replaceAction: ModalAction = {
           label: 'Sostituisci tutto',
           style: 'btn-danger',
-          // CRITICAL FIX (C2/T6): keepOpen = true impedisce che il closeModal()
+          // keepOpen = true impedisce che il closeModal()
           // automatico dopo onClick chiuda il modale genitore prima che la
           // modale di conferma figlia sia visibile.
           keepOpen: true,
@@ -281,7 +272,7 @@ function doExport(): void {
       shows: getState().shows,
       exportedAt: new Date().toISOString(),
     };
-    // BUG-11-09: JSON minified (no indent) per file di backup più piccoli.
+    // JSON minified (no indent) per file di backup più piccoli.
     data = JSON.stringify(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
@@ -304,5 +295,3 @@ function doExport(): void {
     showToast('Errore esportazione: ' + msg, 'error');
   }
 }
-
-export { isStorageOK };
