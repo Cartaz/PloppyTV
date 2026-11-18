@@ -4,7 +4,16 @@ Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il forma
 
 ## [Unreleased]
 
-Nessuna modifica.
+### Corretto
+
+- Dettaglio serie: il poster non genera più una richiesta 404 a ogni apertura (l'URL "originale" costruito dall'app non esiste sul CDN TVMaze); viene usato direttamente il poster medio.
+- Lo stato della serie (In corso, Conclusa, …) è tradotto invece di mostrare il valore TVMaze in inglese.
+
+### Interno
+
+- Niente più hook di test nel codice dell'app: `initKeyboard`, `initNotifications`, `initImageFallback` e `initSearch` restituiscono la propria funzione di cleanup; i test usano moduli freschi.
+- Chiavi i18n generate automaticamente rinominate con nomi descrittivi; titoli e commenti dei test senza ID `BUG-xx`.
+- Note della 1.3.0 in `docs/RELEASE_NOTES_v1.3.0.md`; tag `v1.2.1` creato sul commit di rilascio.
 
 ## [1.3.0] — Pulizia e correzioni (novembre 2026)
 
