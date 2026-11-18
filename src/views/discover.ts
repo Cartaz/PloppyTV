@@ -15,7 +15,7 @@ import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
-import { t } from '../lib/i18n';
+import { t, showStatusLabel } from '../lib/i18n';
 
 type DiscoverTab = 'popular' | 'recent';
 const _cache: Record<DiscoverTab, DiscoverGroups | null> = { popular: null, recent: null };
@@ -369,7 +369,7 @@ function previewDiscover(showId: number): void {
     body +=
       '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">' +
       t('discover.stato') +
-      escapeHtml(found.status) +
+      escapeHtml(showStatusLabel(found.status)) +
       (runtimeNum != null ? ' • ' + runtimeNum + ' min/ep' : '') +
       '</div>';
   }

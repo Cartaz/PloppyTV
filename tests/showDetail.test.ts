@@ -198,12 +198,17 @@ describe('renderShowDetail — status badge', () => {
     expect(badge?.classList.contains('status-running')).toBe(true);
   });
 
-  it('status "In corso" (Italian) → status-running class', () => {
-    const show = makeShow({ id: 1, status: 'In corso' });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const badge = document.querySelector('.status-badge');
-    expect(badge?.classList.contains('status-running')).toBe(true);
+  it('translates the TVMaze status and keeps unknown values as they are', () => {
+    for (const [status, label] of [
+      ['Running', 'In corso'],
+      ['Ended', 'Conclusa'],
+      ['To Be Determined', 'Da definire'],
+      ['Pilot Ordered', 'Pilot Ordered'],
+    ]) {
+      setState({ currentShowId: 1, shows: [makeShow({ id: 1, status })] });
+      renderShowDetail(getMain());
+      expect(document.querySelector('.status-badge')?.textContent).toBe(label);
+    }
   });
 
   it('status "Ended" → status-ended class', () => {

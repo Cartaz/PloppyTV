@@ -135,6 +135,19 @@ export function subscribeI18n(fn: () => void): () => void {
  * Esempio: t('library.results', { count: 5 }) → "5 risultati" (it) / "5 results" (en)
  * Fallback: se la chiave non esiste in _current, prova 'it', poi ritorna la key.
  */
+const SHOW_STATUS_KEYS: Record<string, string> = {
+  Running: 'showStatus.running',
+  Ended: 'showStatus.ended',
+  'To Be Determined': 'showStatus.tbd',
+  'In Development': 'showStatus.inDevelopment',
+};
+
+/** Stato TVMaze della serie nella lingua corrente (valori sconosciuti restano com'erano). */
+export function showStatusLabel(status: string): string {
+  const key = SHOW_STATUS_KEYS[status];
+  return key ? t(key) : status;
+}
+
 /** Durata leggibile ("2g 3h", "1h 30min", "45min") nella lingua corrente. */
 export function formatDuration(totalMinutes: number): string {
   const days = Math.floor(totalMinutes / 1440);

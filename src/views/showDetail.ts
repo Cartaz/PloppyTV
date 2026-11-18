@@ -17,7 +17,7 @@ import {
 import { showModal, closeModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
-import { t } from '../lib/i18n';
+import { t, showStatusLabel } from '../lib/i18n';
 
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
 let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -135,9 +135,7 @@ export function renderShowDetail(main: HTMLElement): void {
   const rawProgress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const progress = Math.max(0, Math.min(100, rawProgress));
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
-  const statusLower = String(show.status || '').toLowerCase();
-  const statusClass =
-    statusLower.includes('running') || statusLower.includes(t('detail.corso')) ? 'status-running' : 'status-ended';
+  const statusClass = show.status === 'Running' ? 'status-running' : 'status-ended';
 
   let html =
     '<button class="btn btn-secondary" data-action="closeShow" style="margin-bottom:20px;">' +
@@ -169,7 +167,7 @@ export function renderShowDetail(main: HTMLElement): void {
     '<span><span class="status-badge ' +
     statusClass +
     '">' +
-    escapeHtml(show.status) +
+    escapeHtml(showStatusLabel(show.status)) +
     '</span></span>' +
     (show.premiered ? '<span>' + formatDate(show.premiered) + '</span>' : '') +
     '<span>' +
