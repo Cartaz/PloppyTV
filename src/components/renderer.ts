@@ -10,11 +10,6 @@ import { safeId } from '../lib/utils';
 let _mainEl: HTMLElement | null = null;
 let _boundDelegated = false;
 
-/**
- * BUG-A17-05 (FIXED): getMain ritorna HTMLElement | null (prima castava a
- * HTMLElement senza null-check). Se mainContent non esiste (test/DOM parziale),
- * il cast mentiva e .addEventListener crashava con TypeError.
- */
 function getMain(): HTMLElement | null {
   if (!_mainEl) _mainEl = document.getElementById('mainContent');
   return _mainEl;
@@ -24,7 +19,7 @@ function getMain(): HTMLElement | null {
 function bindDelegatedEvents(): void {
   if (_boundDelegated) return;
   const main = getMain();
-  // BUG-A17-05: null-check — se main non esiste, esci senza crashare.
+  // Null-check — se main non esiste, esci senza crashare.
   if (!main) return;
   _boundDelegated = true;
   initImageFallback();
@@ -36,7 +31,7 @@ function bindDelegatedEvents(): void {
     const action = actionEl.dataset.action;
 
     if (action === 'openShow') {
-      // BUG-A17-06 (FIXED): usa safeId invece di Number() per validare
+      // Usa safeId invece di Number() per validare
       // l'ID. Number() accetta "0x10" (hex→16), "1e3" (sci→1000),
       // "123.5" (float→123.5 truthy), "  123  " (whitespace). safeId
       // rifiuta tutti questi casi (solo interi decimali positivi).
@@ -53,7 +48,7 @@ function bindDelegatedEvents(): void {
       if (view) switchView(view);
       return;
     }
-    // BUG-A17-07 (FIXED): action reloadPage per evitare inline onclick
+    // Action reloadPage per evitare inline onclick
     // (CSP-safe). Il fallback di safeImport usava onclick="location.reload()"
     // che viola CSP strict (no inline event handlers). Ora il button usa
     // data-action e viene gestito qui.
@@ -78,7 +73,7 @@ export function render(): void {
 
 /**
  * Render di una vista via import dinamico.
- * CRITICAL FIX (C6): wrap in try/catch. Se il chunk 404 (o preview server
+ * Wrap in try/catch. Se il chunk 404 (o preview server
  * serve HTML 200 invece del JS), `import()` lancia SyntaxError. Senza
  * catch diventa unhandled rejection e l'UI resta bricked. Con catch
  * mostriamo un fallback UI + toast.
@@ -115,7 +110,7 @@ async function safeImport<T>(chunkPromise: Promise<T>, main: HTMLElement): Promi
 async function _doRender(): Promise<void> {
   const myToken = ++_renderToken;
   const main = getMain();
-  // BUG-A17-05: null-check — se main non esiste, esci senza crashare.
+  // Null-check — se main non esiste, esci senza crashare.
   if (!main) return;
   const state = getState();
 
@@ -129,12 +124,8 @@ async function _doRender(): Promise<void> {
       const mod = await safeImport(import('../views/showDetail'), main);
       if (myToken !== _renderToken) return;
       if (!mod) return;
-      // CRITICAL FIX (C5): reset bound guard PRIMA del bind, così non accumuliamo
-      // listener ad ogni re-render. Il modulo è cached, quindi l'oggetto `mod`
-      // mantiene lo stato `_boundShowDetail` tra un render e l'altro.
-      mod.resetBoundGuard();
       mod.renderShowDetail(main);
-      // BUG-A17-08 (FIXED): se renderShowDetail ha bailato (closeShow ha nullato
+      // Se renderShowDetail ha bailato (closeShow ha nullato
       // currentShowId perché il show non esiste), NON chiamare bindShowDetailEvents.
       // Prima il renderer bindava incondizionatamente, legando listener al DOM
       // della vista precedente (renderShowDetail ritorna senza modificare
@@ -174,7 +165,6 @@ async function _doRender(): Promise<void> {
         const mod = await safeImport(import('../views/discover'), main);
         if (myToken !== _renderToken) return;
         if (!mod) return;
-        mod.resetBoundGuard();
         mod.renderDiscover(main);
         mod.bindDiscoverEvents(main);
         break;
@@ -183,7 +173,6 @@ async function _doRender(): Promise<void> {
         const mod = await safeImport(import('../views/calendar'), main);
         if (myToken !== _renderToken) return;
         if (!mod) return;
-        mod.resetBoundGuard();
         await mod.renderCalendar(main);
         if (myToken !== _renderToken) return;
         mod.bindCalendarEvents(main);

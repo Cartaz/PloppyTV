@@ -10,26 +10,21 @@ import {
   type DiscoverGroups,
 } from '../lib/discover';
 import { addShowToList } from '../lib/shows';
+import { apiErrorMessage } from '../lib/api';
 import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
+import { t } from '../lib/i18n';
 
-let _popularCache: DiscoverGroups | null = null;
-let _recentCache: DiscoverGroups | null = null;
-let _popularLoading = false;
-let _recentLoading = false;
+type DiscoverTab = 'popular' | 'recent';
+const _cache: Record<DiscoverTab, DiscoverGroups | null> = { popular: null, recent: null };
+const _loading: Record<DiscoverTab, boolean> = { popular: false, recent: false };
 
-let _boundDiscover = false;
 let _discoverClickHandler: ((e: MouseEvent) => void) | null = null;
 let _discoverKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 let _discoverResizeHandler: (() => void) | null = null;
 let _discoverMain: HTMLElement | null = null;
-
-/** Reset guardia listener — BUG-15-01: removeEventListener del vecchio handler. */
-export function resetBoundGuard(): void {
-  _boundDiscover = false;
-}
 
 function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
   // Carousel ID stabile (no Math.random) per essere riferito deterministicamente
@@ -46,11 +41,15 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
   html +=
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
-    '" data-dir="-1" aria-label="Precedente">‹</button>';
+    '" data-dir="-1" aria-label="' +
+    t('discover.precedente') +
+    '">‹</button>';
   html +=
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
-    '" data-dir="1" aria-label="Successivo">›</button>';
+    '" data-dir="1" aria-label="' +
+    t('discover.successivo') +
+    '">›</button>';
   html += '</div></div>';
   html += '<div class="carousel-track" id="' + carouselId + '">';
   for (const show of shows) {
@@ -67,7 +66,7 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
       '" role="button" tabindex="0" aria-label="Anteprima ' +
       escapeAttr(show.name) +
       '">';
-    if (isAdded) html += '<div class="carousel-card-badge">Aggiunta</div>';
+    if (isAdded) html += '<div class="carousel-card-badge">' + t('discover.aggiunta') + '</div>';
     if (img) {
       html +=
         '<img class="carousel-card-poster" src="' +
@@ -103,7 +102,13 @@ function updateCarouselNavState(track: HTMLElement): void {
 
 function renderDiscoverContent(groups: DiscoverGroups | null): string {
   if (!groups) {
-    return '<div class="empty-state"><div class="empty-state-title">Nessuna serie disponibile</div><div class="empty-state-text">Riprova più tardi.</div></div>';
+    return (
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('discover.nessunaSerieDisponibile') +
+      '</div><div class="empty-state-text">' +
+      t('discover.riprovaPiuTardi') +
+      '</div></div>'
+    );
   }
   let html = '';
   for (const genre of GENRE_CAROUSELS) {
@@ -112,75 +117,51 @@ function renderDiscoverContent(groups: DiscoverGroups | null): string {
     html += renderGenreCarousel(genre, groupShows);
   }
   if (groups._other && groups._other.length > 0) {
-    html += renderGenreCarousel('Altro', groups._other);
+    html += renderGenreCarousel(t('discover.altro'), groups._other);
   }
   return html;
 }
 
-function renderDiscoverError(err: { name?: string }): string {
-  let msg = 'Errore caricamento. Riprova.';
-  if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
-  else if (err.name === 'TimeoutError') msg = 'Timeout caricamento.';
-  else if (err.name === 'ParseError') msg = 'Risposta API non valida. Riprova.';
+function renderDiscoverError(err: unknown): string {
   return (
     '<div class="empty-state"><div class="empty-state-title">' +
-    escapeHtml(msg) +
+    escapeHtml(apiErrorMessage(err, 'discover')) +
     '</div>' +
-    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>'
+    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">' +
+    t('discover.riprova') +
+    '</button></div></div>'
   );
 }
 
 /**
- * Carica il tab richiesto. CRITICAL FIX (H15): dopo l'await verifichiamo
+ * Carica il tab richiesto. dopo l'await verifichiamo
  * che `getState()._discoverTab` sia ancora il tab che stavamo caricando;
  * se l'utente ha switchato tab durante il fetch, scartiamo il risultato
  * per non sovrascrivere la vista del nuovo tab.
  */
-async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
+async function loadTab(tab: DiscoverTab): Promise<void> {
   const el = document.getElementById('discoverContent');
   if (!el) return;
-  if (tab === 'popular') {
-    if (_popularCache) {
-      el.innerHTML = renderDiscoverContent(_popularCache);
-      bindCarousels(el);
-      return;
-    }
-    if (_popularLoading) return;
-    _popularLoading = true;
-    el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
-    try {
-      _popularCache = await loadDiscover('popular');
-      // H15: scarta se l'utente ha cambiato tab durante il fetch
-      if (getState()._discoverTab !== 'popular') return;
-      el.innerHTML = renderDiscoverContent(_popularCache);
-      bindCarousels(el);
-    } catch (e) {
-      if (getState()._discoverTab !== 'popular') return;
-      el.innerHTML = renderDiscoverError(e as { name?: string });
-    } finally {
-      _popularLoading = false;
-    }
-  } else {
-    if (_recentCache) {
-      el.innerHTML = renderDiscoverContent(_recentCache);
-      bindCarousels(el);
-      return;
-    }
-    if (_recentLoading) return;
-    _recentLoading = true;
-    el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
-    try {
-      _recentCache = await loadDiscover('recent');
-      // H15: scarta se l'utente ha cambiato tab durante il fetch
-      if (getState()._discoverTab !== 'recent') return;
-      el.innerHTML = renderDiscoverContent(_recentCache);
-      bindCarousels(el);
-    } catch (e) {
-      if (getState()._discoverTab !== 'recent') return;
-      el.innerHTML = renderDiscoverError(e as { name?: string });
-    } finally {
-      _recentLoading = false;
-    }
+  const cached = _cache[tab];
+  if (cached) {
+    el.innerHTML = renderDiscoverContent(cached);
+    bindCarousels(el);
+    return;
+  }
+  if (_loading[tab]) return;
+  _loading[tab] = true;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('discover.caricamentoSerie') + '</div>';
+  try {
+    const groups = await loadDiscover(tab);
+    _cache[tab] = groups;
+    if (getState()._discoverTab !== tab) return;
+    el.innerHTML = renderDiscoverContent(groups);
+    bindCarousels(el);
+  } catch (e) {
+    if (getState()._discoverTab !== tab) return;
+    el.innerHTML = renderDiscoverError(e);
+  } finally {
+    _loading[tab] = false;
   }
 }
 
@@ -193,39 +174,49 @@ function bindCarousels(container: HTMLElement): void {
 
 export function renderDiscover(main: HTMLElement): void {
   const state = getState();
-  let html = '<h1 class="page-title">Scopri</h1>';
-  html += '<p class="page-subtitle">Esplora le serie TV più popolari e i nuovi arrivi.</p>';
+  let html = '<h1 class="page-title">' + t('discover.title') + '</h1>';
+  html += '<p class="page-subtitle">' + t('discover.esploraSerieTvPiu') + '</p>';
 
   html += '<div class="discover-tabs" role="tablist">';
   html +=
     '<button class="discover-tab ' +
     (state._discoverTab === 'popular' ? 'active' : '') +
-    '" data-action="switchDiscoverTab" data-tab="popular" role="tab">Popolari</button>';
+    '" data-action="switchDiscoverTab" data-tab="popular" role="tab">' +
+    t('discover.popular') +
+    '</button>';
   html +=
     '<button class="discover-tab ' +
     (state._discoverTab === 'recent' ? 'active' : '') +
-    '" data-action="switchDiscoverTab" data-tab="recent" role="tab">Ultimi arrivi</button>';
+    '" data-action="switchDiscoverTab" data-tab="recent" role="tab">' +
+    t('discover.ultimiArrivi') +
+    '</button>';
   html += '</div>';
 
   if (state._storageDisabled) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Funzione non disponibile</div><div class="empty-state-text">La cache non è disponibile in modalità privata.</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('discover.funzioneDisponibile') +
+      '</div><div class="empty-state-text">' +
+      t('discover.cacheDisponibileModalitaPrivata') +
+      '</div></div>';
     main.innerHTML = html;
     return;
   }
 
-  html += '<div id="discoverContent"><div class="loading"><div class="spinner"></div>Caricamento...</div></div>';
   html +=
-    '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">Aggiorna lista</button></div>';
+    '<div id="discoverContent"><div class="loading"><div class="spinner"></div>' +
+    t('discover.loading') +
+    '</div></div>';
+  html +=
+    '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">' +
+    t('discover.aggiornaLista') +
+    '</button></div>';
   main.innerHTML = html;
 
   loadTab(state._discoverTab);
 }
 
 export function bindDiscoverEvents(main: HTMLElement): void {
-  // BUG-15-01: se _boundDiscover è true, no-op. Solo resetBoundGuard abilita re-bind.
-  if (_boundDiscover) return;
-  _boundDiscover = true;
   // Rimuovi il vecchio handler se presente SULLO STESSO main.
   if (_discoverClickHandler && _discoverMain === main) {
     main.removeEventListener('click', _discoverClickHandler);
@@ -247,24 +238,18 @@ export function bindDiscoverEvents(main: HTMLElement): void {
     if (action === 'switchDiscoverTab') {
       const tab = actionEl.dataset.tab as 'popular' | 'recent';
       if (!tab) return;
-      // BUG-15-02/03: non chiamare loadTab manualmente, non toccare DOM old.
+      // Non chiamare loadTab manualmente, non toccare DOM old.
       // emitChange → RAF → re-render → renderDiscover chiama loadTab.
       setDiscoverTab(tab);
       return;
     }
 
     if (action === 'refreshDiscover') {
-      const state = getState();
-      if (state._discoverTab === 'popular') {
-        invalidateDiscoverCache('popular');
-        resetDiscoverLoad('popular');
-        _popularCache = null;
-      } else {
-        invalidateDiscoverCache('recent');
-        resetDiscoverLoad('recent');
-        _recentCache = null;
-      }
-      loadTab(state._discoverTab);
+      const tab = getState()._discoverTab;
+      invalidateDiscoverCache(tab);
+      resetDiscoverLoad(tab);
+      _cache[tab] = null;
+      loadTab(tab);
       return;
     }
 
@@ -294,7 +279,7 @@ export function bindDiscoverEvents(main: HTMLElement): void {
       if (list) addDiscoverShow(showId, list);
     }
   };
-  // BUG-15-07: keydown Enter/Space su elementi con role=button.
+  // Keydown Enter/Space su elementi con role=button.
   const keydownHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target as HTMLElement | null;
@@ -319,9 +304,9 @@ export function bindDiscoverEvents(main: HTMLElement): void {
 }
 
 function previewDiscover(showId: number): void {
-  const found = findShowInDiscoverGroups(showId, [_popularCache, _recentCache]);
+  const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast('Serie non trovata', 'error');
+    showToast(t('discover.serieTrovata'), 'error');
     return;
   }
   const isAdded = getState().shows.find((s) => s.id === found.id);
@@ -331,12 +316,12 @@ function previewDiscover(showId: number): void {
       : 'N/D'
     : 'N/D';
   const network = (found.network && found.network.name) || (found.webChannel && found.webChannel.name) || 'N/D';
-  // BUG-A12-01 (FIXED): rating.average was interpolated RAW in the modal HTML body.
+  // Rating.average was interpolated RAW in the modal HTML body.
   // The TS type says `number | null`, but the cache comes from JSON.parse(localStorage)
   // and could hold a string with HTML (e.g. "<img src=x onerror=alert(1)>"). Setting
   // innerHTML on the modal body would execute the payload. Coerce to a finite number;
   // reject anything else as 'N/D'.
-  // BUG-A12-04 (FIXED): the old truthy check `found.rating.average` excluded the
+  // The old truthy check `found.rating.average` excluded the
   // valid value 0 — a show with average rating 0 displayed "N/D" instead of "0/10".
   const ratingAvgRaw = found.rating ? found.rating.average : null;
   const rating = typeof ratingAvgRaw === 'number' && Number.isFinite(ratingAvgRaw) ? ratingAvgRaw + '/10' : 'N/D';
@@ -354,7 +339,14 @@ function previewDiscover(showId: number): void {
   }
   body += '<div class="discover-preview-info">';
   body += '<div class="discover-preview-name">' + escapeHtml(found.name) + '</div>';
-  body += '<div class="discover-preview-meta">' + year + ' • ' + escapeHtml(network) + ' • Rating ' + rating + '</div>';
+  body +=
+    '<div class="discover-preview-meta">' +
+    year +
+    ' • ' +
+    escapeHtml(network) +
+    t('discover.rating') +
+    rating +
+    '</div>';
   if (Array.isArray(found.genres) && found.genres.length > 0) {
     body +=
       '<div class="discover-preview-genres">' +
@@ -370,35 +362,44 @@ function previewDiscover(showId: number): void {
       '</div>';
   }
   if (found.status) {
-    // BUG-A12-02 (FIXED): found.runtime was interpolated RAW in the modal HTML body.
+    // found.runtime was interpolated RAW in the modal HTML body.
     // A corrupted cache holding a non-numeric string (e.g. "<img src=x onerror=...>")
     // would execute when set via innerHTML. Coerce to a finite number; omit otherwise.
     const runtimeNum = typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
     body +=
-      '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' +
+      '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">' +
+      t('discover.stato') +
       escapeHtml(found.status) +
       (runtimeNum != null ? ' • ' + runtimeNum + ' min/ep' : '') +
       '</div>';
   }
 
   const actions = isAdded
-    ? [{ label: 'Chiudi' }]
+    ? [{ label: t('actions.close') }]
     : [
-        { label: 'Chiudi' },
-        { label: 'Da vedere', style: 'btn-secondary' as const, onClick: () => addDiscoverShow(found.id, 'towatch') },
-        { label: 'In corso', style: 'btn-primary' as const, onClick: () => addDiscoverShow(found.id, 'watching') },
+        { label: t('actions.close') },
+        {
+          label: t('stats.towatch'),
+          style: 'btn-secondary' as const,
+          onClick: () => addDiscoverShow(found.id, 'towatch'),
+        },
+        {
+          label: t('stats.watching'),
+          style: 'btn-primary' as const,
+          onClick: () => addDiscoverShow(found.id, 'watching'),
+        },
       ];
-  showModal(found.name || 'Senza titolo', body, actions);
+  showModal(found.name || t('discover.senzaTitolo'), body, actions);
 }
 
 async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Promise<void> {
-  const found = findShowInDiscoverGroups(showId, [_popularCache, _recentCache]);
+  const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast('Serie non trovata nella cache, usa la ricerca', 'error');
+    showToast(t('discover.serieTrovataNellaCache'), 'error');
     return;
   }
   await addShowToList(found, list);
-  // BUG-15-04: non chiamare renderDiscover direttamente — il replaceShow
+  // Non chiamare renderDiscover direttamente — il replaceShow
   // in shows.ts triggera già emitChange → RAF → re-render via renderer.
   // Una seconda chiamata qui causerebbe doppio render e potenziale race.
 }

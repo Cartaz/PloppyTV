@@ -17,3 +17,6 @@ declare interface ServiceWorkerGlobalScope {
 }
 
 declare const self: ServiceWorkerGlobalScope;
+
+/** Versione da package.json, iniettata da Vite (`define`). */
+declare const __APP_VERSION__: string;

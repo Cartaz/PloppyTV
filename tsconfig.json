@@ -20,7 +20,7 @@
     "noImplicitReturns": true,
     "forceConsistentCasingInFileNames": true,
 
-    "types": ["vite/client", "vite-plugin-pwa/client", "node", "vitest/globals"]
+    "types": ["vite/client", "vite-plugin-pwa/client", "node"]
   },
   "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"]
 }

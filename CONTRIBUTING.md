@@ -6,14 +6,14 @@ Questa guida descrive come setuppare l'ambiente, quali convenzioni seguire e com
 
 ## 1. Prerequisiti
 
-- **Node.js 22 LTS**, la stessa versione usata in CI. PloppyTV usa Vite 6, TypeScript 5 e Vitest 4.
-- **npm 10+** (incluso con Node 22). Non usiamo pnpm/yarn per mantenere un solo lockfile.
+- **Node.js 26** (versione di riferimento in [`.nvmrc`](./.nvmrc), usata da CI e deploy). Il minimo supportato è **22.22.1** (`package.json#engines`): la CI esegue i test su entrambe. PloppyTV usa Vite 6, TypeScript 5 e Vitest 4.
+- **npm 10+**. Non usiamo pnpm/yarn per mantenere un solo lockfile.
 - Un editor con supporto TypeScript e ESLint (VS Code consigliato, ma qualsiasi editor va bene).
 
 Verifica la tua versione di Node:
 
 ```bash
-node --version   # v22.x
+node --version   # v26.x (minimo v22.22.1)
 npm --version    # 10.x o superiore
 ```
 
@@ -27,8 +27,8 @@ cd PloppyTV
 # 2. Aggiungi l'upstream per sincronizzarti con il repo principale
 git remote add upstream https://github.com/Cartaz/PloppyTV.git
 
-# 3. Installa le dipendenze
-npm install
+# 3. Installa le dipendenze (con nvm: `nvm use` legge .nvmrc)
+npm ci
 
 # 4. Avvia il dev server
 npm run dev      # http://localhost:5173
@@ -106,7 +106,7 @@ La config è in `.prettierrc.json`. Le regole principali:
 
 ### 5.3 ESLint
 
-La config è in `.eslintrc.cjs`. Estende `eslint:recommended` + `@typescript-eslint/recommended` + `prettier` (per disabilitare le regole in conflitto con Prettier). Regole custom:
+La config è in `eslint.config.js` (flat config ESLint 9). Estende `@eslint/js` recommended + `@typescript-eslint/recommended` + `prettier` (per disabilitare le regole in conflitto con Prettier). Regole custom:
 
 - `no-console`: warn (solo `console.warn` e `console.error` permessi).
 - `eqeqeq`: smart.
@@ -116,7 +116,7 @@ La config è in `.eslintrc.cjs`. Estende `eslint:recommended` + `@typescript-esl
 
 ### 5.4 Naming
 
-- **File**: `camelCase.ts` per moduli, `PascalCase.ts` per componenti React-style (ma qui non ne abbiamo). I file di test: `<nome>.test.ts`.
+- **File**: `camelCase.ts` per moduli, `PascalCase.ts` per componenti React-style (ma qui non ne abbiamo). I file di test: `tests/<modulo>.<aspetto>.test.ts` (es. `storage.multitab.test.ts`); preferisci test di comportamento con moduli reali e mock solo ai confini (rete, storage).
 - **Funzioni/variabili**: `camelCase`.
 - **Tipi/interfacce**: `PascalCase`.
 - **Costanti**: `UPPER_SNAKE_CASE` per valori primitivi (`API_BASE`), `camelCase` per oggetti/array.

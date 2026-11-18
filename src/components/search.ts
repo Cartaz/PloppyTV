@@ -1,25 +1,18 @@
 // Search box: input -> API TVMaze, fallback fuzzy, keyboard nav
-//
-// FIXES applicati:
-//  - BUG-10-02: Escape cleara lastSearchResults/DOM + abortisce in-flight.
-//  - BUG-10-03: click outside cleara DOM/lastSearchResults.
-//  - BUG-10-05: selectSearchResult retain input quando addShowToList fallisce.
-//  - BUG-10-07: fallback altQuery error (Network/Timeout) propaga al outer catch.
-//  - BUG-20-08: ARIA combobox/listbox/option/aria-selected/aria-expanded.
 
 import type { ListName, TvmazeSearchResult } from '../types';
-import { searchShows, ApiError } from '../lib/api';
-import { MAX_QUERY_LENGTH, MIN_SEARCH_INTERVAL_MS } from '../lib/constants';
+import { searchShows, apiErrorMessage } from '../lib/api';
+import { MAX_QUERY_LENGTH } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal } from '../lib/utils';
 import { addShowToList } from '../lib/shows';
 import { showToast } from './toast';
+import { t } from '../lib/i18n';
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastSearchResults: TvmazeSearchResult[] = [];
 let searchSeq = 0;
 let searchAbortController: AbortController | null = null;
 let searchSelectedIdx = -1;
-let lastSearchTime = 0;
 
 let _searchInput: HTMLInputElement | null = null;
 let _searchResults: HTMLElement | null = null;
@@ -47,7 +40,7 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         : 'N/D';
       const network = (show.network && show.network.name) || (show.webChannel && show.webChannel.name) || 'N/D';
       return (
-        // BUG-20-08: role=option, aria-selected=false sui result items.
+        // Role=option, aria-selected=false sui result items.
         '<div class="search-result-item" role="option" aria-selected="false" data-idx="' +
         idx +
         '">' +
@@ -66,13 +59,19 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         '<div class="search-result-actions">' +
         '<button class="btn btn-primary btn-sm" data-idx="' +
         idx +
-        '" data-list="watching">In corso</button>' +
+        '" data-list="watching">' +
+        t('nav.watching') +
+        '</button>' +
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
-        '" data-list="towatch">Da vedere</button>' +
+        '" data-list="towatch">' +
+        t('nav.towatch') +
+        '</button>' +
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
-        '" data-list="completed">Completata</button>' +
+        '" data-list="completed">' +
+        t('search.completata') +
+        '</button>' +
         '</div></div></div>'
       );
     })
@@ -96,14 +95,14 @@ function invalidateCurrentSearch(): void {
   }
 }
 
-/** BUG-20-08: toggle aria-expanded sull'input. */
+/** Toggle aria-expanded sull'input. */
 function setExpanded(expanded: boolean): void {
   if (_searchInput) {
     _searchInput.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
 }
 
-/** BUG-10-02/03: clear completo di DOM + stato + abort. */
+/** Clear completo di DOM + stato + abort. */
 function clearSearchState(): void {
   invalidateCurrentSearch();
   if (_searchResults) {
@@ -116,20 +115,13 @@ function clearSearchState(): void {
 }
 
 async function doSearch(query: string): Promise<void> {
-  const now = Date.now();
-  if (now - lastSearchTime < MIN_SEARCH_INTERVAL_MS) {
-    searchTimeout = setTimeout(() => doSearch(query), MIN_SEARCH_INTERVAL_MS - (now - lastSearchTime));
-    return;
-  }
-  lastSearchTime = now;
-
   if (searchAbortController) searchAbortController.abort();
   searchAbortController = new AbortController();
   const mySeq = ++searchSeq;
   const signal = searchAbortController.signal;
 
   if (!_searchResults) return;
-  _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>Ricerca in corso...</div>';
+  _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('search.searching') + '</div>';
   _searchResults.classList.add('active');
   setExpanded(true);
 
@@ -154,7 +146,7 @@ async function doSearch(query: string): Promise<void> {
             );
             const html = renderSearchResultsHTML(
               filtered.length > 0 ? filtered : altResults.slice(0, 10),
-              'Nessun risultato per "' + query + '". Risultati simili per "' + altQuery + '":',
+              t('search.noResultsAlt', { query, alt: altQuery }),
             );
             if (html) {
               _searchResults.innerHTML = html;
@@ -165,14 +157,12 @@ async function doSearch(query: string): Promise<void> {
           const err = e2 as { name?: string };
           if (err.name === 'AbortError') return;
           if (mySeq !== searchSeq) return;
-          // BUG-10-07: propaga l'errore del fallback al outer catch.
+          // Propaga l'errore del fallback al outer catch.
           throw e2;
         }
       }
       _searchResults.innerHTML =
-        '<div class="search-no-results">Nessuna serie trovata per "' +
-        escapeHtml(query) +
-        '". Prova con meno parole o la parola principale.</div>';
+        '<div class="search-no-results">' + t('search.notFoundHint', { query: escapeHtml(query) }) + '</div>';
       lastSearchResults = [];
       return;
     }
@@ -182,19 +172,13 @@ async function doSearch(query: string): Promise<void> {
       _searchResults.innerHTML = html;
     } else {
       _searchResults.innerHTML =
-        '<div class="search-no-results">Nessuna serie trovata per "' + escapeHtml(query) + '".</div>';
+        '<div class="search-no-results">' + t('search.noResults', { query: escapeHtml(query) }) + '</div>';
       lastSearchResults = [];
     }
   } catch (e: unknown) {
-    const err = e as { name?: string; status?: number };
-    if (err.name === 'AbortError') return;
+    if ((e as { name?: string }).name === 'AbortError') return;
     if (mySeq !== searchSeq) return;
-    let msg = 'Errore nella ricerca. Riprova.';
-    if (err.name === 'TimeoutError') msg = 'Ricerca timeout. Verifica la connessione.';
-    else if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
-    else if (err.status === 429) msg = 'Troppe ricerche. Attendi qualche secondo.';
-    else if (err.name === 'ParseError' || err.name === 'SyntaxError') msg = 'Risposta API non valida. Riprova.';
-    _searchResults.innerHTML = '<div class="search-no-results">' + escapeHtml(msg) + '</div>';
+    _searchResults.innerHTML = '<div class="search-no-results">' + escapeHtml(apiErrorMessage(e, 'search')) + '</div>';
     lastSearchResults = [];
   }
 }
@@ -203,19 +187,19 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   if (!lastSearchResults[idx]) return;
   const show = lastSearchResults[idx].show;
   if (!show) {
-    showToast('Dati serie non validi', 'error');
+    showToast(t('search.datiSerieValidi'), 'error');
     return;
   }
   // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
-  // BUG-A16-01: catturiamo searchSeq PRIMA che invalidateCurrentSearch lo
+  // Catturiamo searchSeq PRIMA che invalidateCurrentSearch lo
   // incrementi. Dopo l'await, se searchSeq è cambiato (l'utente ha digitato
   // durante l'await di addShowToList), NON dobbiamo clearare l'input —
   // l'utente ha iniziato una nuova ricerca e clearing cancellerebbe la sua
   // query mentre i nuovi risultati verrebbero renderizzati su un input
-  // (erroneamente) vuoto. Vedere test BUG-A16-01 in probe_a16.test.ts.
+  // (erroneamente) vuoto.
   const seqBefore = searchSeq;
   invalidateCurrentSearch();
-  // BUG-10-05: NON clearare l'input qui — aspetta il risultato di addShowToList.
+  // NON clearare l'input qui — aspetta il risultato di addShowToList.
   // Se addShowToList fallisce (es. già in lista), l'utente può riprovare.
   if (_searchResults) {
     _searchResults.classList.remove('active');
@@ -225,12 +209,12 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   searchSelectedIdx = -1;
   setExpanded(false);
   try {
-    // BUG-A16-03: defense-in-depth — addShowToList ha il suo try/catch e
+    // Defense-in-depth — addShowToList ha il suo try/catch e
     // non dovrebbe mai lanciare, ma se lo fa (bug futuro o input anomalo)
     // non vogliamo un unhandled rejection. Mostriamo un toast e bail.
     const result = await addShowToList(show, list);
-    // BUG-10-05: clear input solo se addShowToList ha avuto successo (truthy).
-    // BUG-A16-01: AND solo se l'utente non ha digitato durante l'await
+    // Clear input solo se addShowToList ha avuto successo (truthy).
+    // AND solo se l'utente non ha digitato durante l'await
     // (searchSeq deve essere ancora seqBefore + 1, ovvero solo l'incremento
     // di invalidateCurrentSearch — nessun input handler ha incrementato
     // ulteriormente, nessun doSearch è partito).
@@ -239,12 +223,12 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     }
   } catch (e) {
     console.error('[search] selectSearchResult error:', e);
-    showToast('Errore aggiunta serie', 'error');
+    showToast(t('search.erroreAggiuntaSerie'), 'error');
   }
 }
 
 function updateSearchSelection(items: NodeListOf<Element>): void {
-  // BUG-20-08: toggle anche aria-selected, non solo la classe.
+  // Toggle anche aria-selected, non solo la classe.
   items.forEach((el, i) => {
     const selected = i === searchSelectedIdx;
     el.classList.toggle('selected', selected);
@@ -257,13 +241,13 @@ export function initSearch(): void {
   _searchResults = document.getElementById('searchResults');
   if (!_searchInput || !_searchResults) return;
 
-  // BUG-20-08: ARIA combobox/listbox attributes.
+  // ARIA combobox/listbox attributes.
   _searchInput.setAttribute('role', 'combobox');
   _searchInput.setAttribute('aria-expanded', 'false');
   _searchInput.setAttribute('aria-autocomplete', 'list');
   _searchInput.setAttribute('aria-controls', 'searchResults');
   _searchResults.setAttribute('role', 'listbox');
-  _searchResults.setAttribute('aria-label', 'Risultati di ricerca');
+  _searchResults.setAttribute('aria-label', t('search.risultatiRicerca'));
 
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -273,17 +257,15 @@ export function initSearch(): void {
       return;
     }
     if (query.length > MAX_QUERY_LENGTH) {
-      // H10: branch > MAX_QUERY_LENGTH deve abortire la search in-flight
+      // Branch > MAX_QUERY_LENGTH deve abortire la search in-flight
       invalidateCurrentSearch();
       _searchResults!.innerHTML =
-        '<div class="search-no-results" role="status">Query troppo lunga (max ' +
-        MAX_QUERY_LENGTH +
-        ' caratteri)</div>';
+        '<div class="search-no-results" role="status">' + t('search.tooLong', { max: MAX_QUERY_LENGTH }) + '</div>';
       _searchResults!.classList.add('active');
       setExpanded(true);
       return;
     }
-    // H10: abortisce la search precedente prima di schedulare la nuova.
+    // Abortisce la search precedente prima di schedulare la nuova.
     if (searchAbortController) {
       searchAbortController.abort();
       searchAbortController = null;
@@ -312,7 +294,7 @@ export function initSearch(): void {
       searchSelectedIdx = Math.max(searchSelectedIdx - 1, -1);
       updateSearchSelection(items);
     } else if (e.key === 'Escape') {
-      // BUG-10-02: clear completo (DOM + stato + abort).
+      // Clear completo (DOM + stato + abort).
       clearSearchState();
       _searchInput!.blur();
     }
@@ -329,14 +311,17 @@ export function initSearch(): void {
       if (list) selectSearchResult(idx, list);
       return;
     }
+    // Il clic sulla riga seleziona soltanto: l'aggiunta richiede uno dei
+    // pulsanti lista (o Invio), così un clic involontario non modifica i dati.
     const item = target.closest('.search-result-item') as HTMLElement | null;
     if (item) {
-      const idx = Number(item.dataset.idx);
-      selectSearchResult(idx, 'watching');
+      const items = _searchResults!.querySelectorAll('.search-result-item');
+      searchSelectedIdx = Array.prototype.indexOf.call(items, item);
+      updateSearchSelection(items);
     }
   });
 
-  // BUG-A16-04: il listener su `document` è globale e NON viene rimosso
+  // Il listener su `document` è globale e NON viene rimosso
   // quando il DOM viene re-renderizzato (a differenza dei listener su
   // _searchInput/_searchResults, che sono su elementi figli e vengono
   // GC'd insieme all'elemento). Su re-init (SPA navigation, HMR, test con
@@ -355,12 +340,10 @@ export function initSearch(): void {
   }
   const docClickHandler = (e: MouseEvent): void => {
     if (!(e.target as HTMLElement).closest('.search-wrap')) {
-      // BUG-10-03: clear completo anche su click outside.
+      // Clear completo anche su click outside.
       clearSearchState();
     }
   };
   docAny[DOC_CLICK_KEY] = docClickHandler;
   document.addEventListener('click', docClickHandler);
 }
-
-export { ApiError };

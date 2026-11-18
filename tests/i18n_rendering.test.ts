@@ -73,9 +73,7 @@ describe('localized show-list rendering', () => {
     showList.renderShowList(main, 'watching', i18n.t('nav.watching'));
 
     expect(main.querySelector('[data-tag=""]')?.textContent).toBe('All');
-    expect(main.querySelector('.empty-state-text')?.textContent).toBe(
-      'No shows with the tag "<drama>" in this list.',
-    );
+    expect(main.querySelector('.empty-state-text')?.textContent).toBe('No shows with the tag "<drama>" in this list.');
     expect(main.querySelector('.empty-state-text script')).toBeNull();
   });
 });

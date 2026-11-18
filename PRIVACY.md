@@ -36,7 +36,7 @@ PloppyTV usa l'API pubblica gratuita di TVMaze per recuperare metadati delle ser
 
 - **Ricerca di una serie** tramite la search box → TVMaze riceve il termine di ricerca che hai digitato.
 - **Apertura del dettaglio di una serie** → TVMaze riceve l'ID numerico della serie per recuperare stagioni ed episodi.
-- **Scopri** → quando apri la vista, PloppyTV carica il tab richiesto (popolari o recenti); ulteriori richieste avvengono quando cambi tab o usi "Aggiorna lista" se i dati non sono già disponibili in cache.
+- **Scopri** → quando apri la vista, PloppyTV carica il tab richiesto (popolari o recenti); per "Ultimi arrivi" chiede anche a TVMaze l'elenco delle serie aggiornate nell'ultima settimana (`/updates/shows`), solo per capire quali pagine sono le più recenti. Ulteriori richieste avvengono quando cambi tab o usi "Aggiorna lista" se i dati non sono già disponibili in cache.
 - **Caricamento del calendario** → usa normalmente gli episodi già presenti nello stato locale.
 
 Le risposte API e i poster possono essere **cached localmente** dal Service Worker (Workbox) per ridurre traffico e latenza. Il traffico verso TVMaze è soggetto alla [privacy policy di TVMaze](https://www.tvmaze.com/privacy).

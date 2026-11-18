@@ -6,13 +6,6 @@ let _errorHandler: ((e: Event) => void) | null = null;
 /**
  * Inizializza il delegato globale per gli errori di caricamento <img>.
  * Idempotente: chiamate multiple non aggiungono listener duplicati.
- *
- * BUG-A17-03 (FIXED): loop infinito con fallbackSrc relativo. Prima il guard
- * era `target.src !== fallbackSrc`, ma `target.src` restituisce l'URL assoluto
- * risolto (es. `http://localhost/img.jpg`) mentre `fallbackSrc` è il valore raw
- * dell'attributo (es. `/img.jpg`). Con URL relativi, i due valori differiscono
- * SEMPRE, anche dopo l'assegnamento → l'error event re-fireva all'infinito.
- * Ora si usa un flag `data-fallback-src-tried` per tracciare il tentativo.
  */
 export function initImageFallback(): void {
   if (_initialized) return;
@@ -26,7 +19,7 @@ export function initImageFallback(): void {
     // 1) Se c'è un data-fallback-src (catena immagini), prova prima quello.
     //    Marca applied solo quando passiamo al placeholder definitivo, per
     //    permettere all'immagine di fallback di caricare normalmente.
-    //    BUG-A17-03: usa flag invece di confronto stringa (vedi JSDoc).
+    //    Usa flag invece di confronto stringa (vedi JSDoc).
     const fallbackSrc = target.dataset.fallbackSrc;
     if (fallbackSrc && !target.dataset.fallbackSrcTried) {
       target.dataset.fallbackSrcTried = '1';
@@ -38,7 +31,7 @@ export function initImageFallback(): void {
     target.dataset.fallbackApplied = '1';
 
     const fallbackName = target.dataset.fallback || 'N/D';
-    // BUG-20-09: dead branch removed — only data-fallbackCls is read now.
+    // Dead branch removed — only data-fallbackCls is read now.
     const cls = target.dataset.fallbackCls || 'img-placeholder';
     const style = target.dataset.fallbackStyle || '';
     const placeholder = document.createElement('div');
@@ -50,13 +43,8 @@ export function initImageFallback(): void {
   document.addEventListener('error', _errorHandler, true); // capture phase
 }
 
-/**
- * Rimuove il listener globale e resetta lo stato. Utile per test e HMR.
- * BUG-A17-04 (FIXED): prima non esisteva destroy — il listener su `document`
- * non veniva mai rimosso, causando leak nei test con vi.resetModules() (ogni
- * nuovo modulo aggiungeva un listener senza rimuovere il precedente).
- */
-export function destroyImageFallback(): void {
+/** Rimuove il listener globale e resetta lo stato (solo per i test). */
+export function _resetImageFallbackForTesting(): void {
   if (!_initialized || !_errorHandler) return;
   document.removeEventListener('error', _errorHandler, true);
   _errorHandler = null;

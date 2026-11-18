@@ -1,10 +1,10 @@
 // Web Worker: calcolo statistiche + calendario off-main-thread
 //
-// BUG-08-03 (FIXED): le funzioni pure di calcolo sono state spostate in
+// Le funzioni pure di calcolo sono state spostate in
 // `./compute.ts` (single source of truth) per evitare drift tra worker e
 // fallback main-thread.
 //
-// BUG-A9-10 (FIXED): guard esplicita per messaggi non-object (null,
+// Guard esplicita per messaggi non-object (null,
 // undefined, stringhe, primitive). Prima, un messaggio null/undefined
 // lanciava TypeError su `msg.type` dentro il try/catch, producendo un
 // errore cryptic ("Cannot read properties of null (reading 'type')").
@@ -16,7 +16,7 @@ import { computeStats, computeCalendar } from './compute';
 
 self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
   const msg = ev.data;
-  // BUG-A9-10: guard contro messaggi non-object. Un worker può ricevere
+  // Guard contro messaggi non-object. Un worker può ricevere
   // qualsiasi valore serializzabile via postMessage; se il sender (o un
   // mock nei test) passa null/undefined/string, `msg.type` lancerebbe
   // TypeError. Il try/catch sotto lo catturava, ma con un messaggio
@@ -36,7 +36,7 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
       const response: WorkerResponse = { type: 'stats', id: msg.id, result };
       (self as unknown as Worker).postMessage(response);
     } else if (msg.type === 'calendar') {
-      // computeCalendar applica internamente safeWeekOffset (BUG-16-03):
+      // computeCalendar applica internamente safeWeekOffset:
       // NaN/Infinity → 0, non-interi → floor. Nessun Invalid Date possibile.
       const { week, afterWeek, weekStart, weekEnd } = computeCalendar(msg.shows, msg.weekOffset);
       const response: WorkerResponse = { type: 'calendar', id: msg.id, result: week, weekStart, weekEnd, afterWeek };

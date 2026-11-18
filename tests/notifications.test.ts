@@ -129,7 +129,8 @@ describe('notification contracts', () => {
     installServiceWorker(async () => undefined);
     const { scheduleNotifications } = await import('../src/lib/notifications');
     scheduleNotifications();
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    // Uscita il 2026-09-02: avviso alle 09:00 locali (NOTIF_HOUR), 11 ore dopo.
+    await vi.advanceTimersByTimeAsync(11 * 60 * 60 * 1000);
     expect(notification.records[0].title).toContain('Desktop fallback');
   });
   it('detects notification support and both standalone signals', async () => {
@@ -222,7 +223,8 @@ describe('notification contracts', () => {
 
     const { scheduleNotifications } = await import('../src/lib/notifications');
     scheduleNotifications();
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    // Uscita il 2026-09-02: avviso alle 09:00 locali (NOTIF_HOUR), 11 ore dopo.
+    await vi.advanceTimersByTimeAsync(11 * 60 * 60 * 1000);
 
     expect(showNotification).toHaveBeenCalledTimes(1);
     expect(deliveredTitle).toContain('Soon Show');
@@ -244,7 +246,8 @@ describe('notification contracts', () => {
 
     const { scheduleNotifications } = await import('../src/lib/notifications');
     scheduleNotifications();
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    // Uscita il 2026-09-02: avviso alle 09:00 locali (NOTIF_HOUR), 11 ore dopo.
+    await vi.advanceTimersByTimeAsync(11 * 60 * 60 * 1000);
 
     expect(notification.records).toHaveLength(1);
     expect(notification.records[0].title).toContain('Fallback Show');
@@ -317,5 +320,26 @@ describe('notification contracts', () => {
     storeState.shows = [eligibleShow(1, 'First', '2026-09-02'), eligibleShow(2, 'Later', '2026-09-04')];
     const { getNextNotifiableEpisode } = await import('../src/lib/notifications');
     expect(getNextNotifiableEpisode()?.showName).toBe('First');
+  });
+});
+
+describe('notification target episode', () => {
+  it('targets the next upcoming release even when older episodes are still unwatched', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 18, 12, 0, 0));
+    storeState.shows = [
+      {
+        ...eligibleShow(7, 'Behind', '2020-01-01'),
+        seasons: {
+          1: [{ num: 1, id: 1, watched: false, airdate: '2020-01-01', name: null }],
+          2: [{ num: 1, id: 2, watched: false, airdate: '2026-11-20', name: null }],
+        },
+        totalEpisodes: 2,
+        totalSeasons: 2,
+      },
+    ];
+    const { getNextNotifiableEpisode } = await import('../src/lib/notifications');
+    expect(getNextNotifiableEpisode()).toEqual({ showName: 'Behind', season: 2, num: 1, airdate: '2026-11-20' });
+    vi.useRealTimers();
   });
 });

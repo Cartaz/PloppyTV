@@ -72,10 +72,11 @@ describe('normalizeShow — persisted-data invariants', () => {
       airdate: '2024-06-15',
       name: 'Pilot',
       runtime: 42,
-      note: 'spoiler',
+      // Le note sono testo dell'utente: conservate così come scritte.
+      note: '<b>spoiler</b>',
     });
     expect(show!.seasons[1][1]).toMatchObject({ airdate: null, name: null, runtime: null });
-    expect(show!.seasons[1][1].note).toBeUndefined();
+    expect(show!.seasons[1][1].note).toBe('<script>evil()</script>');
     expect(show!.seasons[1][2].runtime).toBeNull();
   });
 
@@ -115,7 +116,7 @@ describe('normalizeShow — persisted-data invariants', () => {
       status: '<b></b>',
       network: '<i></i>',
       summary: '<p>Hello</p><script>bad()</script>',
-      tags: ['<b>Rewatch</b>', 'rewatch', '<script>evil()</script>'],
+      tags: ['  Rewatch ', 'rewatch', 'R&B < 3', '   '],
       runtime: Infinity,
       addedAt: -1,
       list: 'invalid',
@@ -127,7 +128,7 @@ describe('normalizeShow — persisted-data invariants', () => {
       status: 'N/D',
       network: 'N/D',
       summary: 'Hello',
-      tags: ['Rewatch'],
+      tags: ['Rewatch', 'R&B < 3'],
       runtime: 45,
       list: 'towatch',
       manualList: true,

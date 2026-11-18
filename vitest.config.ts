@@ -23,10 +23,22 @@ const virtualPwaRegisterPlugin = {
   },
 };
 
+// Node >= 25 espone un `localStorage` globale (undefined senza
+// --localstorage-file) che nasconde quello di jsdom. Lo disattiviamo nei
+// worker dei test; su Node 22 il flag sperimentale è già spento.
+const nodeFlags = process.allowedNodeEnvironmentFlags;
+const execArgv = nodeFlags.has('--webstorage')
+  ? ['--no-webstorage']
+  : nodeFlags.has('--experimental-webstorage')
+    ? ['--no-experimental-webstorage']
+    : [];
+
 export default defineConfig({
   plugins: [virtualPwaRegisterPlugin],
+  define: { __APP_VERSION__: JSON.stringify('test') },
   test: {
     environment: 'jsdom',
+    execArgv,
     globals: false,
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     coverage: {

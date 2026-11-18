@@ -1,14 +1,4 @@
 // Vista dettaglio show con episodi
-//
-// FIXES applicati:
-//  - BUG-14-01: resetBoundGuard + bindShowDetailEvents — removeEventListener
-//    del vecchio handler prima di bindarne uno nuovo (no accumulation).
-//  - BUG-14-02: progress bar clamped a [0, 100] (no >100% su dati corrotti).
-//  - BUG-14-03: bigImg URL replace usa regex /\/medium_(portrait|landscape)\//
-//    invece di string.replace('medium', ...) (no match su filename "medium").
-//  - BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
-//  - H17 a11y: episode-item e season-tab hanno role/tabindex/aria-*;
-//    keydown listener (Enter/Space) triggera click.
 
 import { getState, switchSeason, closeShow } from '../lib/store';
 import { safeId, escapeHtml, escapeAttr, getWatchedCount, formatDate } from '../lib/utils';
@@ -27,25 +17,18 @@ import {
 import { showModal, closeModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
+import { t } from '../lib/i18n';
 
-let _boundShowDetail = false;
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
 let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 let _showDetailMain: HTMLElement | null = null;
 
-/**
- * Resetta la guardia di idempotenza. Deve essere chiamato dal renderer
- * PRIMA di bindShowDetailEvents per evitare accumulo di listener ad ogni
- * re-render. Vedi bug C5/T1.
- */
-export function resetBoundGuard(): void {
-  _boundShowDetail = false;
-}
-
 // ===== P2 helper: star rating HTML per episodio =====
 function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
   let html =
-    '<span class="ep-rating" role="group" aria-label="Rating episodio" ' +
+    '<span class="ep-rating" role="group" aria-label="' +
+    t('detail.ratingEpisodio') +
+    '" ' +
     'data-action="rateEpisode" data-show-id="' +
     showId +
     '" data-season="' +
@@ -80,7 +63,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
     '" data-ep="' +
     epNum +
     '" title="' +
-    (hasNote ? 'Modifica nota' : 'Aggiungi nota') +
+    (hasNote ? t('notes.editNote') : t('notes.addNote')) +
     '">' +
     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
     (hasNote ? '<span class="ep-note-dot"></span>' : '') +
@@ -89,13 +72,10 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 }
 
 // ===== P2 helper: tag management HTML =====
-// BUG-A11-03 (FIXED): Array.isArray guard — `show.tags ?? []` lascia passare
-// stringhe/oggetti non-array (dati corrotti); `for (const t of "string")`
-// iterava i caratteri, rendendo ogni carattere come un tag separato.
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
-  const tags = Array.isArray(show.tags) ? show.tags : [];
+  const tags = show.tags ?? [];
   let html = '<div class="detail-tags-section">';
-  html += '<div class="detail-tags-label">Tag:</div>';
+  html += '<div class="detail-tags-label">' + t('detail.tag') + '</div>';
   html += '<div class="detail-tags-list">';
   for (const t of tags) {
     html +=
@@ -109,19 +89,19 @@ function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
       escapeAttr(t) +
       '">×</button></span>';
   }
-  html += '<button class="tag-add-btn" data-action="addTag" data-show-id="' + show.id + '">+ Aggiungi tag</button>';
+  html +=
+    '<button class="tag-add-btn" data-action="addTag" data-show-id="' +
+    show.id +
+    '">' +
+    t('detail.addTag') +
+    '</button>';
   html += '</div></div>';
   return html;
 }
 
 // ===== P2 helper: media rating stagione =====
-// BUG-A11-01 (FIXED): `typeof e.rating === 'number'` lasciava passare NaN e
-// Infinity (`typeof NaN === 'number'` è true). sum diventava NaN →
-// "⌀ NaN★" renderizzato. Ora filtra solo numeri finiti e positivi.
 function seasonAvgRating(eps: Array<{ rating?: number }>): string {
-  const rated = eps.filter(
-    (e) => e && typeof e.rating === 'number' && Number.isFinite(e.rating) && (e.rating as number) > 0,
-  );
+  const rated = eps.filter((e) => (e.rating ?? 0) > 0);
   if (rated.length === 0) return '';
   const sum = rated.reduce((s, e) => s + (e.rating ?? 0), 0);
   const avg = sum / rated.length;
@@ -133,14 +113,13 @@ export function renderShowDetail(main: HTMLElement): void {
   const showId = safeId(state.currentShowId);
   const show = state.shows.find((s) => s.id === showId);
   if (!show) {
-    // H13: usa closeShow() invece di mutare currentShowId direttamente,
+    // Usa closeShow() invece di mutare currentShowId direttamente,
     // così emitChange viene triggerato e la nav si aggiorna.
     closeShow();
     return;
   }
-  if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
 
-  // BUG-14-04: filter season keys con regex /^\d+$/ (stretta, no "1.5").
+  // Filter season keys con regex /^\d+$/ (stretta, no "1.5").
   const seasons = Object.keys(show.seasons)
     .filter((k) => /^\d+$/.test(k))
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
@@ -152,23 +131,24 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 
   const watched = getWatchedCount(show);
-  // BUG-14-02: clamp progress a [0, 100] per gestire watched > totalEpisodes.
+  // Clamp progress a [0, 100] per gestire watched > totalEpisodes.
   const rawProgress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const progress = Math.max(0, Math.min(100, rawProgress));
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
   const statusClass =
-    statusLower.includes('running') || statusLower.includes('in corso') ? 'status-running' : 'status-ended';
+    statusLower.includes('running') || statusLower.includes(t('detail.corso')) ? 'status-running' : 'status-ended';
 
   let html =
     '<button class="btn btn-secondary" data-action="closeShow" style="margin-bottom:20px;">' +
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>' +
-    'Torna indietro</button>';
+    t('actions.back') +
+    '</button>';
 
   html += '<div class="detail-header">';
   // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
-  // BUG-14-03: regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
-  // BUG-A11-05 (FIXED): typeof guard su show.image — se corrotto a non-string
+  // Regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
+  // Typeof guard su show.image — se corrotto a non-string
   // (numero/oggetto), `.replace` avrebbe throwato TypeError. normalize valida,
   // ma defense-in-depth contro dati importati malevoli/corrotti.
   const bigImg =
@@ -180,7 +160,9 @@ export function renderShowDetail(main: HTMLElement): void {
       escapeAttr(bigImg) +
       '" alt="' +
       escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
+      '" loading="eager" decoding="async" data-fallback="' +
+      escapeAttr(t('detail.imageUnavailable')) +
+      '" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
       escapeAttr(show.image) +
       '">';
   } else if (show.image) {
@@ -190,9 +172,11 @@ export function renderShowDetail(main: HTMLElement): void {
       escapeAttr(show.image) +
       '" alt="' +
       escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
+      '" loading="eager" decoding="async" data-fallback="' +
+      escapeAttr(t('detail.imageUnavailable')) +
+      '" data-fallback-cls="detail-poster-placeholder">';
   } else {
-    html += '<div class="detail-poster-placeholder">Immagine non disponibile</div>';
+    html += '<div class="detail-poster-placeholder">' + t('detail.imageUnavailable') + '</div>';
   }
   html +=
     '<div class="detail-info">' +
@@ -217,21 +201,15 @@ export function renderShowDetail(main: HTMLElement): void {
     ' episodi</span>' +
     '</div>' +
     '<div class="detail-genres">' +
-    // BUG-A11-07 (FIXED): Array.isArray guard — `show.genres.map` avrebbe
-    // throwato TypeError se genres era non-array (corrupted state).
-    (Array.isArray(show.genres) ? show.genres : [])
-      .map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>')
-      .join('') +
+    show.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') +
     '</div>' +
     '<div class="detail-progress-block' +
     (isCompleted ? ' completed' : '') +
     '">' +
     '<div class="detail-progress-meta">' +
     '<span>' +
-    watched +
-    ' / ' +
-    show.totalEpisodes +
-    ' episodi visti</span>' +
+    t('detail.watchedOf', { watched, total: show.totalEpisodes }) +
+    '</span>' +
     '<span>' +
     Math.round(progress) +
     '%</span></div>' +
@@ -258,31 +236,47 @@ export function renderShowDetail(main: HTMLElement): void {
     html +=
       '<button class="btn btn-primary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="watching">In corso</button>';
+      '" data-list="watching">' +
+      t('nav.watching') +
+      '</button>';
   if (show.list !== 'towatch')
     html +=
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="towatch">Da vedere</button>';
+      '" data-list="towatch">' +
+      t('nav.towatch') +
+      '</button>';
   if (show.list !== 'completed')
     html +=
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="completed">Completata</button>';
+      '" data-list="completed">' +
+      t('search.completata') +
+      '</button>';
   html +=
     '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' +
     show.id +
-    '" title="Aggiorna episodi e metadati da TVMaze">Aggiorna dati</button>';
+    '" title="' +
+    t('detail.aggiornaEpisodiMetadatiTvmaze') +
+    '">' +
+    t('detail.refreshData') +
+    '</button>';
   html +=
     '<button class="btn btn-danger" data-action="removeShow" data-show-id="' +
     show.id +
     '" data-show-name="' +
     escapeAttr(show.name) +
-    '">Rimuovi</button></div></div></div>';
+    '">' +
+    t('actions.remove') +
+    '</button></div></div></div>';
 
   if (seasons.length === 0) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Nessun episodio disponibile</div><div class="empty-state-text">Questa serie non ha episodi registrati.</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('detail.noEpisodes') +
+      '</div><div class="empty-state-text">' +
+      t('detail.noEpisodes.desc') +
+      '</div></div>';
     main.innerHTML = html;
     return;
   }
@@ -297,8 +291,8 @@ export function renderShowDetail(main: HTMLElement): void {
       (isActive ? 'true' : 'false') +
       '" data-action="switchSeason" data-season="' +
       parseInt(s, 10) +
-      '">Stagione ' +
-      s +
+      '">' +
+      t('detail.season', { n: s }) +
       '</div>';
   }
   html += '</div>';
@@ -310,46 +304,35 @@ export function renderShowDetail(main: HTMLElement): void {
       show.id +
       '" data-season="' +
       state.currentSeason +
-      '" data-watched="1">Segna tutti come visti</button>' +
+      '" data-watched="1">' +
+      t('detail.markAllWatched') +
+      '</button>' +
       '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' +
       show.id +
       '" data-season="' +
       state.currentSeason +
-      '" data-watched="0">Segna tutti come non visti</button>' +
+      '" data-watched="0">' +
+      t('detail.markAllUnwatched') +
+      '</button>' +
       '</div>';
-    const eps = show.seasons[state.currentSeason];
-    // BUG-A11-04 (FIXED): Array.isArray guard — `|| []` lasciava passare
-    // stringhe/oggetti non-array; `for (const ep of "string")` iterava i
-    // caratteri rendendo un episode-item rotto per ogni carattere.
-    const epsArr = Array.isArray(eps) ? eps : [];
+    const epsArr = show.seasons[state.currentSeason] ?? [];
     // P2.1: media rating stagione nella sezione actions
     const avgLabel = seasonAvgRating(epsArr);
     if (avgLabel) {
-      html += '<div class="season-rating-avg">Rating medio stagione' + avgLabel + '</div>';
+      html += '<div class="season-rating-avg">' + t('detail.seasonAvgRating') + avgLabel + '</div>';
     }
     html += '<div class="episode-list">';
-    // BUG-A11-02 (FIXED): sort episodes by num prima del render.
-    // `for (const ep of eps)` iterava in ordine di storage; se gli episodi
-    // erano memorizzati out-of-order (refresh TVMaze, import backup), venivano
-    // mostrati nell'ordine sbagliato. Inconsistente con findNextEpisode
-    // (utils.ts) che fa sort. Coerisce num non-finiti a Infinity così i
-    // valori validi vengono ordinati correttamente tra loro.
-    const sortedEps = [...epsArr].sort((a, b) => {
-      const an = a && typeof a.num === 'number' && Number.isFinite(a.num) ? a.num : Infinity;
-      const bn = b && typeof b.num === 'number' && Number.isFinite(b.num) ? b.num : Infinity;
-      return an - bn;
-    });
+    // Ordine per numero: dopo refresh o import gli episodi possono essere salvati fuori ordine.
+    const sortedEps = [...epsArr].sort((a, b) => a.num - b.num);
     for (const ep of sortedEps) {
-      // BUG-A11-06 (FIXED): salta ep null/undefined nell'array (corrupted data).
-      if (!ep) continue;
       const epTitle = ep.name
         ? escapeHtml(ep.name)
-        : '<span style="color:var(--text-muted);font-style:italic;">Episodio ' + ep.num + '</span>';
+        : '<span style="color:var(--text-muted);font-style:italic;">' + t('detail.episode', { n: ep.num }) + '</span>';
       const epNumberLabel = 'S' + state.currentSeason + 'E' + ep.num;
       const runtimeLabel = ep.runtime ? ' • ' + ep.runtime + ' min' : '';
       const ariaLabel = ep.name
         ? escapeAttr(ep.name + ' (' + epNumberLabel + ')')
-        : escapeAttr('Episodio ' + ep.num + ' (' + epNumberLabel + ')');
+        : escapeAttr(t('detail.episode', { n: ep.num }) + ' (' + epNumberLabel + ')');
       const hasNote = typeof ep.note === 'string' && ep.note.length > 0;
       html +=
         '<div class="episode-item ' +
@@ -393,15 +376,10 @@ export function renderShowDetail(main: HTMLElement): void {
   }
 }
 
-// Bind eventi via event delegation sul main content.
-// CRITICAL FIX (C5/T1 + BUG-14-01): guardia _boundShowDetail + removeEventListener
-// del vecchio handler prima di bindarne uno nuovo. Il renderer chiama
-// resetBoundGuard() prima del bind, così ad ogni cambio vista la guardia è
-// false e il listener viene aggiunto una sola volta per quella vista.
+// Bind eventi via event delegation sul main content. Idempotente: rimuove
+// l'handler del render precedente prima di aggiungere quello nuovo.
 export function bindShowDetailEvents(main: HTMLElement): void {
-  if (_boundShowDetail) return;
-  _boundShowDetail = true;
-  // BUG-14-01: removeEventListener del vecchio handler (solo se stesso stesso main).
+  // removeEventListener del vecchio handler (solo se stesso stesso main).
   if (_showDetailClickHandler && _showDetailMain === main) {
     main.removeEventListener('click', _showDetailClickHandler);
   }
@@ -486,14 +464,9 @@ export function bindShowDetailEvents(main: HTMLElement): void {
 function openNoteEditor(showId: number, season: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // BUG-A11-08 (FIXED): guard show.seasons (corrupted state) e Array.isArray
-  // per seasons[season]. Prima, `!show.seasons[season]` throwava TypeError se
-  // show.seasons era undefined; e se seasons[season] era non-array (string),
-  // `.find()` throwava.
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || !Array.isArray(show.seasons[season])) return;
-  const ep = show.seasons[season].find((e) => e && e.num === epNum);
-  if (!ep) return;
-  const epName = ep.name || 'Episodio ' + epNum;
+  const ep = show?.seasons[season]?.find((e) => e.num === epNum);
+  if (!show || !ep) return;
+  const epName = ep.name || t('detail.episode', { n: epNum });
   const currentNote = ep.note ?? '';
 
   const bodyHtml =
@@ -519,10 +492,10 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
     MAX_EPISODE_NOTE_LENGTH +
     '</div>';
 
-  showModal('Nota episodio', bodyHtml, [
-    { label: 'Annulla' },
+  showModal(t('notes.title'), bodyHtml, [
+    { label: t('actions.cancel') },
     {
-      label: 'Salva',
+      label: t('actions.save'),
       style: 'btn-primary',
       keepOpen: true,
       onClick: () => {
@@ -530,7 +503,7 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
         if (!ta) return;
         if (setEpisodeNote(showId, season, epNum, ta.value)) {
           closeModal();
-          showToast('Nota salvata', 'success');
+          showToast(t('notes.saved'), 'success');
         }
       },
     },
@@ -558,12 +531,7 @@ function openAddTagModal(showId: number): void {
   // Suggerisci tag già usati in altre serie (autocomplete visivo)
   const allTags = new Set<string>();
   for (const s of state.shows) {
-    // BUG-A11-09 (FIXED): Array.isArray guard + typeof guard sui singoli tag.
-    // `s.tags && ...` lasciava passare stringhe/oggetti non-array; `for...of`
-    // su una stringa iterava i caratteri, aggiungendoli come suggerimenti.
-    if (Array.isArray(s.tags) && s.id !== showId) {
-      for (const t of s.tags) if (typeof t === 'string') allTags.add(t);
-    }
+    if (s.id !== showId) for (const t of s.tags ?? []) allTags.add(t);
   }
   const suggestions = Array.from(allTags)
     .sort((a, b) => a.localeCompare(b))
@@ -572,7 +540,9 @@ function openAddTagModal(showId: number): void {
   let suggestionsHtml = '';
   if (suggestions.length > 0) {
     suggestionsHtml =
-      '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">Suggerimenti:</div>' +
+      '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">' +
+      t('detail.suggerimenti') +
+      '</div>' +
       '<div class="tag-suggestions">' +
       suggestions
         .map((t) => '<button class="tag-suggestion" data-tag="' + escapeAttr(t) + '">' + escapeHtml(t) + '</button>')
@@ -583,15 +553,17 @@ function openAddTagModal(showId: number): void {
   const bodyHtml =
     '<input type="text" id="tagInput" class="tag-input" maxlength="' +
     MAX_TAG_LENGTH +
-    '" placeholder="Es. da rivedere, con Alice, estate 2026..." autocomplete="off">' +
+    '" placeholder="' +
+    t('tags.placeholder') +
+    '" autocomplete="off">' +
     suggestionsHtml;
 
-  showModal('Aggiungi tag a "' + show.name + '"', bodyHtml, [
-    { label: 'Annulla' },
+  showModal(t('detail.addTagTitle', { name: show.name }), bodyHtml, [
+    { label: t('actions.cancel') },
     {
-      label: 'Aggiungi',
+      label: t('actions.add'),
       style: 'btn-primary',
-      // BUG-A11-10 (FIXED): keepOpen=true + closeModal manuale on success.
+      // keepOpen=true + closeModal manuale on success.
       // Prima il modal si chiudeva SEMPRE (anche su fallimento: tag duplicato,
       // max raggiunto, errore storage), costringendo l'utente a riaprirlo per
       // riprovare. Ora il modal resta aperto su fallimento (addShowTag mostra
@@ -604,7 +576,7 @@ function openAddTagModal(showId: number): void {
         if (tag.length === 0) return;
         if (addShowTag(showId, tag)) {
           closeModal();
-          showToast('Tag aggiunto', 'success');
+          showToast(t('tags.added'), 'success');
         }
       },
     },
@@ -622,7 +594,7 @@ function openAddTagModal(showId: number): void {
           if (tag.length > 0) {
             if (addShowTag(showId, tag)) {
               closeModal();
-              showToast('Tag aggiunto', 'success');
+              showToast(t('tags.added'), 'success');
             }
           }
         }

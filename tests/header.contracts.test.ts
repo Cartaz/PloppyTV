@@ -75,12 +75,11 @@ describe('header contracts', () => {
 
     expect(showModalSpy).toHaveBeenCalledTimes(1);
     const [title, body, actions] = showModalSpy.mock.calls[0];
-    expect(title).toBe('Informazioni su PloppyTV');
-    expect(body).toContain('local-first');
+    expect(title).toBe('modal.about.title');
     expect(body).toContain('PRIVACY.md');
     expect(body).toContain('CONTRIBUTING.md');
     expect(body).toContain('LICENSE');
-    expect(actions).toEqual([{ label: 'Chiudi' }]);
+    expect(actions).toEqual([{ label: 'actions.close' }]);
   });
 
   it('rejects notification activation when the platform does not support it', async () => {

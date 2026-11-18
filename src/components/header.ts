@@ -22,7 +22,7 @@ export function updateBadges(): void {
   const w = document.getElementById('badge-watching');
   const tw = document.getElementById('badge-towatch');
   const c = document.getElementById('badge-completed');
-  // BUG-A17-09 (FIXED): defensive guard — se state.shows è corrotto (non-array),
+  // Defensive guard — se state.shows è corrotto (non-array),
   // filter crashava con TypeError. Ora si conta 0 (consistente con store.setShows
   // che resetta a [] su input invalido, ma defense-in-depth).
   const shows = Array.isArray(state.shows) ? state.shows : [];
@@ -31,35 +31,48 @@ export function updateBadges(): void {
   const cCount = shows.filter((s) => s && s.list === 'completed').length;
   if (w) {
     w.textContent = String(wCount);
-    // BUG-20-10: aria-label dinamico per screen reader.
-    w.setAttribute('aria-label', wCount + ' serie in corso');
+    // Aria-label dinamico per screen reader.
+    w.setAttribute('aria-label', t('header.badgeWatching', { count: wCount }));
   }
   if (tw) {
     tw.textContent = String(twCount);
-    tw.setAttribute('aria-label', twCount + ' serie da vedere');
+    tw.setAttribute('aria-label', t('header.badgeTowatch', { count: twCount }));
   }
   if (c) {
     c.textContent = String(cCount);
-    c.setAttribute('aria-label', cCount + ' serie completate');
+    c.setAttribute('aria-label', t('header.badgeCompleted', { count: cCount }));
   }
 }
 
 /**
  * Chiude la sidebar mobile: rimuove classi 'open'/'active' e ripristina
  * lo scroll del body. Centralizza la logica di chiusura per evitare
- * che un path dimentichi di ripristinare overflow (BUG-A17-11).
+ * che un path dimentichi di ripristinare overflow.
  */
 function closeSidebar(): void {
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('sidebarOverlay')?.classList.remove('active');
-  // BUG-A17-11 (FIXED): ripristina body.overflow alla chiusura.
+  // Ripristina body.overflow alla chiusura.
   // Prima il menuToggle impostava overflow='hidden' all'apertura ma nessuno
   // lo ripristinava alla chiusura via overlay-click o nav-item click.
   document.body.style.overflow = '';
 }
 
+/** Applica la lingua corrente agli elementi statici di index.html (data-i18n*). */
+export function applyStaticTranslations(): void {
+  document.documentElement.lang = getLocale();
+  document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n!);
+  });
+  for (const attr of ['title', 'placeholder', 'aria-label']) {
+    document.querySelectorAll<HTMLElement>('[data-i18n-' + attr + ']').forEach((el) => {
+      el.setAttribute(attr, t(el.getAttribute('data-i18n-' + attr)!));
+    });
+  }
+}
+
 export function initHeader(): void {
-  // BUG-A17-10 (FIXED): idempotency guard. Prima initHeader non aveva guard
+  // Idempotency guard. Prima initHeader non aveva guard
   // e aggiungeva listener duplicati ad ogni chiamata (nav-items, menuToggle,
   // aboutBtn, notifBtn, langBtn, overlay, window). In production era chiamata
   // una sola volta, ma in test/HMR o se main.ts venisse re-eseguito, i
@@ -82,24 +95,54 @@ export function initHeader(): void {
   // About
   document.getElementById('aboutBtn')?.addEventListener('click', () => {
     showModal(
-      'Informazioni su PloppyTV',
-      '<p>PloppyTV è un tracker TV local-first: non richiede account né un backend PloppyTV.</p>' +
-        '<p><strong>Caratteristiche:</strong></p>' +
+      t('modal.about.title'),
+      '<p>' +
+        t('header.ploppytvTrackerTvLocal') +
+        '</p>' +
+        '<p><strong>' +
+        t('header.caratteristiche') +
+        '</strong></p>' +
         '<ul style="margin-left:20px;margin-bottom:10px;">' +
-        '<li>Tracking serie TV ed episodi visti</li><li>Liste In corso, Da vedere e Completate</li>' +
-        '<li>Calendario settimanale e statistiche</li><li>Scopri con preload in background</li>' +
-        '<li>Backup Esporta/Importa</li><li>PWA offline per gli asset già in cache</li>' +
+        '<li>' +
+        t('header.trackingSerieTvEd') +
+        '</li><li>' +
+        t('header.listeCorsoVedereCompletate') +
+        '</li>' +
+        '<li>' +
+        t('header.calendarioSettimanaleStatistiche') +
+        '</li><li>' +
+        t('header.scopriPreloadBackground') +
+        '</li>' +
+        '<li>' +
+        t('header.backupEsportaImporta') +
+        '</li><li>' +
+        t('header.pwaOfflineAssetGia') +
+        '</li>' +
         '</ul>' +
-        '<p><strong>Dati:</strong> il tuo stato resta nel browser. I metadati e i poster arrivano da TVMaze; Scopri può pre-caricarli poco dopo l’avvio per ridurre l’attesa.</p>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">Le notifiche sono locali e best-effort: senza backend non possono essere garantite mentre la PWA è completamente chiusa.</p>' +
+        '<p><strong>' +
+        t('header.dati') +
+        '</strong> ' +
+        t('header.dataText') +
+        '</p>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">' +
+        t('header.notificheSonoLocaliBest') +
+        '</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
         '<p style="font-size:12px;color:var(--text-secondary);">' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy Policy</a> · ' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribuire</a> · ' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">' +
+        t('header.privacyPolicy') +
+        '</a> · ' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">' +
+        t('header.contribuire') +
+        '</a> · ' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">' +
+        t('header.licenzaMit') +
+        '</a>' +
         '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.2.1 · 2026</p>',
-      [{ label: 'Chiudi' }],
+        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">' +
+        t('header.version', { version: __APP_VERSION__ }) +
+        '</p>',
+      [{ label: t('actions.close') }],
     );
   });
 
@@ -113,17 +156,17 @@ export function initHeader(): void {
     } else {
       sb.classList.add('open');
       ov.classList.add('active');
-      // BUG-A17-11 (FIXED): blocca scroll del body quando la sidebar è aperta
+      // Blocca scroll del body quando la sidebar è aperta
       // (mobile). Prima il body scorreva dietro l'overlay, peggiorando UX.
       document.body.style.overflow = 'hidden';
     }
   });
   document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
-    // BUG-A17-11: usa closeSidebar per ripristinare overflow.
+    // Usa closeSidebar per ripristinare overflow.
     closeSidebar();
   });
 
-  // BUG-A17-12 (FIXED): ESC chiude la sidebar mobile. Prima non c'era handler
+  // ESC chiude la sidebar mobile. Prima non c'era handler
   // ESC per la sidebar — solo l'overlay click la chiudeva. Accessibilità WAI-ARIA
   // richiede ESC per dismissable overlays. Non interferisce con modali (controlla
   // aria-hidden del modal overlay prima di agire).
@@ -167,7 +210,7 @@ export function initHeader(): void {
     }
   });
 
-  // BUG-A17-13 (FIXED): delegated click handler per [data-lang] su document.
+  // Delegated click handler per [data-lang] su document.
   // Prima il binding era via setTimeout(50) dopo showModal — fragile (race
   // con rendering modale, querySelectorAll poteva beccare bottoni di modali
   // precedenti, listener duplicati ad apertura ripetuta). Ora un singolo
@@ -188,7 +231,7 @@ export function initHeader(): void {
     const current = getLocale();
     const locales = getAvailableLocales();
     const labels: Record<string, string> = { it: 'Italiano', en: 'English' };
-    // BUG-A17-14 (FIXED): escapa il codice lingua e la label nell'HTML.
+    // Escapa il codice lingua e la label nell'HTML.
     // Prima `l` era interpolato raw in data-lang — se getAvailableLocales
     // restituisse un locale con `"` o `<`, si aveva breakout attributo/HTML.
     // Defense-in-depth (i locale sono controllati, ma l'escape è gratuito).
@@ -208,6 +251,6 @@ export function initHeader(): void {
         )
         .join('') +
       '</div>';
-    showModal(t('nav.menu') + ' — Lingua', bodyHtml, [{ label: t('actions.close') }]);
+    showModal(t('header.languageTitle'), bodyHtml, [{ label: t('actions.close') }]);
   });
 }

@@ -1,25 +1,8 @@
 // Client TVMaze con timeout, abort, errori tipizzati
-//
-// FIXES applicati:
-//  - C2: onExternalAbort listener resta attaccato fino a quando fetch settlea
-//    (rimosso nella `finally`, non come microtask). Così un abort esterno
-//    successivo (es. l'utente digita di nuovo) propaga correttamente
-//    l'abort al controller interno e aborta la fetch in-flight.
-//  - H6: searchShows/getShowEpisodes/getShowsPage coerce null → [] (body vuoto).
-//  - A5-01: `timedOut` flag distingue timeout interno da abort esterno anche
-//    nel race window tra il fire del setTimeout interno e il microtask che
-//    risolve il reject della fetch. Prima, se `signal.aborted` era true al
-//    catch, si propagava AbortError — anche quando l'abort della fetch era
-//    stato causato dal timeout interno e l'abort esterno era arrivato
-//    tardivamente (subito dopo il fire del timeout, ma prima che il microtask
-//    di reject della fetch girasse). Con il flag, timeout vince.
-//  - A5-02: i wrapper validano `Array.isArray(r)` (non solo `r ?? []`).
-//    Se TVMaze ritorna JSON non-array (es. `{"error":...}`, primitiva, stringa)
-//    su endpoint documentati come array, i wrapper ritornano `[]` invece di
-//    passare through l'oggetto e far crashare il caller in `for (const ep of episodes)`.
 
 import type { TvmazeEpisode, TvmazeSearchResult, TvmazeShow } from '../types';
 import { API_BASE, API_TIMEOUT_MS } from './constants';
+import { t } from './i18n';
 
 export class ApiError extends Error {
   status?: number;
@@ -42,12 +25,6 @@ export class ApiError extends Error {
  *  - `ApiError`: HTTP non ok (con `status`)
  *  - `ParseError`: body non JSON o JSON malformato (anche 200 OK con HTML)
  *
- * C2 FIX: l'`onExternalAbort` listener resta attaccato al signal esterno fino
- * a quando la fetch non settlea (rimosso nella `finally`). Prima veniva
- * rimosso come microtask, il che impediva a un abort esterno successivo
- * (es. l'utente digita di nuovo dopo qualche decina di ms) di propagarsi
- * alla fetch in-flight.
- *
  * A5-01 FIX: il flag `timedOut` viene settato quando il setTimeout interno
  * fire (prima di chiamare `controller.abort()`). Nel catch, se `timedOut` è
  * true, classifichiamo come `TimeoutError` — anche se `signal.aborted` nel
@@ -66,7 +43,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     controller.abort();
   }, API_TIMEOUT_MS);
 
-  // C2 FIX: propaga abort dal signal esterno al controller interno.
+  // Propaga abort dal signal esterno al controller interno.
   // Il listener resta attaccato fino alla `finally` (non microtask cleanup).
   let onExternalAbort: (() => void) | null = null;
   if (signal) {
@@ -123,19 +100,13 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     throw e;
   } finally {
     clearTimeout(timeoutId);
-    // C2 FIX: rimuovi il listener solo qui, dopo che fetch ha settleato.
+    // Rimuovi il listener solo qui, dopo che fetch ha settleato.
     if (onExternalAbort && signal) {
       signal.removeEventListener('abort', onExternalAbort);
     }
   }
 }
 
-/**
- * H6 + A5-02 FIX: i wrapper coerciscono non solo `null` ma qualsiasi
- * valore non-array (oggetto, primitiva, stringa) a `[]`. Se TVMaze ritorna
- * JSON inatteso su endpoint documentati come array, i caller non crashano
- * in `for (const ep of episodes)`.
- */
 export async function searchShows(query: string, signal?: AbortSignal): Promise<TvmazeSearchResult[]> {
   const r = await apiGet<TvmazeSearchResult[]>('/search/shows?q=' + encodeURIComponent(query), signal);
   return Array.isArray(r) ? r : [];
@@ -149,4 +120,37 @@ export async function getShowEpisodes(showId: number, signal?: AbortSignal): Pro
 export async function getShowsPage(page: number, signal?: AbortSignal): Promise<TvmazeShow[]> {
   const r = await apiGet<TvmazeShow[]>('/shows?page=' + encodeURIComponent(page), signal);
   return Array.isArray(r) ? r : [];
+}
+
+/** Mappa `{ [showId]: updatedAt }` delle serie aggiornate nel periodo. */
+export async function getUpdatedShowIds(since: 'day' | 'week', signal?: AbortSignal): Promise<number[]> {
+  const r = await apiGet<Record<string, unknown>>('/updates/shows?since=' + since, signal);
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return [];
+  return Object.keys(r)
+    .map(Number)
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+}
+
+export type ApiAction = 'search' | 'load' | 'refresh' | 'discover';
+
+// Messaggi per azione (chiavi errors.<azione>.<tipo> nei dizionari).
+const ERROR_KINDS: Record<ApiAction, Array<'timeout' | 'network' | 'rateLimit' | 'notFound' | 'parse' | 'fallback'>> = {
+  search: ['timeout', 'network', 'rateLimit', 'parse', 'fallback'],
+  load: ['timeout', 'network', 'rateLimit', 'notFound', 'fallback'],
+  discover: ['timeout', 'network', 'rateLimit', 'parse', 'fallback'],
+  refresh: ['timeout', 'network', 'rateLimit', 'notFound', 'fallback'],
+};
+
+/** Messaggio per l'utente di un errore di `apiGet`, secondo l'azione in corso. */
+export function apiErrorMessage(error: unknown, action: ApiAction): string {
+  const kinds = ERROR_KINDS[action];
+  const e = (error && typeof error === 'object' ? error : {}) as { name?: string; status?: number };
+  let kind: (typeof kinds)[number] = 'fallback';
+  if (e.name === 'TimeoutError') kind = 'timeout';
+  else if (e.name === 'NetworkError') kind = 'network';
+  else if (e.status === 429) kind = 'rateLimit';
+  else if (e.status === 404 && kinds.includes('notFound')) kind = 'notFound';
+  else if ((e.name === 'ParseError' || e.name === 'SyntaxError') && kinds.includes('parse')) kind = 'parse';
+  const key = `errors.${action}.${kind}`;
+  return t(key);
 }

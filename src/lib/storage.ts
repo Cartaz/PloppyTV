@@ -9,11 +9,12 @@
 // indistinguibile da quello iniziale.
 
 import type { SavedData, Show } from '../types';
-import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
+import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY, QUOTA_WARN_KB } from './constants';
 import { getState, setShows, setStorageDisabled, setQuotaWarned, emitChange } from './store';
 import { canonicalizeDataDocument } from './dataDocument';
 import { showToast } from '../components/toast';
 import { isModalOpen } from '../components/modal';
+import { t } from './i18n';
 
 let _storageOK = true;
 
@@ -32,8 +33,6 @@ export function isStorageOK(): boolean {
   }
 })();
 
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
-
 // Il documento esatto è la revisione: due scritture nello stesso
 // millisecondo (o legacy senza savedAt) restano distinguibili, senza cambiare
 // lo schema persistito. null rappresenta la chiave assente.
@@ -48,33 +47,20 @@ function _readStorageRevision(): { raw: string | null } | null {
 }
 
 /**
- * Salva lo stato corrente su localStorage.
- * - `{ immediate: true }`: scrive sincronamente, ritorna `false` se la
- *   scrittura fallisce (quota, serializzazione, conflitto multi-tab).
- * - senza `immediate`: schedula un debounce di 300ms e ritorna `void`, perché
- *   il risultato della persistenza non è ancora disponibile al chiamante.
+ * Salva subito lo stato corrente su localStorage. Ritorna `false` se la
+ * scrittura fallisce (quota, serializzazione, conflitto multi-tab): i
+ * chiamanti fanno rollback della modifica in memoria.
  *
  * CAS multi-tab: se la revisione corrente (contenuto esatto) differisce
  * da quella caricata dal tab, la scrittura viene rifiutata.
  */
-export function saveData(opts?: { immediate?: boolean }): boolean | void {
-  if (opts && opts.immediate) {
-    if (_saveTimer) clearTimeout(_saveTimer);
-    return _saveDataNow();
-  }
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(_saveDataNow, 300);
-  return;
-}
-
-function _saveDataNow(): boolean {
-  _saveTimer = null;
+export function saveData(): boolean {
   const state = getState();
   if (state._storageDisabled || !_storageOK) return false;
 
   const currentRevision = _readStorageRevision();
   if (currentRevision === null || currentRevision.raw !== _lastRevision) {
-    showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
+    showToast(t('toast.multiTabConflict'), 'warning');
     return false;
   }
 
@@ -89,14 +75,15 @@ function _saveDataNow(): boolean {
     } satisfies SavedData);
   } catch (e) {
     console.error('Serializzazione fallita:', e);
-    showToast('Errore: dati non serializzabili', 'error');
+    showToast(t('toast.serializeError'), 'error');
     return false;
   }
 
-  // BUG-04-07: size threshold uses UTF-8 byte length (TextEncoder), non char count.
+  // Il documento viene scritto due volte (principale + backup), quindi la
+  // soglia d'avviso vale per metà della quota tipica di localStorage (~5 MB).
   const sizeKB = Math.round(new TextEncoder().encode(serialized).length / 1024);
-  if (sizeKB > 4500 && !state._quotaWarned) {
-    showToast('Attenzione: dati vicini al limite (' + sizeKB + 'KB). Usa Esporta per backup.', 'warning');
+  if (sizeKB > QUOTA_WARN_KB && !state._quotaWarned) {
+    showToast(t('toast.quotaWarn', { size: sizeKB }), 'warning');
     setQuotaWarned(true);
   }
 
@@ -126,7 +113,7 @@ function _saveDataNow(): boolean {
       // e il write fallito un altro tab potrebbe aver scritto o cancellato.
       const recoverRevision = _readStorageRevision();
       if (recoverRevision === null || recoverRevision.raw !== expectedRevision) {
-        showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
+        showToast(t('toast.multiTabConflict'), 'warning');
         return false;
       }
       const stripped: Show[] = state.shows.map((s) => ({ ...s, image: null }));
@@ -138,16 +125,16 @@ function _saveDataNow(): boolean {
         } satisfies SavedData);
         localStorage.setItem(STORAGE_KEY, strippedSerialized);
         _lastRevision = strippedSerialized;
-        showToast('Salvato senza immagini (spazio limitato).', 'warning');
+        showToast(t('toast.quotaStripped'), 'warning');
         return true;
       } catch {
-        showToast('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
+        showToast(t('toast.quotaFull'), 'error');
       }
     } else if (err.name === 'SecurityError' || err.code === 18) {
       setStorageDisabled(true);
-      showToast('Salvataggio non disponibile (modalità privata?).', 'error');
+      showToast(t('toast.storageUnavailable'), 'error');
     } else {
-      showToast('Errore salvataggio: ' + (err.message || 'unknown'), 'error');
+      showToast(t('storage.erroreSalvataggio') + (err.message || 'unknown'), 'error');
     }
     return false;
   }
@@ -167,10 +154,6 @@ function _loadCanonicalBackup(): Show[] | null {
   return result.ok && result.document.shows.length > 0 ? result.document.shows : null;
 }
 
-/**
- * BUG-04-08: rimuove tutte le chiavi `ploppytv_corrupted_*` forensi da localStorage.
- * Chiamato dopo un loadData valido per evitare accumulo di chiavi inutili.
- */
 function _cleanupCorruptedKeys(): void {
   try {
     const keysToRemove: string[] = [];
@@ -197,7 +180,7 @@ export function loadData(): void {
     setStorageDisabled(true);
     return;
   }
-  // BUG-A4-01: localStorage.getItem può lanciare SecurityError in modalità
+  // localStorage.getItem può lanciare SecurityError in modalità
   // privata (Safari) o dopo revoca mid-session dei permessi storage. Senza
   // questo wrap, loadData crasherebbe e il caller (main.ts) non recupererebbe.
   let raw: string | null;
@@ -207,7 +190,7 @@ export function loadData(): void {
     _storageOK = false;
     setShows([]);
     setStorageDisabled(true);
-    showToast('Archiviazione non disponibile.', 'error');
+    showToast(t('storage.archiviazioneDisponibile'), 'error');
     return;
   }
   if (raw === null) {
@@ -233,12 +216,12 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
-      saveData({ immediate: true });
+      showToast(t('toast.corruptedData'), 'warning');
+      saveData();
       return;
     }
     setShows([]);
-    showToast('Dati corrotti. Usa Importa per ripristinare.', 'error');
+    showToast(t('toast.corruptedManual'), 'error');
     return;
   }
 
@@ -248,13 +231,10 @@ export function loadData(): void {
     if (unsupported) {
       console.warn('[PloppyTV] Schema version futura:', canonical.version, '— atteso', SCHEMA_VERSION);
       // Una versione futura è valida per una build più recente, non corrotta.
-      // Bloccare le scritture evita che recovery o beforeunload la distruggano.
+      // Bloccare le scritture evita che il recovery la distrugga.
       setStorageDisabled(true);
       setShows([]);
-      showToast(
-        'Versione dati non supportata. Aggiorna l’app per accedere ai dati; salvataggio disabilitato.',
-        'error',
-      );
+      showToast(t('storage.unsupportedVersion'), 'error');
       return;
     } else {
       console.warn('[PloppyTV] Documento storage non valido:', canonical.code);
@@ -263,13 +243,13 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast('Dati non validi. Ripristinato backup precedente.', 'warning');
-      saveData({ immediate: true });
+      showToast(t('storage.datiValidiRipristinatoBackup'), 'warning');
+      saveData();
       return;
     }
 
     setShows([]);
-    showToast('Dati non validi. Usa Importa per ripristinare.', 'error');
+    showToast(t('storage.datiValidiUsaImporta'), 'error');
     return;
   }
 
@@ -280,7 +260,7 @@ export function loadData(): void {
     console.warn('[PloppyTV] Schema version passata:', sourceVersion, '— atteso', SCHEMA_VERSION);
   }
   setShows(canonical.document.shows);
-  // BUG-04-08: pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
+  // Pulisci le chiavi ploppytv_corrupted_* forensi dopo un load valido.
   _cleanupCorruptedKeys();
 }
 
@@ -291,12 +271,12 @@ if (typeof window !== 'undefined') {
     try {
       const state = getState();
 
-      // BUG-04-03: storage event con newValue=null (altro tab ha cancellato).
-      // Se ci sono shows locali (o _localDirty), NON wipe — mostra toast.
+      // Storage event con newValue=null (altro tab ha cancellato).
+      // Se ci sono shows locali, NON wipe — mostra toast.
       if (ev.newValue === null) {
         if (state.shows.length > 0) {
-          showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
-          // BUG-04-04: NON avanza _lastRevision (resta al valore pre-event).
+          showToast(t('toast.multiTabDeleted'), 'warning');
+          // NON avanza _lastRevision (resta al valore pre-event).
           return;
         }
         // Nessun show locale → safe to wipe.
@@ -324,19 +304,11 @@ if (typeof window !== 'undefined') {
       }
       const newShows = canonical.document.shows;
 
-      // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
-      // sovrascrivere lo stato. Mostra toast e lascia _lastRevision al valore
-      // pre-event (così il prossimo saveData CAS-fail e forza reload).
-      if (state._localDirty) {
-        showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
-        return;
-      }
-
-      // H5 / BUG-04-04: se c'è una modale aperta, NON sovrascrivere lo stato.
+      // Se c'è una modale aperta, NON sovrascrivere lo stato.
       // Mostriamo un toast che invita a ricaricare a modale chiusa.
       // NON avanza _lastRevision (così i salvataggi successivi falliscono per CAS).
       if (isModalOpen()) {
-        showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
+        showToast(t('toast.multiTabUpdate'), 'warning');
         const evBadges = new CustomEvent('ploppytv:badges');
         window.dispatchEvent(evBadges);
         return;

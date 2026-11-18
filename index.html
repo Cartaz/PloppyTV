@@ -83,20 +83,21 @@
             class="search-input"
             id="searchInput"
             placeholder="Cerca serie TV..."
+            data-i18n-placeholder="search.placeholder"
             autocomplete="off"
             maxlength="100"
           />
           <div class="search-results" id="searchResults"></div>
         </div>
         <div class="header-actions">
-          <button class="icon-btn" id="exportBtn" title="Esporta dati" aria-label="Esporta">
+          <button class="icon-btn" id="exportBtn" title="Esporta dati" aria-label="Esporta" data-i18n-title="actions.export" data-i18n-aria-label="actions.export">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
-          <button class="icon-btn" id="importBtn" title="Importa dati" aria-label="Importa">
+          <button class="icon-btn" id="importBtn" title="Importa dati" aria-label="Importa" data-i18n-title="actions.import" data-i18n-aria-label="actions.import">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
@@ -109,7 +110,7 @@
 
       <nav class="sidebar" id="sidebar">
         <div class="nav-section">
-          <div class="nav-section-title">Menu</div>
+          <div class="nav-section-title" data-i18n="nav.menu">Menu</div>
           <button type="button" class="nav-item active" data-view="dashboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="7" height="7" />
@@ -117,27 +118,27 @@
               <rect x="14" y="14" width="7" height="7" />
               <rect x="3" y="14" width="7" height="7" />
             </svg>
-            <span>Dashboard</span>
+            <span data-i18n="nav.dashboard">Dashboard</span>
           </button>
           <button type="button" class="nav-item" data-view="watching">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            <span>In corso</span>
+            <span data-i18n="nav.watching">In corso</span>
             <span class="nav-badge" id="badge-watching">0</span>
           </button>
           <button type="button" class="nav-item" data-view="towatch">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </svg>
-            <span>Da vedere</span>
+            <span data-i18n="nav.towatch">Da vedere</span>
             <span class="nav-badge" id="badge-towatch">0</span>
           </button>
           <button type="button" class="nav-item" data-view="completed">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            <span>Completate</span>
+            <span data-i18n="nav.completed">Completate</span>
             <span class="nav-badge" id="badge-completed">0</span>
           </button>
           <button type="button" class="nav-item" data-view="discover">
@@ -145,14 +146,14 @@
               <circle cx="12" cy="12" r="10" />
               <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
             </svg>
-            <span>Scopri</span>
+            <span data-i18n="nav.discover">Scopri</span>
           </button>
           <button type="button" class="nav-item" data-view="library">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
             </svg>
-            <span>Libreria</span>
+            <span data-i18n="nav.library">Libreria</span>
           </button>
           <button type="button" class="nav-item" data-view="calendar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -161,7 +162,7 @@
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <span>Calendario</span>
+            <span data-i18n="nav.calendar">Calendario</span>
           </button>
           <button type="button" class="nav-item" data-view="stats">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -169,31 +170,31 @@
               <line x1="12" y1="20" x2="12" y2="4" />
               <line x1="6" y1="20" x2="6" y2="14" />
             </svg>
-            <span>Statistiche</span>
+            <span data-i18n="nav.stats">Statistiche</span>
           </button>
           <button type="button" class="nav-item" data-view="yearreview">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
-            <span>Anno in TV</span>
+            <span data-i18n="nav.yearReview">Anno in TV</span>
           </button>
         </div>
         <div class="nav-section">
-          <div class="nav-section-title">Info</div>
-          <button type="button" class="nav-item" id="notifBtn" title="Notifiche episodi">
+          <div class="nav-section-title" data-i18n="nav.infoSection">Info</div>
+          <button type="button" class="nav-item" id="notifBtn" title="Notifiche episodi" data-i18n-title="notifications.title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span>Notifiche</span>
+            <span data-i18n="nav.notifications">Notifiche</span>
           </button>
-          <button type="button" class="nav-item" id="langBtn" title="Cambia lingua">
+          <button type="button" class="nav-item" id="langBtn" title="Cambia lingua" data-i18n-title="header.changeLanguage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10" />
               <line x1="2" y1="12" x2="22" y2="12" />
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
-            <span>Lingua</span>
+            <span data-i18n="nav.language">Lingua</span>
           </button>
           <button type="button" class="nav-item" id="aboutBtn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -201,7 +202,7 @@
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            <span>Informazioni</span>
+            <span data-i18n="nav.info">Informazioni</span>
           </button>
         </div>
       </nav>

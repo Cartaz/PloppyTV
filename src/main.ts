@@ -1,32 +1,10 @@
 // Entry point: inizializza tutti i moduli e avvia l'app
-//
-// FIXES applicati (Agent A18):
-//  - BUG-A18-01: registerSW wrappato in try/catch — se la registrazione SW
-//    lancia (navigator.serviceWorker rotto, virtual module buggy), init non
-//    crasha e l'app continua a funzionare senza PWA offline.
-//  - BUG-A18-02: init() body wrappato in try/catch con fallback UI. Il
-//    listener beforeunload è spostato DENTRO init() DOPO loadData: se init
-//    lancia prima di loadData, il listener non viene attaccato, evitando
-//    che saveData sovrascriva localStorage valido con state vuoto.
-//  - BUG-A18-03: onNeedRefresh dedup — multiple chiamate mostrano un solo
-//    bottone "Aggiorna ora". Il flag dedup è resettato dopo l'auto-remove
-//    (30s) così un secondo update può mostrare un nuovo bottone.
-//  - BUG-A18-04: reloadBtn.onclick catcha reject di updateSW — reload
-//    avviene comunque, no unhandled rejection.
-//  - BUG-A18-05: toast message chiaro ("vedi pulsante in basso a destra")
-//    invece del precedente "tocca per aggiornare" (il toast non è cliccabile).
-//  - BUG-A18-06: beforeunload handler wrappa saveData in try/catch.
-//  - BUG-A18-07: idempotency guard via __ploppytvInit flag su window —
-//    sopravvive a vi.resetModules() (HMR / re-import), evitando listener
-//    duplication e double-init.
-//  - BUG-A18-08: global error handlers (window.error + unhandledrejection)
-//    catturano errori in async chunks (renderer imports, worker client).
 
 import './styles/main.css';
 import { getState, subscribe, switchView, openShow } from './lib/store';
-import { isStorageOK, loadData, saveData } from './lib/storage';
+import { isStorageOK, loadData } from './lib/storage';
 import { initModal, showModal } from './components/modal';
-import { initHeader, updateBadges } from './components/header';
+import { initHeader, updateBadges, applyStaticTranslations } from './components/header';
 import { initSearch } from './components/search';
 import { initExportImport } from './components/exportImport';
 import { initRenderer, render } from './components/renderer';
@@ -36,6 +14,7 @@ import { initKeyboard } from './lib/keyboard';
 import { initNotifications } from './lib/notifications';
 import { registerSW } from 'virtual:pwa-register';
 import { safeId } from './lib/utils';
+import { t } from './lib/i18n';
 
 // ===== Hash routing minimale per PWA shortcuts e deep link =====
 // PWA shortcuts in vite.config.ts puntano a ./index.html#dashboard, #discover,
@@ -74,14 +53,32 @@ function applyHash(): void {
   }
 }
 
+// Stato → hash: ogni cambio di vista o serie aperta diventa una voce di
+// cronologia, così Indietro/Avanti e i link condivisi funzionano. Attivo solo
+// dopo aver applicato l'hash iniziale, per non sovrascrivere un deep link.
+let _routingReady = false;
+
+function syncHashFromState(): void {
+  if (!_routingReady) return;
+  const state = getState();
+  const wanted = '#' + (state.currentShowId ? 'show/' + state.currentShowId : state.currentView);
+  if (window.location.hash === wanted) return;
+  if (window.location.hash) window.history.pushState(null, '', wanted);
+  else window.history.replaceState(null, '', wanted);
+}
+
 function setupHashRouting(): void {
   window.addEventListener('hashchange', applyHash);
   // Applica l'hash iniziale (es. se l'utente apre la PWA da uno shortcut)
   // dopo che i dati sono caricati e il primo render è stato fatto.
-  setTimeout(applyHash, 0);
+  setTimeout(() => {
+    applyHash();
+    _routingReady = true;
+    syncHashFromState();
+  }, 0);
 }
 
-// BUG-A18-08: global error handlers per errori non catturati e rejection
+// Global error handlers per errori non catturati e rejection
 // non gestite. Questi catturano errori in async chunks (renderer imports,
 // worker client) che altrimenti diventerebbero failure silenti.
 function registerGlobalErrorHandlers(): void {
@@ -96,14 +93,14 @@ function registerGlobalErrorHandlers(): void {
     }
     console.error('[PloppyTV] unhandled rejection:', event.reason);
     try {
-      showToast('Si è verificato un errore inatteso', 'error');
+      showToast(t('app.siVerificatoErroreInatteso'), 'error');
     } catch {
       // ignore — showToast potrebbe non essere disponibile
     }
   });
 }
 
-// BUG-A18-02: fallback UI quando init() fallisce. Mostra un messaggio
+// Fallback UI quando init() fallisce. Mostra un messaggio
 // user-friendly nel main content area + logga l'errore in console.
 function showFatalError(err: unknown): void {
   console.error('[PloppyTV] init failed:', err);
@@ -112,9 +109,15 @@ function showFatalError(err: unknown): void {
     if (main) {
       main.innerHTML =
         '<div class="empty-state">' +
-        '<div class="empty-state-title">Errore di avvio</div>' +
-        '<div class="empty-state-text">Si è verificato un errore imprevisto. Ricarica la pagina per riprovare.</div>' +
-        '<button class="btn btn-primary" style="margin-top:12px;">Ricarica</button>' +
+        '<div class="empty-state-title">' +
+        t('app.erroreAvvio') +
+        '</div>' +
+        '<div class="empty-state-text">' +
+        t('app.siVerificatoErroreImprevisto') +
+        '</div>' +
+        '<button class="btn btn-primary" style="margin-top:12px;">' +
+        t('actions.reload') +
+        '</button>' +
         '</div>';
       main.querySelector('button')?.addEventListener('click', () => window.location.reload());
     }
@@ -123,15 +126,15 @@ function showFatalError(err: unknown): void {
   }
 }
 
-// BUG-A18-01: PWA registration wrappata in try/catch. Se registerSW lancia
+// PWA registration wrappata in try/catch. Se registerSW lancia
 // (navigator.serviceWorker rotto, virtual module buggy), init non crasha.
-// BUG-A18-03: onNeedRefresh dedup — un solo bottone "Aggiorna ora" alla volta.
-// BUG-A18-04: reloadBtn.onclick catcha reject di updateSW.
-// BUG-A18-05: toast message chiaro.
+// onNeedRefresh dedup — un solo bottone "Aggiorna ora" alla volta.
+// reloadBtn.onclick catcha reject di updateSW.
+// Toast message chiaro.
 function registerPWA(): void {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   try {
-    // BUG-A18-03: track se un bottone è già visibile per evitare duplicati.
+    // Track se un bottone è già visibile per evitare duplicati.
     let updateBtn: HTMLButtonElement | null = null;
     let autoRemoveTimer: ReturnType<typeof setTimeout> | null = null;
     const updateSW = registerSW({
@@ -145,24 +148,24 @@ function registerPWA(): void {
       },
       onNeedRefresh() {
         // Nuova versione del SW disponibile (in stato waiting).
-        // BUG-A18-05: toast message chiaro — il toast non è cliccabile,
+        // Toast message chiaro — il toast non è cliccabile,
         // il bottone di aggiornamento è in basso a destra.
-        showToast('Nuova versione disponibile (vedi pulsante in basso a destra)', 'warning');
-        // BUG-A18-03: dedup — se un bottone è già visibile, non aggiungerne un altro.
+        showToast(t('app.nuovaVersioneDisponibileVedi'), 'warning');
+        // Dedup — se un bottone è già visibile, non aggiungerne un altro.
         // Il toast è comunque re-mostrato ogni volta per ricordare all'utente.
         if (updateBtn) return;
         const reloadBtn = document.createElement('button');
-        reloadBtn.textContent = 'Aggiorna ora';
+        reloadBtn.textContent = t('toast.updateNow');
         reloadBtn.className = 'btn btn-primary btn-sm';
         reloadBtn.style.cssText =
           'position:fixed;bottom:20px;right:20px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.3);';
         reloadBtn.onclick = async () => {
-          // BUG-A18-03: cancella l'auto-remove timer visto che l'utente ha cliccato.
+          // Cancella l'auto-remove timer visto che l'utente ha cliccato.
           if (autoRemoveTimer) {
             clearTimeout(autoRemoveTimer);
             autoRemoveTimer = null;
           }
-          // BUG-A18-04: catch updateSW rejection — reload deve comunque avvenire.
+          // Catch updateSW rejection — reload deve comunque avvenire.
           try {
             if (updateSW) {
               await updateSW(true);
@@ -180,7 +183,7 @@ function registerPWA(): void {
         document.body.appendChild(reloadBtn);
         updateBtn = reloadBtn;
         // Auto-rimuovi dopo 30s se l'utente non clicca.
-        // BUG-A18-03 follow-up: reset del flag dedup così un successivo
+        // Reset del flag dedup così un successivo
         // onNeedRefresh può mostrare un nuovo bottone (es. secondo SW update).
         autoRemoveTimer = setTimeout(() => {
           if (updateBtn) {
@@ -195,7 +198,7 @@ function registerPWA(): void {
     (window as unknown as { __ploppytvUpdateSW?: () => Promise<void> }).__ploppytvUpdateSW = () =>
       updateSW ? updateSW(true) : Promise.resolve();
   } catch (e) {
-    // BUG-A18-01: registerSW non deve crashare init.
+    // registerSW non deve crashare init.
     console.warn('[PWA] registerSW threw:', e);
   }
 }
@@ -217,15 +220,15 @@ function detectStandalone(): void {
 
 // ===== INIT =====
 function init(): void {
-  // BUG-A18-07: idempotency guard. Il flag su window sopravvive a
+  // Idempotency guard. Il flag su window sopravvive a
   // vi.resetModules() (HMR / re-import), così il secondo import non
-  // re-registra listener (hashchange, beforeunload, error, unhandledrejection)
+  // re-registra listener (hashchange, error, unhandledrejection)
   // e non re-runna initX (evitando double-bind, double-save, ecc.).
   const w = window as unknown as { __ploppytvInit?: boolean };
   if (w.__ploppytvInit) return;
   w.__ploppytvInit = true;
 
-  // BUG-A18-08: registra gli error handler globali PRIMA di qualsiasi init
+  // Registra gli error handler globali PRIMA di qualsiasi init
   // step che potrebbe lanciare. Così catturano anche errori durante init.
   registerGlobalErrorHandlers();
 
@@ -245,11 +248,17 @@ function init(): void {
     // Modalità privata: avvisa l'utente
     if (!isStorageOK()) {
       showModal(
-        'Modalità di navigazione privata',
-        '<p>Il tuo browser non permette il salvataggio locale (modalità privata o storage disabilitato).</p>' +
-          '<p>Puoi usare PloppyTV, ma <strong>tutti i dati andranno persi al ricaricamento</strong>.</p>' +
-          '<p>Per la persistenza, disattiva la modalità privata o abilita i cookie/storage nelle impostazioni.</p>',
-        [{ label: 'Ho capito', style: 'btn-primary' }],
+        t('modal.privateMode.title'),
+        '<p>' +
+          t('modal.privateMode.body1') +
+          '</p>' +
+          '<p>' +
+          t('modal.privateMode.body2') +
+          '</p>' +
+          '<p>' +
+          t('modal.privateMode.body3') +
+          '</p>',
+        [{ label: t('app.hoCapito'), style: 'btn-primary' }],
       );
     }
 
@@ -261,12 +270,16 @@ function init(): void {
     render();
     subscribe(() => {
       render();
+      syncHashFromState();
       // P2.9: re-schedula notifiche quando lo stato cambia
       window.dispatchEvent(new CustomEvent('ploppytv:reschedule-notifications'));
     });
 
     // P2.7: re-render al cambio lingua
+    applyStaticTranslations();
     subscribeI18n(() => {
+      applyStaticTranslations();
+      updateBadges();
       render();
     });
 
@@ -280,22 +293,8 @@ function init(): void {
     registerPWA();
 
     detectStandalone();
-
-    // BUG-A18-02: beforeunload registrato DENTRO init() DOPO loadData.
-    // Se init lancia prima di loadData (es. initRenderer throw), il listener
-    // non viene attaccato → saveData NON viene chiamato su tab close →
-    // evita di sovrascrivere localStorage valido con state vuoto.
-    // BUG-A18-06: saveData avvolto in try/catch — un throw del modulo storage
-    // (es. SecurityError in casi rari) non deve crashare il listener.
-    window.addEventListener('beforeunload', () => {
-      try {
-        saveData({ immediate: true });
-      } catch (e) {
-        console.warn('[PloppyTV] saveData on beforeunload failed:', e);
-      }
-    });
   } catch (e) {
-    // BUG-A18-02: init() non deve lanciare. Mostra fallback UI + logga.
+    // init() non deve lanciare. Mostra fallback UI + logga.
     showFatalError(e);
   }
 }

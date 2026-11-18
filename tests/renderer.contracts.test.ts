@@ -6,10 +6,8 @@ let rafSpy: ReturnType<typeof vi.fn>;
 let showToastSpy: ReturnType<typeof vi.fn>;
 let renderDashboardSpy: ReturnType<typeof vi.fn>;
 let renderShowListSpy: ReturnType<typeof vi.fn>;
-let resetDiscoverSpy: ReturnType<typeof vi.fn>;
 let renderDiscoverSpy: ReturnType<typeof vi.fn>;
 let bindDiscoverSpy: ReturnType<typeof vi.fn>;
-let resetCalendarSpy: ReturnType<typeof vi.fn>;
 let renderCalendarSpy: ReturnType<typeof vi.fn>;
 let bindCalendarSpy: ReturnType<typeof vi.fn>;
 let renderStatsSpy: ReturnType<typeof vi.fn>;
@@ -43,10 +41,8 @@ beforeEach(() => {
   showToastSpy = vi.fn();
   renderDashboardSpy = vi.fn();
   renderShowListSpy = vi.fn();
-  resetDiscoverSpy = vi.fn();
   renderDiscoverSpy = vi.fn();
   bindDiscoverSpy = vi.fn();
-  resetCalendarSpy = vi.fn();
   renderCalendarSpy = vi.fn(async () => {});
   bindCalendarSpy = vi.fn();
   renderStatsSpy = vi.fn(async () => {});
@@ -59,12 +55,10 @@ beforeEach(() => {
   vi.doMock('../src/views/dashboard', () => ({ renderDashboard: renderDashboardSpy }));
   vi.doMock('../src/views/showList', () => ({ renderShowList: renderShowListSpy }));
   vi.doMock('../src/views/discover', () => ({
-    resetBoundGuard: resetDiscoverSpy,
     renderDiscover: renderDiscoverSpy,
     bindDiscoverEvents: bindDiscoverSpy,
   }));
   vi.doMock('../src/views/calendar', () => ({
-    resetBoundGuard: resetCalendarSpy,
     renderCalendar: renderCalendarSpy,
     bindCalendarEvents: bindCalendarSpy,
   }));
@@ -114,14 +108,12 @@ describe('renderer contracts', () => {
     store.setState({ currentShowId: null, currentView: 'discover' });
     renderer.render();
     await flushFrame();
-    expect(resetDiscoverSpy).toHaveBeenCalledTimes(1);
     expect(renderDiscoverSpy).toHaveBeenCalledWith(main);
     expect(bindDiscoverSpy).toHaveBeenCalledWith(main);
 
     store.setState({ currentShowId: null, currentView: 'calendar' });
     renderer.render();
     await flushFrame();
-    expect(resetCalendarSpy).toHaveBeenCalledTimes(1);
     expect(renderCalendarSpy).toHaveBeenCalledWith(main);
     expect(bindCalendarSpy).toHaveBeenCalledWith(main);
 
@@ -316,7 +308,7 @@ describe('renderer contracts', () => {
     store.setState({ currentView: 'dashboard', currentShowId: null });
     renderer.render();
     await flushFrame();
-    chunk.resolve({ [renderName]: obsoleteRenderer, resetBoundGuard: vi.fn() });
+    chunk.resolve({ [renderName]: obsoleteRenderer });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(obsoleteRenderer).not.toHaveBeenCalled();
     expect(renderDashboardSpy).toHaveBeenCalledTimes(1);
@@ -357,7 +349,6 @@ describe('renderer contracts', () => {
     const store = await import('../src/lib/store');
     const bind = vi.fn();
     vi.doMock('../src/views/showDetail', () => ({
-      resetBoundGuard: vi.fn(),
       renderShowDetail: () => {
         if (!exists) store.closeShow();
       },

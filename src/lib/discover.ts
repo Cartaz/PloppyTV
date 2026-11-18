@@ -1,13 +1,15 @@
 // Discover: serie popolari + ultimi arrivi con cache 1h
 
 import type { TvmazeShow } from '../types';
-import { getShowsPage, ApiError } from './api';
+import { getShowsPage, getUpdatedShowIds, ApiError } from './api';
 import {
   DISCOVER_CACHE_KEY,
   DISCOVER_RECENT_CACHE_KEY,
   DISCOVER_CACHE_TTL,
   DISCOVER_POPULAR_PAGES,
-  DISCOVER_RECENT_PAGES,
+  DISCOVER_RECENT_FALLBACK_PAGES,
+  DISCOVER_RECENT_PAGE_COUNT,
+  TVMAZE_SHOWS_PER_PAGE,
   DISCOVER_TARGET_PER_GENRE,
   DISCOVER_TARGET_OTHER,
   DISCOVER_TOTAL_TARGET,
@@ -32,11 +34,10 @@ export interface DiscoverGroups {
 async function fetchAllCandidates(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void,
 ): Promise<{ shows: TvmazeShow[]; failedPages: number[] }> {
   const sixMonthsAgo = recentOnly
     ? (() => {
-        // BUG-07-06: anchor to day 1, then clamp day to last day of target month.
+        // Anchor to day 1, then clamp day to last day of target month.
         // Old code: new Date(2024,2,31).setMonth(-6) → Sep 31 → rolls to Oct 1.
         // Fixed code: start from day 1, setMonth, then clamp to last day of target.
         const now = new Date();
@@ -47,29 +48,6 @@ async function fetchAllCandidates(
         return d;
       })()
     : null;
-
-  const total = pages.length;
-  let completed = 0;
-  let lastProgressText = '';
-  let progressRAF: number | null = null;
-  let progressDirty = false;
-
-  const scheduleProgress = (label: string) => {
-    progressDirty = true;
-    if (progressRAF) return;
-    progressRAF = requestAnimationFrame(() => {
-      progressRAF = null;
-      if (!progressDirty) return;
-      progressDirty = false;
-      const text = label + '... (' + completed + '/' + total + ' pagine)';
-      if (text === lastProgressText) return;
-      lastProgressText = text;
-      onProgress?.(text);
-    });
-  };
-
-  const label = recentOnly ? 'Caricamento ultimi arrivi' : 'Caricamento serie popolari';
-  scheduleProgress(label);
 
   // Concurrency limitato: batch di 3 pagine alla volta
   const CONCURRENCY = 3;
@@ -84,11 +62,11 @@ async function fetchAllCandidates(
           const pageShows = await getShowsPage(page);
           return { idx: i + j, shows: Array.isArray(pageShows) ? pageShows : [] };
         } catch (e) {
+          // L'indice /shows di TVMaze è in ritardo rispetto agli ID più nuovi:
+          // l'ultima pagina può non esistere ancora. È vuota, non un errore.
+          if (e instanceof ApiError && e.status === 404) return { idx: i + j, shows: [] as TvmazeShow[] };
           console.warn('Errore caricamento pagina ' + page + ':', e);
           return { idx: i + j, shows: [] as TvmazeShow[], failed: page };
-        } finally {
-          completed++;
-          scheduleProgress(label);
         }
       }),
     );
@@ -98,21 +76,12 @@ async function fetchAllCandidates(
     }
   }
 
-  // BUG-A7-02 (FIXED): cancel any pending progress RAF so onProgress is not
-  // invoked after the fetch has settled. The RAF was scheduled in the last
-  // page's `finally` and would fire on the next animation frame, leaking a
-  // final callback to the caller who already received the resolved data.
-  if (progressRAF !== null) {
-    cancelAnimationFrame(progressRAF);
-    progressRAF = null;
-  }
-
   const all: TvmazeShow[] = [];
   for (const pageShows of results) {
     for (const show of pageShows) {
-      // BUG-07-03: weight=0 is INCLUDED (valid TVMaze value). Missing/negative excluded.
+      // Weight=0 is INCLUDED (valid TVMaze value). Missing/negative excluded.
       if (!show || !show.image || !show.name) continue;
-      // BUG-A7-04 (FIXED): non-numeric weight (string "abc", null, undefined) and
+      // Non-numeric weight (string "abc", null, undefined) and
       // non-finite (NaN/Infinity) are now excluded via typeof + isFinite check.
       // Old code: `weight < 0` is false for NaN (NaN < 0 === false), so a string
       // weight would slip through and poison the sort comparator with NaN.
@@ -120,7 +89,7 @@ async function fetchAllCandidates(
       if (recentOnly) {
         if (!show.premiered) continue;
         const d = parseISODateLocal(show.premiered);
-        // BUG-A7-01 (FIXED): exclude shows premiered in the FUTURE. "Recent" means
+        // Exclude shows premiered in the FUTURE. "Recent" means
         // "aired in the last 6 months", not "will air eventually". A show with
         // premiered='2099-01-01' would otherwise pass `d >= sixMonthsAgo`.
         if (!d || d < sixMonthsAgo! || d.getTime() > Date.now()) continue;
@@ -132,7 +101,7 @@ async function fetchAllCandidates(
   all.sort((a, b) => {
     const wDiff = (b.weight || 0) - (a.weight || 0);
     if (wDiff !== 0) return wDiff;
-    // BUG-A7-05 (FIXED): coerce rating.average to a finite number. A non-numeric
+    // Coerce rating.average to a finite number. A non-numeric
     // value (string "abc") would otherwise yield NaN in the comparator, leaving
     // the sort order undefined. `Number(x) || 0` maps NaN/null/undefined to 0.
     const rA = Number(a.rating?.average) || 0;
@@ -149,7 +118,7 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
   const assignedIds = new Set<number>();
 
   // Helper: find the first matching carousel genre that STILL HAS SPACE.
-  // BUG-A7-06 (FIXED): the old code picked the first matching genre regardless
+  // The old code picked the first matching genre regardless
   // of whether that carousel was full, then redirected to _other. A show with
   // genres ['Drama','Comedy'] where Comedy was at cap would go to _other even
   // if Drama still had space. Now we try every matching genre in carousel
@@ -183,8 +152,8 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
     }
   }
 
-  // FASE 2: ridistribuzione deficit — BUG-07-01/02: rispetta i cap per-genre e _other.
-  // BUG-A7-06 (FIXED): uses findGenreWithSpace so multi-genre shows fill any
+  // FASE 2: ridistribuzione deficit — rispetta i cap per-genre e _other.
+  // Uses findGenreWithSpace so multi-genre shows fill any
   // carousel with room before falling back to _other.
   let total = 0;
   for (const g of GENRE_CAROUSELS) total += groups[g].length;
@@ -204,7 +173,7 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
         added++;
       } else if (groups._other.length < DISCOVER_TARGET_OTHER) {
         // No matching genre with space (either no carousel genre, or all at
-        // cap). Spillover to _other, respecting its cap (BUG-07-02).
+        // cap). Spillover to _other, respecting its cap.
         groups._other.push(show);
         assignedIds.add(show.id);
         added++;
@@ -218,9 +187,8 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
 async function fetchShowsByGenre(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void,
 ): Promise<{ groups: DiscoverGroups; failedPages: number[] }> {
-  const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly, onProgress);
+  const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly);
   return { groups: assignShowsToGroups(shows), failedPages };
 }
 
@@ -229,7 +197,7 @@ function readCache(key: string): DiscoverGroups | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw) as { cachedAt: number; groups: DiscoverGroups };
-    // BUG-07-04: cachedAt deve essere un numero finito e non nel futuro.
+    // cachedAt deve essere un numero finito e non nel futuro.
     if (
       !cached ||
       typeof cached.cachedAt !== 'number' ||
@@ -239,11 +207,11 @@ function readCache(key: string): DiscoverGroups | null {
     ) {
       return null;
     }
-    // BUG-07-05: groups deve essere un oggetto non-null con chiavi array.
+    // Groups deve essere un oggetto non-null con chiavi array.
     if (!cached.groups || typeof cached.groups !== 'object' || Array.isArray(cached.groups)) {
       return null;
     }
-    // BUG-A7-03 (FIXED): validate that each expected genre key (and _other),
+    // Validate that each expected genre key (and _other),
     // if present, is an array. A corrupted cache like `{ Drama: "not-an-array" }`
     // would otherwise be returned as-is, crashing the view's `for (const show
     // of shows)` loop (iterating characters of the string). Reject the cache
@@ -278,18 +246,33 @@ function writeCache(key: string, groups: DiscoverGroups, failedPages: number[]):
   }
 }
 
-export async function getPopularShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+export async function getPopularShows(): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_CACHE_KEY);
   if (cached) return cached;
-  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false, onProgress);
+  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false);
   writeCache(DISCOVER_CACHE_KEY, groups, failedPages);
   return groups;
 }
 
-export async function getRecentShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+/** Le ultime pagine di `/shows`, ricavate dall'ID più alto aggiornato di recente. */
+export async function getRecentPages(): Promise<number[]> {
+  try {
+    const ids = await getUpdatedShowIds('week');
+    if (ids.length > 0) {
+      const last = Math.floor(Math.max(...ids) / TVMAZE_SHOWS_PER_PAGE);
+      const first = Math.max(0, last - DISCOVER_RECENT_PAGE_COUNT + 1);
+      return Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    }
+  } catch (e) {
+    console.warn('[discover] /updates/shows non disponibile, uso pagine di riserva:', e);
+  }
+  return DISCOVER_RECENT_FALLBACK_PAGES;
+}
+
+export async function getRecentShows(): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_RECENT_CACHE_KEY);
   if (cached) return cached;
-  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_RECENT_PAGES, true, onProgress);
+  const { groups, failedPages } = await fetchShowsByGenre(await getRecentPages(), true);
   writeCache(DISCOVER_RECENT_CACHE_KEY, groups, failedPages);
   return groups;
 }
@@ -355,5 +338,3 @@ export function findShowInDiscoverGroups(showId: number, groupsArr: Array<Discov
   }
   return null;
 }
-
-export { ApiError };

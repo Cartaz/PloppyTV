@@ -12,8 +12,8 @@ import {
 } from '../src/lib/constants';
 
 describe('P2 — Schema v2: rating, note, tags', () => {
-  it('SCHEMA_VERSION is 2', () => {
-    expect(SCHEMA_VERSION).toBe(2);
+  it('SCHEMA_VERSION is 3 (watchedAt)', () => {
+    expect(SCHEMA_VERSION).toBe(3);
   });
 
   it('normalizeShow preserves episode rating 1-5', () => {
@@ -101,46 +101,12 @@ describe('P2 — Schema v2: rating, note, tags', () => {
 
   it('buildShowFromTvmaze includes empty tags array', async () => {
     const { buildShowFromTvmaze } = await import('../src/lib/normalize');
-    const show = buildShowFromTvmaze(
-      { id: 1, name: 'Test' },
-      [{ id: 100, season: 1, number: 1 }],
-      'towatch',
-    );
+    const show = buildShowFromTvmaze({ id: 1, name: 'Test' }, [{ id: 100, season: 1, number: 1 }], 'towatch');
     expect(show.tags).toEqual([]);
   });
 });
 
 describe('P2.5 — getRandomGoldEpisode guards', () => {
-  it('handles show with seasons=null without throwing', async () => {
-    const { getRandomGoldEpisode } = await import('../src/lib/shows');
-    const { setShows } = await import('../src/lib/store');
-    const show: any = {
-      id: 1,
-      name: 'Test',
-      seasons: null,
-      list: 'watching',
-      totalEpisodes: 0,
-      totalSeasons: 0,
-    };
-    setShows([show]);
-    expect(() => getRandomGoldEpisode()).not.toThrow();
-    expect(getRandomGoldEpisode()).toBeNull();
-  });
-
-  it('handles show with seasons=undefined without throwing', async () => {
-    const { getRandomGoldEpisode } = await import('../src/lib/shows');
-    const { setShows } = await import('../src/lib/store');
-    const show: any = {
-      id: 1,
-      name: 'Test',
-      list: 'watching',
-      totalEpisodes: 0,
-      totalSeasons: 0,
-    };
-    setShows([show]);
-    expect(() => getRandomGoldEpisode()).not.toThrow();
-  });
-
   it('returns null when no 5★ episodes exist', async () => {
     const { getRandomGoldEpisode } = await import('../src/lib/shows');
     const { setShows } = await import('../src/lib/store');

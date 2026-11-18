@@ -38,15 +38,15 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 - **Rating 5★ per episodio** con media stagione
 - **Note private per episodio** con editor modale
 - **Tag personalizzabili per serie** con filtro nelle liste
-- **Scopri**: serie popolari e recenti raggruppate per genere, caricate on demand con cache locale
+- **Scopri**: serie popolari e ultimi arrivi (ricavati dalle pagine più recenti di TVMaze) raggruppati per genere, caricati on demand con cache locale
 - **Libreria** con ricerca avanzata e filtri
 - **Rivedi un episodio casuale** tra gli episodi valutati 5★
-- **Calendario settimanale** con airdate reali
+- **Calendario settimanale** con tutte le uscite non viste delle serie in corso (anche se sei indietro con gli episodi precedenti)
 - **Statistiche personali** di visione
-- **Year-in-Review** con export PNG
+- **Year-in-Review** con export PNG (gli episodi contano nell'anno in cui li hai segnati come visti)
 - **Keyboard shortcuts** per ricerca, navigazione ed episodi
-- **i18n IT + EN** con persistenza della lingua
-- **Notifiche locali best-effort** per i nuovi episodi, senza backend o Push server
+- **i18n IT + EN** completa (interfaccia, messaggi ed errori) con persistenza della lingua
+- **Notifiche locali best-effort** alle 9:00 del giorno di uscita del prossimo episodio, senza backend o Push server
 - **Ricerca integrata** su TVMaze
 - **Backup/Import** dei dati in formato JSON
 - **Funzionamento offline** tramite Service Worker
@@ -60,8 +60,8 @@ PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie c
 - **vite-plugin-pwa + Workbox** — precache e runtime caching
 - **Web Worker** — statistiche e calendario off-main-thread con fallback main-thread
 - **Code-splitting per vista** — le viste più pesanti vengono caricate solo quando servono
-- **Vitest + jsdom + V8 coverage** — test dei contratti e coverage sull'intero runtime TypeScript
-- **ESLint + Prettier + Husky** — lint e formattazione automatizzati
+- **Vitest + jsdom + V8 coverage** — test per modulo, test di flusso con moduli reali e coverage sull'intero runtime TypeScript
+- **ESLint 9 (flat config) + Prettier + Husky** — lint e formattazione automatizzati
 
 ## Roadmap
 
@@ -114,7 +114,7 @@ ploppytv/
 │   ├── styles/       # stile globale
 │   ├── main.ts       # bootstrap dell'app
 │   └── sw.ts         # Service Worker
-├── tests/            # test di contratto, regressione e integrazione jsdom
+├── tests/            # test per modulo (<modulo>.<aspetto>.test.ts), flusso e sicurezza
 ├── docs/             # roadmap e release notes
 ├── public/           # icone e asset statici PWA
 ├── .github/workflows # CI e deploy GitHub Pages
@@ -171,10 +171,12 @@ Il coverage viene misurato sull'intero runtime TypeScript. Le soglie di regressi
 La CI in `.github/workflows/ci.yml` esegue su PR e push:
 
 1. type-check + build;
-2. ESLint + Prettier + dependency audit;
-3. Vitest + coverage gate.
+2. ESLint + Prettier + dependency audit (bloccante sulle dipendenze di produzione, informativo su quelle di sviluppo);
+3. Vitest + coverage gate su Node 22 e Node 26.
 
-I test storici di bug hunting vengono mantenuti solo quando proteggono un contratto non già posseduto da una suite più focalizzata.
+Node: la versione di riferimento è in [`.nvmrc`](./.nvmrc) (26), il minimo supportato in `package.json#engines` (22.22.1).
+
+I test sono organizzati per modulo; `flow.integration.test.ts` copre il percorso utente completo e `security.xss.test.ts` il rendering di testo ostile in tutte le viste.
 
 ## Ottimizzazioni implementate
 
@@ -202,13 +204,15 @@ Gli stress test e i successivi audit hanno consolidato soprattutto questi contra
 | **Modali** | stack, focus trap, ESC e semantica accessibile |
 | **Web Worker** | correlazione delle risposte, timeout, error handling e fallback deterministico |
 | **PWA update** | gestione esplicita degli aggiornamenti del Service Worker |
-| **Routing** | hash/deep link compatibili con navigazione browser |
+| **Routing** | ogni vista e ogni serie aperta è una voce di cronologia (`#calendar`, `#show/<id>`): Indietro/Avanti e deep link funzionano |
 | **Ricerca TVMaze** | protezione dalle risposte stale di ricerche precedenti |
 | **Rendering** | escaping/sanitizzazione ai boundary appropriati |
 
 ## Migrare dati da versioni precedenti
 
 La chiave di storage storica viene mantenuta per compatibilità. I documenti legacy supportati vengono normalizzati al modello corrente attraverso il boundary di canonicalizzazione; versioni future non riconosciute vengono rifiutate invece di essere interpretate in modo permissivo.
+
+Lo **schema 3** aggiunge a ogni episodio la data in cui è stato segnato come visto (`watchedAt`, usata dal Year-in-Review). I dati e i backup degli schemi 1 e 2 si caricano senza conversione: gli episodi già visti non hanno la data e nel Year-in-Review contano nell'anno di uscita. Una build precedente che trova dati di schema 3 li apre in sola lettura, senza sovrascriverli.
 
 Prima di una migrazione o di un aggiornamento importante è comunque consigliato usare **Esporta** per creare un backup JSON.
 

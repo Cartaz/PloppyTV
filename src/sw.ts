@@ -15,7 +15,7 @@ cleanupOutdatedCaches();
 clientsClaim();
 
 // Skip waiting su message dal client.
-// BUG-A18-11 (FIXED): workbox-window.messageSkipWaiting() invia un oggetto
+// Workbox-window.messageSkipWaiting() invia un oggetto
 // `{ type: 'SKIP_WAITING' }`, NON la stringa 'SKIP_WAITING'. Il precedente
 // handler `event.data === 'SKIP_WAITING'` (strict string equality) non
 // matchava mai → self.skipWaiting() non veniva mai chiamato → il nuovo SW
@@ -30,11 +30,6 @@ self.addEventListener('message', (event) => {
  * Determina se un messaggio postMessage ricevuto dal SW è una richiesta
  * di skipWaiting. Accetta sia il formato stringa legacy ('SKIP_WAITING')
  * sia il formato oggetto workbox-window ({ type: 'SKIP_WAITING' }).
- *
- * BUG-A18-11 (FIXED): estratta come funzione locale (non esportata: il SW
- * è buildato con rollupFormat "es" ma registrato come classic script, e
- * un export statement romperebbe il parsing in classic mode). Testata
- * indirettamente via message dispatch nei test di probe_a18.
  */
 function shouldSkipWaiting(data: unknown): boolean {
   if (data === 'SKIP_WAITING') return true;
@@ -95,7 +90,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // Catch handler per navigazioni offline.
-// CRITICAL FIX (H1/T3): usa matchPrecache invece di caches.open('workbox-precache-v2').
+// Usa matchPrecache invece di caches.open('workbox-precache-v2').
 // Motivo: il cache name reale include un suffix di scope
 // (es. `workbox-precache-v2-https://example.com/PloppyTV/`), quindi
 // caches.open senza suffix apre una cache vuota. Inoltre Workbox precacha
