@@ -3,7 +3,8 @@ export const API_BASE = 'https://api.tvmaze.com';
 
 export const STORAGE_KEY = 'ploppytv_data_v1';
 export const BACKUP_KEY = 'ploppytv_data_backup';
-export const SCHEMA_VERSION = 2;
+// v3: Episode.watchedAt (opzionale). I documenti v1/v2 restano leggibili così come sono.
+export const SCHEMA_VERSION = 3;
 /** Avviso spazio: il documento salvato (×2 con il backup) si avvicina a ~5 MB. */
 export const QUOTA_WARN_KB = 2250;
 

@@ -4,7 +4,33 @@ Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il forma
 
 ## [Unreleased]
 
-Nessuna modifica.
+Pulizia guidata dall'analisi in `ANALISI.md`. **Schema dati 3** (vedi *Dati*): fai un backup con Esporta prima di aggiornare.
+
+### Corretto
+
+- Note e tag non vengono più alterati al ricaricamento (prima `"2 < 3 > 1"` diventava `"2  1"`): sono testo dell'utente, l'escaping avviene solo nel rendering.
+- Import "Unisci": unione per episodio; non perde più voti, note e tag locali e importa quelli del backup.
+- Calendario: mostra tutte le uscite non viste della settimana anche se sei indietro con gli episodi precedenti; "In arrivo" mostra la prossima uscita di ogni serie.
+- Notifiche: riguardano la prossima uscita (non il prossimo episodio non visto) e partono alle 9:00 del giorno di uscita invece che alle 23:00 del giorno prima.
+- Scopri "Ultimi arrivi": le pagine TVMaze si ricavano da `/updates/shows` invece che da numeri fissi ormai superati.
+- Ricerca: il clic sulla riga di un risultato non aggiunge più la serie; "Completata" segna come visti tutti gli episodi.
+- Nessun salvataggio alla chiusura del tab (ogni modifica è già salvata): non invalida più la revisione degli altri tab aperti.
+- Routing: ogni vista è una voce di cronologia; Indietro/Avanti e deep link `#show/<id>` funzionano.
+- Avviso di spazio: tiene conto della copia di backup scritta a ogni salvataggio.
+- Interfaccia inglese completa: prima ~130 delle 188 chiavi tradotte non erano usate.
+
+### Dati
+
+- Schema 3: `Episode.watchedAt` registra quando un episodio è stato segnato come visto; il Year-in-Review conta gli episodi nell'anno di visione (per i dati precedenti usa l'anno di uscita e lo segnala). Gli schemi 1 e 2 restano leggibili.
+
+### Interno
+
+- Toolchain: `engines.node >=22.22.1`, `.nvmrc` 26, CI su Node 22 e 26; ESLint 9 flat config, typescript-eslint 8, vite-plugin-pwa 2, lint-staged 17; dipendenze `workbox-*` dichiarate. I test non falliscono più su Node ≥ 25.
+- Audit in CI bloccante sulle dipendenze di produzione (nessuna), informativo su quelle di sviluppo (`picomatch` non ha ancora una versione corretta).
+- Rimossi codice morto (snapshot dello store, debounce di salvataggio, flag `_localDirty`, `normalizeApiBase`, re-export, guardie `_boundX`), i ~450 marcatori `BUG-xx` nei commenti e i controlli difensivi su stati impossibili: i dati vengono validati ai confini (caricamento, import, API).
+- Test riorganizzati per modulo (da ~31.000 a ~22.000 righe), con nuovi test di flusso, sicurezza XSS, interazioni e copertura i18n; soglie di coverage invariate.
+
+Nota sulle release precedenti: la voce 1.2.1 indica 1.994 test e `stripHtml` applicato a note e tag in `shows.ts`; in realtà la suite contava 1.596 test e `shows.ts` non applicava `stripHtml` (era l'incoerenza che alterava le note).
 
 ## [1.2.1] — Stress-test bug-fix release (luglio 2026)
 

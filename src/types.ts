@@ -15,6 +15,11 @@ export interface Episode {
   rating?: number;
   /** Nota privata (max 500 char). P2.2 */
   note?: string;
+  /**
+   * Quando l'utente l'ha segnato come visto (epoch ms). Assente per episodi
+   * visti prima dello schema v3: per quelli si usa l'airdate come stima.
+   */
+  watchedAt?: number;
 }
 
 export interface Show {

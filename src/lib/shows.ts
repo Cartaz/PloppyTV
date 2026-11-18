@@ -19,6 +19,14 @@ function findShow(showId: number): Show | undefined {
   return getState().shows.find((s) => s.id === showId);
 }
 
+/** Cambia lo stato visto registrando quando: la data serve al Year-in-Review. */
+function setWatched(ep: Episode, watched: boolean): void {
+  if (ep.watched === watched) return;
+  ep.watched = watched;
+  if (watched) ep.watchedAt = Date.now();
+  else delete ep.watchedAt;
+}
+
 function findEpisode(show: Show, seasonNum: number, epNum: number): Episode | undefined {
   return show.seasons[seasonNum]?.find((e) => e.num === epNum);
 }
@@ -154,10 +162,12 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
   const prevWatched = ep.watched;
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
-  ep.watched = !ep.watched;
+  const prevWatchedAt = ep.watchedAt;
+  setWatched(ep, !ep.watched);
   updateShowListStatus(show);
   if (!saveData()) {
     ep.watched = prevWatched;
+    ep.watchedAt = prevWatchedAt;
     show.list = prevList;
     show.manualList = prevManual;
     showToast(t('toast.notSaved'), 'error');
@@ -175,7 +185,7 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
   seasonArr.forEach((ep) => {
-    ep.watched = watched;
+    setWatched(ep, watched);
   });
   updateShowListStatus(show);
   if (!saveData()) {
@@ -245,6 +255,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
           if (positional && (!ep.id || !safeId(positional.id))) existing = positional;
         }
         ep.watched = existing?.watched === true;
+        if (ep.watched && existing?.watchedAt) ep.watchedAt = existing.watchedAt;
         if (existing && typeof existing.rating === 'number' && Number.isFinite(existing.rating)) {
           const rating = Math.round(existing.rating);
           if (rating >= 1 && rating <= MAX_EPISODE_RATING) ep.rating = rating;

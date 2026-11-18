@@ -27,6 +27,9 @@ function mergeEpisode(local: Episode, imported: Episode): Episode {
   const merged: Episode = { ...local, watched: local.watched || imported.watched };
   if (merged.rating === undefined && imported.rating !== undefined) merged.rating = imported.rating;
   if (merged.note === undefined && imported.note !== undefined) merged.note = imported.note;
+  if (merged.watched && merged.watchedAt === undefined && imported.watchedAt !== undefined) {
+    merged.watchedAt = imported.watchedAt;
+  }
   return merged;
 }
 

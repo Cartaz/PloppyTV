@@ -12,8 +12,8 @@ import {
 } from '../src/lib/constants';
 
 describe('P2 — Schema v2: rating, note, tags', () => {
-  it('SCHEMA_VERSION is 2', () => {
-    expect(SCHEMA_VERSION).toBe(2);
+  it('SCHEMA_VERSION is 3 (watchedAt)', () => {
+    expect(SCHEMA_VERSION).toBe(3);
   });
 
   it('normalizeShow preserves episode rating 1-5', () => {

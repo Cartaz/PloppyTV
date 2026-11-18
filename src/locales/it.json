@@ -313,6 +313,8 @@
   "yearReview.cardTitle": "Il tuo {year} in TV",
   "yearReview.dominantGenre": "Genere dominante",
   "yearReview.erroreExportImmagine": "Errore export immagine",
+  "yearReview.estimatedHint.one": "{count} episodio è stato segnato come visto prima che PloppyTV registrasse la data di visione: viene contato nel suo anno di uscita.",
+  "yearReview.estimatedHint.other": "{count} episodi sono stati segnati come visti prima che PloppyTV registrasse la data di visione: vengono contati nel loro anno di uscita.",
   "yearReview.exported": "Immagine esportata",
   "yearReview.generatoPloppytv": "Generato con PloppyTV",
   "yearReview.hours": "{h} ore",

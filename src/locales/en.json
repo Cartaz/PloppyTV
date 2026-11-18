@@ -313,6 +313,8 @@
   "yearReview.cardTitle": "Your {year} in TV",
   "yearReview.dominantGenre": "Dominant genre",
   "yearReview.erroreExportImmagine": "Image export error",
+  "yearReview.estimatedHint.one": "{count} episode was marked as watched before PloppyTV recorded watch dates: it is counted in its release year.",
+  "yearReview.estimatedHint.other": "{count} episodes were marked as watched before PloppyTV recorded watch dates: they are counted in their release year.",
   "yearReview.exported": "Image exported",
   "yearReview.generatoPloppytv": "Made with PloppyTV",
   "yearReview.hours": "{h} hours",

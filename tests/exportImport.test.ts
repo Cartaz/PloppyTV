@@ -50,7 +50,7 @@ vi.mock('../src/components/toast', () => ({
 }));
 
 import { initExportImport } from '../src/components/exportImport';
-import { MAX_IMPORT_SIZE } from '../src/lib/constants';
+import { MAX_IMPORT_SIZE, SCHEMA_VERSION } from '../src/lib/constants';
 
 // ===== DOM setup (mirrors index.html relevant elements) =====
 const APP_HTML = `
@@ -977,7 +977,7 @@ describe('export flow', () => {
     });
     clickSpy.mockRestore();
     const parsed = JSON.parse(text);
-    expect(parsed.version).toBe(2);
+    expect(parsed.version).toBe(SCHEMA_VERSION);
     expect(Array.isArray(parsed.shows)).toBe(true);
     expect(parsed.shows).toHaveLength(1);
     expect(parsed.shows[0].name).toBe('X');

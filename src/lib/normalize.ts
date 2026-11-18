@@ -104,6 +104,16 @@ export function normalizeShow(raw: unknown): Show | null {
           // Le note sono testo dell'utente, non HTML: vanno conservate così
           // come scritte (l'escaping appartiene al renderer). Stessa regola di
           // setEpisodeNote: troncata e trimmata, vuota = assente.
+          // watchedAt solo per episodi visti, come timestamp plausibile (non nel futuro).
+          if (
+            obj.watched &&
+            typeof ep.watchedAt === 'number' &&
+            Number.isInteger(ep.watchedAt) &&
+            ep.watchedAt > 0 &&
+            ep.watchedAt <= Date.now() + 24 * 60 * 60 * 1000
+          ) {
+            obj.watchedAt = ep.watchedAt;
+          }
           if (typeof ep.note === 'string') {
             const note = ep.note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim();
             if (note.length > 0) obj.note = note;

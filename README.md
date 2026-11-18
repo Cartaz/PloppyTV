@@ -212,6 +212,8 @@ Gli stress test e i successivi audit hanno consolidato soprattutto questi contra
 
 La chiave di storage storica viene mantenuta per compatibilità. I documenti legacy supportati vengono normalizzati al modello corrente attraverso il boundary di canonicalizzazione; versioni future non riconosciute vengono rifiutate invece di essere interpretate in modo permissivo.
 
+Lo **schema 3** aggiunge a ogni episodio la data in cui è stato segnato come visto (`watchedAt`, usata dal Year-in-Review). I dati e i backup degli schemi 1 e 2 si caricano senza conversione: gli episodi già visti non hanno la data e nel Year-in-Review contano nell'anno di uscita. Una build precedente che trova dati di schema 3 li apre in sola lettura, senza sovrascriverli.
+
 Prima di una migrazione o di un aggiornamento importante è comunque consigliato usare **Esporta** per creare un backup JSON.
 
 ## Privacy

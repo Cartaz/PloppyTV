@@ -8,18 +8,24 @@
 //   - Episodi totali visti
 //   - Card condivisibile come immagine (canvas export → download PNG)
 //
-// Nota: PloppyTV non traccia WHEN un episodio è stato guardato (solo se lo è).
-// Per stimare le visioni dell'anno, usiamo l'airdate dell'episodio:
-//   se airdate cade nell'anno selezionato E l'episodio è watched → conta.
-// Questa è un'approssimazione ragionevole (la maggior parte degli utenti
-// guarda gli episodi vicino all'airdate).
+// Un episodio visto conta nell'anno di `watchedAt` (quando è stato segnato
+// come visto). Gli episodi segnati prima dello schema v3 non hanno la data:
+// per quelli si usa l'anno di uscita come stima, e la vista lo segnala.
 
 import { getState } from '../lib/store';
 import { escapeHtml } from '../lib/utils';
 import { imgTag } from '../components/img';
-import { t, formatDuration } from '../lib/i18n';
+import { t, tn, formatDuration } from '../lib/i18n';
 import { showToast } from '../components/toast';
-import type { Show } from '../types';
+import type { Episode, Show } from '../types';
+
+/** Anno in cui l'episodio visto va contato, e se è una stima basata sull'airdate. */
+function watchYear(ep: Episode): { year: number; estimated: boolean } | null {
+  if (!ep.watched) return null;
+  if (ep.watchedAt) return { year: new Date(ep.watchedAt).getFullYear(), estimated: false };
+  const year = ep.airdate ? Number(ep.airdate.slice(0, 4)) : NaN;
+  return Number.isInteger(year) ? { year, estimated: true } : null;
+}
 
 export interface YearStats {
   year: number;
@@ -28,6 +34,8 @@ export interface YearStats {
   topShows: Array<{ showId: number; showName: string; image: string | null; watched: number }>;
   dominantGenre: string;
   longestSeason: { showName: string; season: number; episodes: number } | null;
+  /** Episodi contati con l'airdate perché segnati prima che si registrasse la data di visione. */
+  estimatedEpisodes: number;
 }
 
 /**
@@ -35,93 +43,34 @@ export interface YearStats {
  * Un episodio conta se: watched === true AND airdate (stringa) inizia con l'anno.
  */
 export function computeYearStats(shows: Show[], year: number): YearStats {
-  // Valida year. Se non è un intero plausibile, ritorna stats vuote.
-  const validYear = Number.isInteger(year) && year > 1900 && year < 3000 ? year : 0;
-  const empty: YearStats = {
-    year,
-    totalEpisodes: 0,
-    totalMinutes: 0,
-    topShows: [],
-    dominantGenre: 'N/D',
-    longestSeason: null,
-  };
-  if (!validYear || !Array.isArray(shows)) return empty;
-
-  const yearStr = String(validYear);
   const genreCount: Record<string, number> = {};
   const showWatched: Record<number, { showId: number; showName: string; image: string | null; watched: number }> = {};
   let totalEpisodes = 0;
   let totalMinutes = 0;
+  let estimatedEpisodes = 0;
   let longestSeason: { showName: string; season: number; episodes: number } | null = null;
 
   for (const show of shows) {
-    if (!show || typeof show !== 'object') continue;
-    // Guard contro seasons malformati (null/undefined/array/primitive).
-    const seasons = show.seasons;
-    if (!seasons || typeof seasons !== 'object' || Array.isArray(seasons)) continue;
-
     let showWatchedCount = 0;
-    for (const seasonKey of Object.keys(seasons)) {
-      const seasonNum = Number(seasonKey);
-      if (!Number.isInteger(seasonNum) || seasonNum <= 0) continue;
-      const eps = seasons[seasonNum];
-      if (!Array.isArray(eps)) continue;
-
-      // Conta episodi visti con airdate nell'anno
+    for (const [seasonKey, eps] of Object.entries(show.seasons)) {
       let seasonWatchedInYear = 0;
       for (const ep of eps) {
-        if (!ep) continue;
-        // Strict === true (consistente con getWatchedCount in utils.ts).
-        if (ep.watched !== true) continue;
-        // Airdate deve essere una stringa (potrebbe essere numero/
-        // oggetto in dati corrotti da import/storage malevolo).
-        if (typeof ep.airdate !== 'string' || !ep.airdate.startsWith(yearStr)) continue;
-
+        const when = watchYear(ep);
+        if (!when || when.year !== year) continue;
+        if (when.estimated) estimatedEpisodes++;
         totalEpisodes++;
         showWatchedCount++;
         seasonWatchedInYear++;
-        // Runtime deve essere un numero finito positivo. Se ep.runtime
-        // è una stringa truthy (es. "30"), `totalMinutes += "30"` concatenava
-        // stringhe, corrompendo totalMinutes e le stat derivate.
-        const epRuntime =
-          typeof ep.runtime === 'number' && Number.isFinite(ep.runtime) && ep.runtime > 0
-            ? ep.runtime
-            : typeof show.runtime === 'number' && Number.isFinite(show.runtime) && show.runtime > 0
-              ? show.runtime
-              : 45;
-        totalMinutes += epRuntime;
+        totalMinutes += ep.runtime || show.runtime || 45;
       }
-
-      // Stagione più longeva (per episodi visti nell'anno)
-      if (seasonWatchedInYear > 0) {
-        if (!longestSeason || seasonWatchedInYear > longestSeason.episodes) {
-          longestSeason = {
-            showName: typeof show.name === 'string' ? show.name : 'N/D',
-            season: seasonNum,
-            episodes: seasonWatchedInYear,
-          };
-        }
+      if (seasonWatchedInYear > 0 && (!longestSeason || seasonWatchedInYear > longestSeason.episodes)) {
+        longestSeason = { showName: show.name, season: Number(seasonKey), episodes: seasonWatchedInYear };
       }
     }
 
     if (showWatchedCount > 0) {
-      const sid = typeof show.id === 'number' && Number.isFinite(show.id) ? show.id : 0;
-      showWatched[sid] = {
-        showId: sid,
-        showName: typeof show.name === 'string' ? show.name : 'N/D',
-        image: typeof show.image === 'string' ? show.image : null,
-        watched: showWatchedCount,
-      };
-    }
-
-    // Generi (basati sulle serie viste nell'anno)
-    if (showWatchedCount > 0 && Array.isArray(show.genres)) {
-      for (const g of show.genres) {
-        // Salta generi non-stringa o vuoti/solo-whitespace
-        // (una stringa vuota come dominantGenre veniva mostrata vuota nell'HTML).
-        if (typeof g !== 'string' || g.trim().length === 0) continue;
-        genreCount[g] = (genreCount[g] || 0) + showWatchedCount;
-      }
+      showWatched[show.id] = { showId: show.id, showName: show.name, image: show.image, watched: showWatchedCount };
+      for (const g of show.genres) genreCount[g] = (genreCount[g] || 0) + showWatchedCount;
     }
   }
 
@@ -147,6 +96,7 @@ export function computeYearStats(shows: Show[], year: number): YearStats {
     topShows,
     dominantGenre,
     longestSeason,
+    estimatedEpisodes,
   };
 }
 
@@ -335,26 +285,13 @@ let _selectedYear: number = new Date().getFullYear();
 export function renderYearReview(main: HTMLElement): void {
   const state = getState();
 
-  // Raccogli anni disponibili (dagli airdate degli episodi watched)
+  // Anni disponibili: quelli in cui risulta almeno un episodio visto.
   const yearSet = new Set<number>();
-  // Guard state.shows (defense-in-depth — A2 fix garantisce array,
-  // ma il consumer deve essere defensive contro dati corrotti).
-  const shows = Array.isArray(state.shows) ? state.shows : [];
-  for (const show of shows) {
-    if (!show || typeof show !== 'object') continue;
-    // Guard show.seasons (null/undefined/array → Object.values throw).
-    const seasons = show.seasons;
-    if (!seasons || typeof seasons !== 'object' || Array.isArray(seasons)) continue;
-    for (const eps of Object.values(seasons)) {
-      if (!Array.isArray(eps)) continue;
+  for (const show of state.shows) {
+    for (const eps of Object.values(show.seasons)) {
       for (const ep of eps) {
-        if (!ep) continue;
-        // Strict === true (consistente con computeYearStats/getWatchedCount).
-        if (ep.watched !== true) continue;
-        // Airdate deve essere una stringa (.slice throw se numero).
-        if (typeof ep.airdate !== 'string') continue;
-        const y = parseInt(ep.airdate.slice(0, 4), 10);
-        if (Number.isFinite(y) && y > 1900 && y < 3000) yearSet.add(y);
+        const when = watchYear(ep);
+        if (when) yearSet.add(when.year);
       }
     }
   }
@@ -397,6 +334,13 @@ export function renderYearReview(main: HTMLElement): void {
     main.innerHTML = html;
     bindYearReviewEvents(main);
     return;
+  }
+
+  if (stats.estimatedEpisodes > 0) {
+    html +=
+      '<p class="page-subtitle year-estimated-hint">' +
+      escapeHtml(tn('yearReview.estimatedHint', stats.estimatedEpisodes)) +
+      '</p>';
   }
 
   // Big stats grid
