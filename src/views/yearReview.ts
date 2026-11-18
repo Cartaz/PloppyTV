@@ -108,7 +108,7 @@ export function exportYearCard(stats: YearStats): void {
   try {
     canvas = document.createElement('canvas');
   } catch {
-    showToast(t('yearReview.canvasSupportato'), 'error');
+    showToast(t('yearReview.canvasUnsupported'), 'error');
     return;
   }
   const W = 1080;
@@ -117,7 +117,7 @@ export function exportYearCard(stats: YearStats): void {
   canvas.height = H;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    showToast(t('yearReview.canvasSupportato'), 'error');
+    showToast(t('yearReview.canvasUnsupported'), 'error');
     return;
   }
 
@@ -168,13 +168,13 @@ export function exportYearCard(stats: YearStats): void {
 
   ctx.fillStyle = '#b8b8c8';
   ctx.font = '28px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  ctx.fillText(t('yearReview.visioneTotale'), W / 2, 500);
+  ctx.fillText(t('yearReview.totalWatchTime'), W / 2, 500);
 
   // Top 5 shows
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(t('yearReview.top5Serie'), 80, 580);
+  ctx.fillText(t('yearReview.top5'), 80, 580);
 
   ctx.font = '28px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   stats.topShows.forEach((s, i) => {
@@ -220,7 +220,7 @@ export function exportYearCard(stats: YearStats): void {
   ctx.fillStyle = '#6e6e80';
   ctx.font = '24px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(t('yearReview.generatoPloppytv'), W / 2, 1280);
+  ctx.fillText(t('yearReview.madeWith'), W / 2, 1280);
 
   // Sanitize year per il filename. Se year è NaN/0/negativo (non
   // dovrebbe mai succedere dopo le fix di computeYearStats, ma defense-in-depth),
@@ -236,12 +236,12 @@ export function exportYearCard(stats: YearStats): void {
   try {
     // Check toBlob availability (browser very old / env non-DOM).
     if (typeof canvas.toBlob !== 'function') {
-      showToast(t('yearReview.canvasSupportato'), 'error');
+      showToast(t('yearReview.canvasUnsupported'), 'error');
       return;
     }
     canvas.toBlob((blob) => {
       if (!blob) {
-        showToast(t('yearReview.erroreExportImmagine'), 'error');
+        showToast(t('yearReview.exportError'), 'error');
         return;
       }
       let url: string | null = null;
@@ -257,7 +257,7 @@ export function exportYearCard(stats: YearStats): void {
         downloadOk = true;
       } catch (e) {
         console.error('[yearReview] export download failed:', e);
-        showToast(t('yearReview.erroreExportImmagine'), 'error');
+        showToast(t('yearReview.exportError'), 'error');
       } finally {
         // Revoke sempre, anche se click throwa (leak prevention).
         if (url) {
@@ -275,7 +275,7 @@ export function exportYearCard(stats: YearStats): void {
   } catch (e) {
     // SecurityError (tainted canvas) o altri errori sincroni da toBlob.
     console.error('[yearReview] toBlob threw:', e);
-    showToast(t('yearReview.erroreExportImmagine'), 'error');
+    showToast(t('yearReview.exportError'), 'error');
   }
 }
 

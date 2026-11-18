@@ -25,10 +25,10 @@ function renderCalendarSkeleton(main: HTMLElement): void {
     t('calendar.title') +
     '</h1>' +
     '<p class="page-subtitle">' +
-    t('calendar.prossimiEpisodiDelleTue') +
+    t('calendar.subtitle') +
     '</p>' +
     '<div class="loading"><div class="spinner"></div>' +
-    t('calendar.calcolandoEpisodi') +
+    t('calendar.loading') +
     '</div>';
 }
 
@@ -48,9 +48,9 @@ function renderCalendarContent(
       t('calendar.title') +
       '</h1>' +
       '<div class="empty-state"><div class="empty-state-title">' +
-      t('calendar.erroreDate') +
+      t('calendar.dateErrorTitle') +
       '</div><div class="empty-state-text">' +
-      t('calendar.dateSettimanaSonoValide') +
+      t('calendar.dateErrorText') +
       '</div></div>';
     return;
   }
@@ -64,13 +64,13 @@ function renderCalendarContent(
   today.setHours(0, 0, 0, 0);
 
   const weekDays = [
-    t('calendar.lunedi'),
-    t('calendar.martedi'),
-    t('calendar.mercoledi'),
-    t('calendar.giovedi'),
-    t('calendar.venerdi'),
-    t('calendar.sabato'),
-    t('calendar.domenica'),
+    t('calendar.monday'),
+    t('calendar.tuesday'),
+    t('calendar.wednesday'),
+    t('calendar.thursday'),
+    t('calendar.friday'),
+    t('calendar.saturday'),
+    t('calendar.sunday'),
   ];
 
   // Raggruppa per giorno della settimana corrente (gli episodi con data malformata vengono saltati).
@@ -83,7 +83,7 @@ function renderCalendarContent(
   }
 
   let html = '<h1 class="page-title">' + t('calendar.title') + '</h1>';
-  html += '<p class="page-subtitle">' + t('calendar.prossimiEpisodiDelleTue') + '</p>';
+  html += '<p class="page-subtitle">' + t('calendar.subtitle') + '</p>';
 
   const weekLabel =
     start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) +
@@ -101,7 +101,7 @@ function renderCalendarContent(
     t('calendar.nextWeek') +
     '">›</button></div>' +
     (state.calendarWeekOffset !== 0
-      ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">' + t('calendar.oggi') + '</button>'
+      ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">' + t('calendar.today') + '</button>'
       : '') +
     '</div>';
 
@@ -144,7 +144,7 @@ function renderCalendarContent(
                 '</div></div>',
             )
             .join('')
-        : '<div style="color:var(--text-muted);font-size:12px;">' + t('calendar.nessunEpisodio') + '</div>') +
+        : '<div style="color:var(--text-muted);font-size:12px;">' + t('calendar.noEpisodesDay') + '</div>') +
       '</div>';
   }
   html += '</div>';
@@ -156,7 +156,7 @@ function renderCalendarContent(
     const remaining = afterWeek.length - shown.length;
     html +=
       '<div class="section" style="margin-top:32px;"><h2 class="section-title">' +
-      t('calendar.arrivo') +
+      t('calendar.comingUp') +
       '</h2><div class="episode-list">';
     for (const ep of shown) {
       const epTitle = ep.name
@@ -188,14 +188,14 @@ function renderCalendarContent(
 
   html +=
     '<div class="section" style="margin-top:32px;"><h2 class="section-title">' +
-    t('calendar.vedereQuestaSettimana') +
+    t('calendar.toWatchThisWeek') +
     '</h2>';
   if (week.length === 0) {
     html +=
       '<div class="empty-state"><div class="empty-state-title">' +
-      t('calendar.tuttoVisto') +
+      t('calendar.allCaughtUp') +
       '</div><div class="empty-state-text">' +
-      t('calendar.nessunEpisodioProgrammazioneQuesta') +
+      t('calendar.noEpisodesWeek') +
       '</div></div>';
   } else {
     html += '<div class="episode-list">';
@@ -273,7 +273,7 @@ export async function renderCalendar(main: HTMLElement): Promise<void> {
       '<div class="empty-state"><div class="empty-state-title">' +
       t('calendar.error.title') +
       '</div><div class="empty-state-text">' +
-      t('calendar.riprovaAdAprireCalendario') +
+      t('calendar.retryText') +
       '</div></div>';
   }
 }

@@ -97,50 +97,50 @@ export function initHeader(): void {
     showModal(
       t('modal.about.title'),
       '<p>' +
-        t('header.ploppytvTrackerTvLocal') +
+        t('about.intro') +
         '</p>' +
         '<p><strong>' +
-        t('header.caratteristiche') +
+        t('about.featuresTitle') +
         '</strong></p>' +
         '<ul style="margin-left:20px;margin-bottom:10px;">' +
         '<li>' +
-        t('header.trackingSerieTvEd') +
+        t('about.featureTracking') +
         '</li><li>' +
-        t('header.listeCorsoVedereCompletate') +
+        t('about.featureLists') +
         '</li>' +
         '<li>' +
-        t('header.calendarioSettimanaleStatistiche') +
+        t('about.featureCalendar') +
         '</li><li>' +
-        t('header.scopriPreloadBackground') +
+        t('about.featureDiscover') +
         '</li>' +
         '<li>' +
-        t('header.backupEsportaImporta') +
+        t('about.featureBackup') +
         '</li><li>' +
-        t('header.pwaOfflineAssetGia') +
+        t('about.featureOffline') +
         '</li>' +
         '</ul>' +
         '<p><strong>' +
-        t('header.dati') +
+        t('about.dataTitle') +
         '</strong> ' +
-        t('header.dataText') +
+        t('about.dataText') +
         '</p>' +
         '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">' +
-        t('header.notificheSonoLocaliBest') +
+        t('about.notificationsNote') +
         '</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
         '<p style="font-size:12px;color:var(--text-secondary);">' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">' +
-        t('header.privacyPolicy') +
+        t('about.privacy') +
         '</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">' +
-        t('header.contribuire') +
+        t('about.contributing') +
         '</a> · ' +
         '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">' +
-        t('header.licenzaMit') +
+        t('about.license') +
         '</a>' +
         '</p>' +
         '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">' +
-        t('header.version', { version: __APP_VERSION__ }) +
+        t('about.version', { version: __APP_VERSION__ }) +
         '</p>',
       [{ label: t('actions.close') }],
     );

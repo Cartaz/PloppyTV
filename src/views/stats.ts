@@ -139,7 +139,7 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">' + t('stats.topShows') + '</h2>';
   const topShows = stats.topShows;
   if (topShows.length === 0) {
-    html += '<p style="color:var(--text-muted);">' + t('stats.nessunDato') + '</p>';
+    html += '<p style="color:var(--text-muted);">' + t('stats.noDataShort') + '</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
     for (const item of topShows) {

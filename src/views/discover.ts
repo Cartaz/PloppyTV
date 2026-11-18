@@ -42,13 +42,13 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
     '" data-dir="-1" aria-label="' +
-    t('discover.precedente') +
+    t('discover.previous') +
     '">‹</button>';
   html +=
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
     '" data-dir="1" aria-label="' +
-    t('discover.successivo') +
+    t('discover.next') +
     '">›</button>';
   html += '</div></div>';
   html += '<div class="carousel-track" id="' + carouselId + '">';
@@ -66,7 +66,7 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
       '" role="button" tabindex="0" aria-label="Anteprima ' +
       escapeAttr(show.name) +
       '">';
-    if (isAdded) html += '<div class="carousel-card-badge">' + t('discover.aggiunta') + '</div>';
+    if (isAdded) html += '<div class="carousel-card-badge">' + t('discover.addedBadge') + '</div>';
     if (img) {
       html +=
         '<img class="carousel-card-poster" src="' +
@@ -104,9 +104,9 @@ function renderDiscoverContent(groups: DiscoverGroups | null): string {
   if (!groups) {
     return (
       '<div class="empty-state"><div class="empty-state-title">' +
-      t('discover.nessunaSerieDisponibile') +
+      t('discover.emptyTitle') +
       '</div><div class="empty-state-text">' +
-      t('discover.riprovaPiuTardi') +
+      t('discover.emptyText') +
       '</div></div>'
     );
   }
@@ -117,7 +117,7 @@ function renderDiscoverContent(groups: DiscoverGroups | null): string {
     html += renderGenreCarousel(genre, groupShows);
   }
   if (groups._other && groups._other.length > 0) {
-    html += renderGenreCarousel(t('discover.altro'), groups._other);
+    html += renderGenreCarousel(t('discover.otherGenre'), groups._other);
   }
   return html;
 }
@@ -128,7 +128,7 @@ function renderDiscoverError(err: unknown): string {
     escapeHtml(apiErrorMessage(err, 'discover')) +
     '</div>' +
     '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">' +
-    t('discover.riprova') +
+    t('discover.retry') +
     '</button></div></div>'
   );
 }
@@ -150,7 +150,7 @@ async function loadTab(tab: DiscoverTab): Promise<void> {
   }
   if (_loading[tab]) return;
   _loading[tab] = true;
-  el.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('discover.caricamentoSerie') + '</div>';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('discover.loadingShows') + '</div>';
   try {
     const groups = await loadDiscover(tab);
     _cache[tab] = groups;
@@ -175,7 +175,7 @@ function bindCarousels(container: HTMLElement): void {
 export function renderDiscover(main: HTMLElement): void {
   const state = getState();
   let html = '<h1 class="page-title">' + t('discover.title') + '</h1>';
-  html += '<p class="page-subtitle">' + t('discover.esploraSerieTvPiu') + '</p>';
+  html += '<p class="page-subtitle">' + t('discover.subtitle') + '</p>';
 
   html += '<div class="discover-tabs" role="tablist">';
   html +=
@@ -188,16 +188,16 @@ export function renderDiscover(main: HTMLElement): void {
     '<button class="discover-tab ' +
     (state._discoverTab === 'recent' ? 'active' : '') +
     '" data-action="switchDiscoverTab" data-tab="recent" role="tab">' +
-    t('discover.ultimiArrivi') +
+    t('discover.recentTab') +
     '</button>';
   html += '</div>';
 
   if (state._storageDisabled) {
     html +=
       '<div class="empty-state"><div class="empty-state-title">' +
-      t('discover.funzioneDisponibile') +
+      t('discover.unavailableTitle') +
       '</div><div class="empty-state-text">' +
-      t('discover.cacheDisponibileModalitaPrivata') +
+      t('discover.unavailableText') +
       '</div></div>';
     main.innerHTML = html;
     return;
@@ -209,7 +209,7 @@ export function renderDiscover(main: HTMLElement): void {
     '</div></div>';
   html +=
     '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">' +
-    t('discover.aggiornaLista') +
+    t('discover.refresh') +
     '</button></div>';
   main.innerHTML = html;
 
@@ -306,7 +306,7 @@ export function bindDiscoverEvents(main: HTMLElement): void {
 function previewDiscover(showId: number): void {
   const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast(t('discover.serieTrovata'), 'error');
+    showToast(t('discover.notFound'), 'error');
     return;
   }
   const isAdded = getState().shows.find((s) => s.id === found.id);
@@ -344,7 +344,7 @@ function previewDiscover(showId: number): void {
     year +
     ' • ' +
     escapeHtml(network) +
-    t('discover.rating') +
+    t('discover.ratingLabel') +
     rating +
     '</div>';
   if (Array.isArray(found.genres) && found.genres.length > 0) {
@@ -368,7 +368,7 @@ function previewDiscover(showId: number): void {
     const runtimeNum = typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
     body +=
       '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">' +
-      t('discover.stato') +
+      t('discover.statusLabel') +
       escapeHtml(showStatusLabel(found.status)) +
       (runtimeNum != null ? ' • ' + runtimeNum + ' min/ep' : '') +
       '</div>';
@@ -389,13 +389,13 @@ function previewDiscover(showId: number): void {
           onClick: () => addDiscoverShow(found.id, 'watching'),
         },
       ];
-  showModal(found.name || t('discover.senzaTitolo'), body, actions);
+  showModal(found.name || t('discover.untitled'), body, actions);
 }
 
 async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Promise<void> {
   const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast(t('discover.serieTrovataNellaCache'), 'error');
+    showToast(t('discover.notInCache'), 'error');
     return;
   }
   await addShowToList(found, list);

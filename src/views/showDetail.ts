@@ -27,7 +27,7 @@ let _showDetailMain: HTMLElement | null = null;
 function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
   let html =
     '<span class="ep-rating" role="group" aria-label="' +
-    t('detail.ratingEpisodio') +
+    t('detail.ratingGroup') +
     '" ' +
     'data-action="rateEpisode" data-show-id="' +
     showId +
@@ -75,7 +75,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
   const tags = show.tags ?? [];
   let html = '<div class="detail-tags-section">';
-  html += '<div class="detail-tags-label">' + t('detail.tag') + '</div>';
+  html += '<div class="detail-tags-label">' + t('detail.tagsLabel') + '</div>';
   html += '<div class="detail-tags-list">';
   for (const t of tags) {
     html +=
@@ -231,13 +231,13 @@ export function renderShowDetail(main: HTMLElement): void {
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
       '" data-list="completed">' +
-      t('search.completata') +
+      t('search.addCompleted') +
       '</button>';
   html +=
     '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' +
     show.id +
     '" title="' +
-    t('detail.aggiornaEpisodiMetadatiTvmaze') +
+    t('detail.refreshTitle') +
     '">' +
     t('detail.refreshData') +
     '</button>';
@@ -521,7 +521,7 @@ function openAddTagModal(showId: number): void {
   if (suggestions.length > 0) {
     suggestionsHtml =
       '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">' +
-      t('detail.suggerimenti') +
+      t('detail.suggestions') +
       '</div>' +
       '<div class="tag-suggestions">' +
       suggestions

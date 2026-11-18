@@ -93,7 +93,7 @@ function registerGlobalErrorHandlers(): void {
     }
     console.error('[PloppyTV] unhandled rejection:', event.reason);
     try {
-      showToast(t('app.siVerificatoErroreInatteso'), 'error');
+      showToast(t('app.unexpectedError'), 'error');
     } catch {
       // ignore — showToast potrebbe non essere disponibile
     }
@@ -110,10 +110,10 @@ function showFatalError(err: unknown): void {
       main.innerHTML =
         '<div class="empty-state">' +
         '<div class="empty-state-title">' +
-        t('app.erroreAvvio') +
+        t('app.startupErrorTitle') +
         '</div>' +
         '<div class="empty-state-text">' +
-        t('app.siVerificatoErroreImprevisto') +
+        t('app.startupErrorText') +
         '</div>' +
         '<button class="btn btn-primary" style="margin-top:12px;">' +
         t('actions.reload') +
@@ -150,7 +150,7 @@ function registerPWA(): void {
         // Nuova versione del SW disponibile (in stato waiting).
         // Toast message chiaro — il toast non è cliccabile,
         // il bottone di aggiornamento è in basso a destra.
-        showToast(t('app.nuovaVersioneDisponibileVedi'), 'warning');
+        showToast(t('app.updateAvailable'), 'warning');
         // Dedup — se un bottone è già visibile, non aggiungerne un altro.
         // Il toast è comunque re-mostrato ogni volta per ricordare all'utente.
         if (updateBtn) return;
@@ -247,7 +247,7 @@ function init(): void {
           '<p>' +
           t('modal.privateMode.body3') +
           '</p>',
-        [{ label: t('app.hoCapito'), style: 'btn-primary' }],
+        [{ label: t('app.gotIt'), style: 'btn-primary' }],
       );
     }
 

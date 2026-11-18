@@ -84,7 +84,7 @@ export function bindKeydown(main: HTMLElement): void {
       // (textContent), ma coerciamo a number per consistenza col hint HTML.
       const epNum = Number(ep.ep.num) || 0;
       showToast(
-        t('dashboard.episodioOro') +
+        t('dashboard.goldEpisodeToast') +
           ep.show.name +
           ' S' +
           ep.season +
@@ -210,7 +210,7 @@ export function renderDashboard(main: HTMLElement): void {
       '</div>' +
       '</div>' +
       '<div class="random-gold-action">' +
-      t('dashboard.sorprendimi') +
+      t('dashboard.surpriseMe') +
       '</div>' +
       '</div>' +
       '</div>';
@@ -219,7 +219,7 @@ export function renderDashboard(main: HTMLElement): void {
   if (watching.length > 0) {
     html +=
       '<div class="section"><div class="section-header"><h2 class="section-title">' +
-      t('dashboard.stoGuardando') +
+      t('dashboard.watchingSection') +
       '</h2><span class="section-link" data-action="switchView" data-view="watching" role="button" tabindex="0">' +
       t('actions.seeAll') +
       '</span></div>';

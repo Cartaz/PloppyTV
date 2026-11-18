@@ -70,7 +70,7 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
         '" data-list="completed">' +
-        t('search.completata') +
+        t('search.addCompleted') +
         '</button>' +
         '</div></div></div>'
       );
@@ -187,7 +187,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   if (!lastSearchResults[idx]) return;
   const show = lastSearchResults[idx].show;
   if (!show) {
-    showToast(t('search.datiSerieValidi'), 'error');
+    showToast(t('search.invalidShow'), 'error');
     return;
   }
   // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
@@ -223,7 +223,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     }
   } catch (e) {
     console.error('[search] selectSearchResult error:', e);
-    showToast(t('search.erroreAggiuntaSerie'), 'error');
+    showToast(t('search.addError'), 'error');
   }
 }
 
@@ -248,7 +248,7 @@ export function initSearch(): () => void {
   _searchInput.setAttribute('aria-autocomplete', 'list');
   _searchInput.setAttribute('aria-controls', 'searchResults');
   _searchResults.setAttribute('role', 'listbox');
-  _searchResults.setAttribute('aria-label', t('search.risultatiRicerca'));
+  _searchResults.setAttribute('aria-label', t('search.resultsLabel'));
 
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);

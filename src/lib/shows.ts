@@ -33,12 +33,12 @@ function findEpisode(show: Show, seasonNum: number, epNum: number): Episode | un
 
 export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Promise<Show | null> {
   if (!tvmazeShow || typeof tvmazeShow !== 'object' || tvmazeShow.id == null) {
-    showToast(t('search.datiSerieValidi'), 'error');
+    showToast(t('search.invalidShow'), 'error');
     return null;
   }
   const showId = safeId(tvmazeShow.id);
   if (!showId) {
-    showToast(t('shows.idSerieValido'), 'error');
+    showToast(t('shows.invalidId'), 'error');
     return null;
   }
   // Valida `list` — un valore non in ALLOWED_LISTS causerebbe
@@ -46,7 +46,7 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
   // `if (list !== 'towatch') show.manualList = true` imposterebbe manualList=true,
   // lasciando lo stato inconsistente (list='towatch', manualList=true).
   if (!ALLOWED_LISTS.includes(list)) {
-    showToast(t('shows.listaValida'), 'error');
+    showToast(t('shows.invalidList'), 'error');
     return null;
   }
   const state = getState();
@@ -80,7 +80,7 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     if (!saveData()) {
       // rollback
       removeShowFromState(show.id);
-      showToast(t('shows.impossibileSalvareStoragePieno'), 'error');
+      showToast(t('shows.addSaveError'), 'error');
       return null;
     }
     updateBadges();
@@ -206,7 +206,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
   const id = safeId(showId);
   if (!id) return false;
   if (_refreshInFlight.has(id)) {
-    if (!opts?.silent) showToast(t('shows.aggiornamentoGiaCorso'), 'warning');
+    if (!opts?.silent) showToast(t('shows.refreshInProgress'), 'warning');
     return false;
   }
   _refreshInFlight.add(id);
@@ -222,7 +222,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     // Se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
     // i dati utente (potrebbe essere un glitch temporaneo dell'API o un 200 OK vuoto).
     if (episodes.length === 0 && Object.keys(show.seasons).length > 0) {
-      if (!opts?.silent) showToast(t('shows.nessunEpisodioRicevutoDati'), 'warning');
+      if (!opts?.silent) showToast(t('shows.noEpisodesReceived'), 'warning');
       return false;
     }
     // Un import, una rimozione o la sincronizzazione multi-tab può aver
@@ -235,7 +235,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     // nessun episodio utilizzabile: in quel caso preserviamo i dati esistenti.
     const refreshed = buildShowFromTvmaze({ id }, episodes, show.list);
     if (refreshed.totalEpisodes === 0 && show.totalEpisodes > 0) {
-      if (!opts?.silent) showToast(t('shows.nessunEpisodioRicevutoDati'), 'warning');
+      if (!opts?.silent) showToast(t('shows.noEpisodesReceived'), 'warning');
       return false;
     }
     const newSeasons = refreshed.seasons;
@@ -286,7 +286,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       show.totalSeasons = prevTotalSeasons;
       show.list = prevList;
       show.manualList = prevManual;
-      showToast(t('shows.impossibileSalvareAggiornamentoStorage'), 'error');
+      showToast(t('shows.refreshSaveError'), 'error');
       return false;
     }
     updateBadges();
