@@ -5,6 +5,7 @@ import { computeStatsAsync } from '../worker/client';
 import { escapeHtml, escapeAttr } from '../lib/utils';
 import { imgTag } from '../components/img';
 import type { StatsResult } from '../types';
+import { t, formatDuration } from '../lib/i18n';
 
 function safeClampPct(v: unknown, round: boolean): number {
   if (typeof v !== 'number' || Number.isNaN(v)) return 0;
@@ -20,15 +21,25 @@ function safeCount(v: unknown): number {
 
 function renderStatsSkeleton(main: HTMLElement): void {
   main.innerHTML =
-    '<h1 class="page-title">Statistiche</h1>' +
-    '<div class="loading"><div class="spinner"></div>Calcolando statistiche...</div>';
+    '<h1 class="page-title">' +
+    t('stats.title') +
+    '</h1>' +
+    '<div class="loading"><div class="spinner"></div>' +
+    t('stats.calculating') +
+    '</div>';
 }
 
 function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   if (stats.totalShows === 0) {
     main.innerHTML =
-      '<h1 class="page-title">Statistiche</h1>' +
-      '<div class="empty-state"><div class="empty-state-title">Nessun dato</div><div class="empty-state-text">Aggiungi serie TV per visualizzare le statistiche.</div></div>';
+      '<h1 class="page-title">' +
+      t('stats.title') +
+      '</h1>' +
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('stats.noData') +
+      '</div><div class="empty-state-text">' +
+      t('stats.noData.desc') +
+      '</div></div>';
     return;
   }
 
@@ -39,30 +50,44 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   const totalProgress = safeClampPct(stats.totalProgress, false);
   const totalProgressComplete = totalProgress >= 100;
 
-  let html = '<h1 class="page-title">Statistiche</h1>';
+  let html = '<h1 class="page-title">' + t('stats.title') + '</h1>';
   html +=
     '<div class="stats-grid">' +
     '<div class="stat-card"><div class="stat-value">' +
     stats.totalShows +
-    '</div><div class="stat-label">Serie tracciate</div></div>' +
+    '</div><div class="stat-label">' +
+    t('stats.tracked') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
     stats.totalWatched +
-    '</div><div class="stat-label">Episodi visti</div></div>' +
+    '</div><div class="stat-label">' +
+    t('stats.watched') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
-    escapeHtml(stats.timeLabel) +
-    '</div><div class="stat-label">Tempo totale</div></div>' +
+    escapeHtml(formatDuration(stats.totalMinutes)) +
+    '</div><div class="stat-label">' +
+    t('stats.totalTime') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
     stats.completedShows +
-    '</div><div class="stat-label">Completate</div></div>' +
+    '</div><div class="stat-label">' +
+    t('stats.completed') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
     stats.watchingShows +
-    '</div><div class="stat-label">In corso</div></div>' +
+    '</div><div class="stat-label">' +
+    t('stats.watching') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
     stats.towatchShows +
-    '</div><div class="stat-label">Da vedere</div></div>' +
+    '</div><div class="stat-label">' +
+    t('stats.towatch') +
+    '</div></div>' +
     '<div class="stat-card"><div class="stat-value">' +
     totalProgress +
-    '%</div><div class="stat-label">Progresso totale</div></div>' +
+    '%</div><div class="stat-label">' +
+    t('stats.totalProgress') +
+    '</div></div>' +
     '</div>';
 
   // Barra di progresso totale: 100% → verde (commit ba32535)
@@ -75,12 +100,13 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
     ';transition:width .3s;"></div></div></div>';
 
   // Generi
-  html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">Generi più visti</h2>';
+  html +=
+    '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">' + t('stats.topGenres') + '</h2>';
   const topGenres = stats.topGenres;
   // maxCount fallback a 1 se 0/NaN per evitare division-by-zero e pct >100.
   const maxCount = topGenres.length > 0 ? safeCount(topGenres[0].episodes) || 1 : 1;
   if (topGenres.length === 0 || topGenres.every((g) => safeCount(g.episodes) === 0)) {
-    html += '<p style="color:var(--text-muted);">Nessun dato. Segna alcuni episodi come visti.</p>';
+    html += '<p style="color:var(--text-muted);">' + t('stats.noDataGenre') + '</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:12px;">';
     for (const { genre, episodes, shows } of topGenres) {
@@ -93,7 +119,7 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
       html +=
         '<div><div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">' +
         '<span>' +
-        escapeHtml(genre) +
+        escapeHtml(genre || t('stats.noGenre')) +
         '</span>' +
         '<span style="color:var(--text-muted);">' +
         safeEps +
@@ -110,10 +136,10 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
   html += '</div>';
 
   // Top serie
-  html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">Top serie per completamento</h2>';
+  html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">' + t('stats.topShows') + '</h2>';
   const topShows = stats.topShows;
   if (topShows.length === 0) {
-    html += '<p style="color:var(--text-muted);">Nessun dato.</p>';
+    html += '<p style="color:var(--text-muted);">' + t('stats.nessunDato') + '</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
     for (const item of topShows) {
@@ -136,12 +162,8 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
         escapeHtml(item.showName) +
         '</div>' +
         '<div class="episode-meta">' +
-        safeCount(item.watched) +
-        '/' +
-        safeCount(item.totalEpisodes) +
-        ' episodi • ' +
-        pct +
-        '%</div></div></div>';
+        t('stats.topShowMeta', { watched: safeCount(item.watched), total: safeCount(item.totalEpisodes), pct }) +
+        '</div></div></div>';
     }
     html += '</div>';
   }
@@ -189,7 +211,13 @@ export async function renderStats(main: HTMLElement): Promise<void> {
     }
     console.error('[stats] error:', e);
     main.innerHTML =
-      '<h1 class="page-title">Statistiche</h1>' +
-      '<div class="empty-state"><div class="empty-state-title">Errore caricamento</div><div class="empty-state-text">Riprova.</div></div>';
+      '<h1 class="page-title">' +
+      t('stats.title') +
+      '</h1>' +
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('stats.error.title') +
+      '</div><div class="empty-state-text">' +
+      t('stats.error.desc') +
+      '</div></div>';
   }
 }

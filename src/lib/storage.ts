@@ -14,6 +14,7 @@ import { getState, setShows, setStorageDisabled, setQuotaWarned, emitChange } fr
 import { canonicalizeDataDocument } from './dataDocument';
 import { showToast } from '../components/toast';
 import { isModalOpen } from '../components/modal';
+import { t } from './i18n';
 
 let _storageOK = true;
 
@@ -59,7 +60,7 @@ export function saveData(): boolean {
 
   const currentRevision = _readStorageRevision();
   if (currentRevision === null || currentRevision.raw !== _lastRevision) {
-    showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
+    showToast(t('toast.multiTabConflict'), 'warning');
     return false;
   }
 
@@ -74,7 +75,7 @@ export function saveData(): boolean {
     } satisfies SavedData);
   } catch (e) {
     console.error('Serializzazione fallita:', e);
-    showToast('Errore: dati non serializzabili', 'error');
+    showToast(t('toast.serializeError'), 'error');
     return false;
   }
 
@@ -82,7 +83,7 @@ export function saveData(): boolean {
   // soglia d'avviso vale per metà della quota tipica di localStorage (~5 MB).
   const sizeKB = Math.round(new TextEncoder().encode(serialized).length / 1024);
   if (sizeKB > QUOTA_WARN_KB && !state._quotaWarned) {
-    showToast('Attenzione: dati vicini al limite (' + sizeKB + 'KB). Usa Esporta per backup.', 'warning');
+    showToast(t('toast.quotaWarn', { size: sizeKB }), 'warning');
     setQuotaWarned(true);
   }
 
@@ -112,7 +113,7 @@ export function saveData(): boolean {
       // e il write fallito un altro tab potrebbe aver scritto o cancellato.
       const recoverRevision = _readStorageRevision();
       if (recoverRevision === null || recoverRevision.raw !== expectedRevision) {
-        showToast('Modifiche in un altro tab — ricarica per vedere i dati aggiornati', 'warning');
+        showToast(t('toast.multiTabConflict'), 'warning');
         return false;
       }
       const stripped: Show[] = state.shows.map((s) => ({ ...s, image: null }));
@@ -124,16 +125,16 @@ export function saveData(): boolean {
         } satisfies SavedData);
         localStorage.setItem(STORAGE_KEY, strippedSerialized);
         _lastRevision = strippedSerialized;
-        showToast('Salvato senza immagini (spazio limitato).', 'warning');
+        showToast(t('toast.quotaStripped'), 'warning');
         return true;
       } catch {
-        showToast('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
+        showToast(t('toast.quotaFull'), 'error');
       }
     } else if (err.name === 'SecurityError' || err.code === 18) {
       setStorageDisabled(true);
-      showToast('Salvataggio non disponibile (modalità privata?).', 'error');
+      showToast(t('toast.storageUnavailable'), 'error');
     } else {
-      showToast('Errore salvataggio: ' + (err.message || 'unknown'), 'error');
+      showToast(t('storage.erroreSalvataggio') + (err.message || 'unknown'), 'error');
     }
     return false;
   }
@@ -189,7 +190,7 @@ export function loadData(): void {
     _storageOK = false;
     setShows([]);
     setStorageDisabled(true);
-    showToast('Archiviazione non disponibile.', 'error');
+    showToast(t('storage.archiviazioneDisponibile'), 'error');
     return;
   }
   if (raw === null) {
@@ -215,12 +216,12 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
+      showToast(t('toast.corruptedData'), 'warning');
       saveData();
       return;
     }
     setShows([]);
-    showToast('Dati corrotti. Usa Importa per ripristinare.', 'error');
+    showToast(t('toast.corruptedManual'), 'error');
     return;
   }
 
@@ -233,10 +234,7 @@ export function loadData(): void {
       // Bloccare le scritture evita che il recovery la distrugga.
       setStorageDisabled(true);
       setShows([]);
-      showToast(
-        'Versione dati non supportata. Aggiorna l’app per accedere ai dati; salvataggio disabilitato.',
-        'error',
-      );
+      showToast(t('storage.unsupportedVersion'), 'error');
       return;
     } else {
       console.warn('[PloppyTV] Documento storage non valido:', canonical.code);
@@ -245,13 +243,13 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast('Dati non validi. Ripristinato backup precedente.', 'warning');
+      showToast(t('storage.datiValidiRipristinatoBackup'), 'warning');
       saveData();
       return;
     }
 
     setShows([]);
-    showToast('Dati non validi. Usa Importa per ripristinare.', 'error');
+    showToast(t('storage.datiValidiUsaImporta'), 'error');
     return;
   }
 
@@ -277,7 +275,7 @@ if (typeof window !== 'undefined') {
       // Se ci sono shows locali, NON wipe — mostra toast.
       if (ev.newValue === null) {
         if (state.shows.length > 0) {
-          showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
+          showToast(t('toast.multiTabDeleted'), 'warning');
           // NON avanza _lastRevision (resta al valore pre-event).
           return;
         }
@@ -310,7 +308,7 @@ if (typeof window !== 'undefined') {
       // Mostriamo un toast che invita a ricaricare a modale chiusa.
       // NON avanza _lastRevision (così i salvataggi successivi falliscono per CAS).
       if (isModalOpen()) {
-        showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
+        showToast(t('toast.multiTabUpdate'), 'warning');
         const evBadges = new CustomEvent('ploppytv:badges');
         window.dispatchEvent(evBadges);
         return;

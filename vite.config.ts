@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 // Per GitHub Pages: se il repo si chiama <username>.github.io, lascia '/'; altrimenti usa '/nome-repo/'.
 // Override con VITE_BASE_PATH nel .env per deploy personalizzati.
@@ -7,6 +10,7 @@ const base = process.env.VITE_BASE_PATH || './';
 
 export default defineConfig({
   base,
+  define: { __APP_VERSION__: JSON.stringify(version) },
   build: {
     target: 'es2022',
     cssCodeSplit: true,

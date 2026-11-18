@@ -13,6 +13,7 @@
 //  - BUG-A9-10: worker non-object message → clean error response
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { formatDuration } from '../src/lib/i18n';
 import type { Show, WorkerRequest, WorkerResponse } from '../src/types';
 import { makeShow, makeShowWithSeasons, markWatchedFirst } from './helpers';
 import { computeStats, computeCalendar } from '../src/worker/compute';
@@ -72,7 +73,7 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
     expect(genreNames).toEqual(['Crime', 'Drama']);
   });
 
-  it('all-non-string genres → falls back to "Senza genere"', () => {
+  it('all-non-string genres → falls back to "" (no genre)', () => {
     const s = makeShowWithSeasons(
       { 1: 2 },
       {
@@ -83,7 +84,7 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
     markWatchedFirst(s, 1, 2);
     const r = computeStats([s]);
     expect(r.topGenres).toHaveLength(1);
-    expect(r.topGenres[0].genre).toBe('Senza genere');
+    expect(r.topGenres[0].genre).toBe('');
   });
 
   it('two shows with same genre → genre episodes = sum, shows = 2', () => {
@@ -108,7 +109,7 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
     }
   });
 
-  it('genres not an array (string/null) → falls back to "Senza genere"', () => {
+  it('genres not an array (string/null) → falls back to "" (no genre)', () => {
     const s1 = makeShowWithSeasons({ 1: 2 }, { id: 1 });
     (s1 as unknown as { genres: unknown }).genres = 'Drama'; // not an array
     markWatchedFirst(s1, 1, 2);
@@ -117,7 +118,7 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
     markWatchedFirst(s2, 1, 1);
     const r = computeStats([s1, s2]);
     expect(r.topGenres).toHaveLength(1);
-    expect(r.topGenres[0].genre).toBe('Senza genere');
+    expect(r.topGenres[0].genre).toBe('');
     expect(r.topGenres[0].episodes).toBe(3);
     expect(r.topGenres[0].shows).toBe(2);
   });
@@ -476,7 +477,7 @@ describe('[compute] regression: existing behavior preserved', () => {
     const r = computeStats([]);
     expect(r.totalShows).toBe(0);
     expect(r.totalWatched).toBe(0);
-    expect(r.timeLabel).toBe('0min');
+    expect(formatDuration(r.totalMinutes)).toBe('0min');
     expect(r.totalProgress).toBe(0);
     expect(r.topGenres).toEqual([]);
     expect(r.topShows).toEqual([]);

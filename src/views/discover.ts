@@ -15,6 +15,7 @@ import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
+import { t } from '../lib/i18n';
 
 type DiscoverTab = 'popular' | 'recent';
 const _cache: Record<DiscoverTab, DiscoverGroups | null> = { popular: null, recent: null };
@@ -40,11 +41,15 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
   html +=
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
-    '" data-dir="-1" aria-label="Precedente">‹</button>';
+    '" data-dir="-1" aria-label="' +
+    t('discover.precedente') +
+    '">‹</button>';
   html +=
     '<button class="carousel-nav-btn" data-action="scrollCarousel" data-carousel="' +
     carouselId +
-    '" data-dir="1" aria-label="Successivo">›</button>';
+    '" data-dir="1" aria-label="' +
+    t('discover.successivo') +
+    '">›</button>';
   html += '</div></div>';
   html += '<div class="carousel-track" id="' + carouselId + '">';
   for (const show of shows) {
@@ -61,7 +66,7 @@ function renderGenreCarousel(genre: string, shows: TvmazeShow[]): string {
       '" role="button" tabindex="0" aria-label="Anteprima ' +
       escapeAttr(show.name) +
       '">';
-    if (isAdded) html += '<div class="carousel-card-badge">Aggiunta</div>';
+    if (isAdded) html += '<div class="carousel-card-badge">' + t('discover.aggiunta') + '</div>';
     if (img) {
       html +=
         '<img class="carousel-card-poster" src="' +
@@ -97,7 +102,13 @@ function updateCarouselNavState(track: HTMLElement): void {
 
 function renderDiscoverContent(groups: DiscoverGroups | null): string {
   if (!groups) {
-    return '<div class="empty-state"><div class="empty-state-title">Nessuna serie disponibile</div><div class="empty-state-text">Riprova più tardi.</div></div>';
+    return (
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('discover.nessunaSerieDisponibile') +
+      '</div><div class="empty-state-text">' +
+      t('discover.riprovaPiuTardi') +
+      '</div></div>'
+    );
   }
   let html = '';
   for (const genre of GENRE_CAROUSELS) {
@@ -106,7 +117,7 @@ function renderDiscoverContent(groups: DiscoverGroups | null): string {
     html += renderGenreCarousel(genre, groupShows);
   }
   if (groups._other && groups._other.length > 0) {
-    html += renderGenreCarousel('Altro', groups._other);
+    html += renderGenreCarousel(t('discover.altro'), groups._other);
   }
   return html;
 }
@@ -116,7 +127,9 @@ function renderDiscoverError(err: unknown): string {
     '<div class="empty-state"><div class="empty-state-title">' +
     escapeHtml(apiErrorMessage(err, 'discover')) +
     '</div>' +
-    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>'
+    '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">' +
+    t('discover.riprova') +
+    '</button></div></div>'
   );
 }
 
@@ -137,7 +150,7 @@ async function loadTab(tab: DiscoverTab): Promise<void> {
   }
   if (_loading[tab]) return;
   _loading[tab] = true;
-  el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('discover.caricamentoSerie') + '</div>';
   try {
     const groups = await loadDiscover(tab);
     _cache[tab] = groups;
@@ -161,30 +174,43 @@ function bindCarousels(container: HTMLElement): void {
 
 export function renderDiscover(main: HTMLElement): void {
   const state = getState();
-  let html = '<h1 class="page-title">Scopri</h1>';
-  html += '<p class="page-subtitle">Esplora le serie TV più popolari e i nuovi arrivi.</p>';
+  let html = '<h1 class="page-title">' + t('discover.title') + '</h1>';
+  html += '<p class="page-subtitle">' + t('discover.esploraSerieTvPiu') + '</p>';
 
   html += '<div class="discover-tabs" role="tablist">';
   html +=
     '<button class="discover-tab ' +
     (state._discoverTab === 'popular' ? 'active' : '') +
-    '" data-action="switchDiscoverTab" data-tab="popular" role="tab">Popolari</button>';
+    '" data-action="switchDiscoverTab" data-tab="popular" role="tab">' +
+    t('discover.popular') +
+    '</button>';
   html +=
     '<button class="discover-tab ' +
     (state._discoverTab === 'recent' ? 'active' : '') +
-    '" data-action="switchDiscoverTab" data-tab="recent" role="tab">Ultimi arrivi</button>';
+    '" data-action="switchDiscoverTab" data-tab="recent" role="tab">' +
+    t('discover.ultimiArrivi') +
+    '</button>';
   html += '</div>';
 
   if (state._storageDisabled) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Funzione non disponibile</div><div class="empty-state-text">La cache non è disponibile in modalità privata.</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('discover.funzioneDisponibile') +
+      '</div><div class="empty-state-text">' +
+      t('discover.cacheDisponibileModalitaPrivata') +
+      '</div></div>';
     main.innerHTML = html;
     return;
   }
 
-  html += '<div id="discoverContent"><div class="loading"><div class="spinner"></div>Caricamento...</div></div>';
   html +=
-    '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">Aggiorna lista</button></div>';
+    '<div id="discoverContent"><div class="loading"><div class="spinner"></div>' +
+    t('discover.loading') +
+    '</div></div>';
+  html +=
+    '<div style="text-align:center;margin-top:16px;"><button class="btn btn-secondary btn-sm" data-action="refreshDiscover">' +
+    t('discover.aggiornaLista') +
+    '</button></div>';
   main.innerHTML = html;
 
   loadTab(state._discoverTab);
@@ -280,7 +306,7 @@ export function bindDiscoverEvents(main: HTMLElement): void {
 function previewDiscover(showId: number): void {
   const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast('Serie non trovata', 'error');
+    showToast(t('discover.serieTrovata'), 'error');
     return;
   }
   const isAdded = getState().shows.find((s) => s.id === found.id);
@@ -313,7 +339,14 @@ function previewDiscover(showId: number): void {
   }
   body += '<div class="discover-preview-info">';
   body += '<div class="discover-preview-name">' + escapeHtml(found.name) + '</div>';
-  body += '<div class="discover-preview-meta">' + year + ' • ' + escapeHtml(network) + ' • Rating ' + rating + '</div>';
+  body +=
+    '<div class="discover-preview-meta">' +
+    year +
+    ' • ' +
+    escapeHtml(network) +
+    t('discover.rating') +
+    rating +
+    '</div>';
   if (Array.isArray(found.genres) && found.genres.length > 0) {
     body +=
       '<div class="discover-preview-genres">' +
@@ -334,26 +367,35 @@ function previewDiscover(showId: number): void {
     // would execute when set via innerHTML. Coerce to a finite number; omit otherwise.
     const runtimeNum = typeof found.runtime === 'number' && Number.isFinite(found.runtime) ? found.runtime : null;
     body +=
-      '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">Stato: ' +
+      '<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">' +
+      t('discover.stato') +
       escapeHtml(found.status) +
       (runtimeNum != null ? ' • ' + runtimeNum + ' min/ep' : '') +
       '</div>';
   }
 
   const actions = isAdded
-    ? [{ label: 'Chiudi' }]
+    ? [{ label: t('actions.close') }]
     : [
-        { label: 'Chiudi' },
-        { label: 'Da vedere', style: 'btn-secondary' as const, onClick: () => addDiscoverShow(found.id, 'towatch') },
-        { label: 'In corso', style: 'btn-primary' as const, onClick: () => addDiscoverShow(found.id, 'watching') },
+        { label: t('actions.close') },
+        {
+          label: t('stats.towatch'),
+          style: 'btn-secondary' as const,
+          onClick: () => addDiscoverShow(found.id, 'towatch'),
+        },
+        {
+          label: t('stats.watching'),
+          style: 'btn-primary' as const,
+          onClick: () => addDiscoverShow(found.id, 'watching'),
+        },
       ];
-  showModal(found.name || 'Senza titolo', body, actions);
+  showModal(found.name || t('discover.senzaTitolo'), body, actions);
 }
 
 async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Promise<void> {
   const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
-    showToast('Serie non trovata nella cache, usa la ricerca', 'error');
+    showToast(t('discover.serieTrovataNellaCache'), 'error');
     return;
   }
   await addShowToList(found, list);

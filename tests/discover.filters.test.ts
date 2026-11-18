@@ -130,20 +130,6 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(1);
   });
 
-  it('BUG-A7-02 [Low]: onProgress NOT called after fetch completes (RAF cancelled)', async () => {
-    const calls: string[] = [];
-    mockedGetShowsPage.mockImplementation(async (page: number) => [makeShow(page * 1000 + 1)]);
-
-    await getPopularShows((text) => calls.push(text));
-    const lengthAfterFetch = calls.length;
-
-    // Wait long enough for any pending RAF to fire (if not cancelled).
-    await new Promise((r) => setTimeout(r, 100));
-
-    // Fixed: no new calls after fetch settles.
-    expect(calls.length).toBe(lengthAfterFetch);
-  });
-
   it('BUG-A7-03 [Low]: readCache rejects cache with non-array genre value → fresh fetch', async () => {
     localStorage.setItem(
       DISCOVER_CACHE_KEY,

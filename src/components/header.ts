@@ -32,15 +32,15 @@ export function updateBadges(): void {
   if (w) {
     w.textContent = String(wCount);
     // Aria-label dinamico per screen reader.
-    w.setAttribute('aria-label', wCount + ' serie in corso');
+    w.setAttribute('aria-label', t('header.badgeWatching', { count: wCount }));
   }
   if (tw) {
     tw.textContent = String(twCount);
-    tw.setAttribute('aria-label', twCount + ' serie da vedere');
+    tw.setAttribute('aria-label', t('header.badgeTowatch', { count: twCount }));
   }
   if (c) {
     c.textContent = String(cCount);
-    c.setAttribute('aria-label', cCount + ' serie completate');
+    c.setAttribute('aria-label', t('header.badgeCompleted', { count: cCount }));
   }
 }
 
@@ -56,6 +56,19 @@ function closeSidebar(): void {
   // Prima il menuToggle impostava overflow='hidden' all'apertura ma nessuno
   // lo ripristinava alla chiusura via overlay-click o nav-item click.
   document.body.style.overflow = '';
+}
+
+/** Applica la lingua corrente agli elementi statici di index.html (data-i18n*). */
+export function applyStaticTranslations(): void {
+  document.documentElement.lang = getLocale();
+  document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n!);
+  });
+  for (const attr of ['title', 'placeholder', 'aria-label']) {
+    document.querySelectorAll<HTMLElement>('[data-i18n-' + attr + ']').forEach((el) => {
+      el.setAttribute(attr, t(el.getAttribute('data-i18n-' + attr)!));
+    });
+  }
 }
 
 export function initHeader(): void {
@@ -82,24 +95,54 @@ export function initHeader(): void {
   // About
   document.getElementById('aboutBtn')?.addEventListener('click', () => {
     showModal(
-      'Informazioni su PloppyTV',
-      '<p>PloppyTV è un tracker TV local-first: non richiede account né un backend PloppyTV.</p>' +
-        '<p><strong>Caratteristiche:</strong></p>' +
+      t('modal.about.title'),
+      '<p>' +
+        t('header.ploppytvTrackerTvLocal') +
+        '</p>' +
+        '<p><strong>' +
+        t('header.caratteristiche') +
+        '</strong></p>' +
         '<ul style="margin-left:20px;margin-bottom:10px;">' +
-        '<li>Tracking serie TV ed episodi visti</li><li>Liste In corso, Da vedere e Completate</li>' +
-        '<li>Calendario settimanale e statistiche</li><li>Scopri con preload in background</li>' +
-        '<li>Backup Esporta/Importa</li><li>PWA offline per gli asset già in cache</li>' +
+        '<li>' +
+        t('header.trackingSerieTvEd') +
+        '</li><li>' +
+        t('header.listeCorsoVedereCompletate') +
+        '</li>' +
+        '<li>' +
+        t('header.calendarioSettimanaleStatistiche') +
+        '</li><li>' +
+        t('header.scopriPreloadBackground') +
+        '</li>' +
+        '<li>' +
+        t('header.backupEsportaImporta') +
+        '</li><li>' +
+        t('header.pwaOfflineAssetGia') +
+        '</li>' +
         '</ul>' +
-        '<p><strong>Dati:</strong> il tuo stato resta nel browser. I metadati e i poster arrivano da TVMaze; Scopri può pre-caricarli poco dopo l’avvio per ridurre l’attesa.</p>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">Le notifiche sono locali e best-effort: senza backend non possono essere garantite mentre la PWA è completamente chiusa.</p>' +
+        '<p><strong>' +
+        t('header.dati') +
+        '</strong> ' +
+        t('header.dataText') +
+        '</p>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-top:10px;">' +
+        t('header.notificheSonoLocaliBest') +
+        '</p>' +
         '<hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">' +
         '<p style="font-size:12px;color:var(--text-secondary);">' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy Policy</a> · ' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribuire</a> · ' +
-        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/PRIVACY.md" target="_blank" rel="noopener">' +
+        t('header.privacyPolicy') +
+        '</a> · ' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">' +
+        t('header.contribuire') +
+        '</a> · ' +
+        '<a href="https://github.com/Cartaz/PloppyTV/blob/main/LICENSE" target="_blank" rel="noopener">' +
+        t('header.licenzaMit') +
+        '</a>' +
         '</p>' +
-        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Versione 1.2.1 · 2026</p>',
-      [{ label: 'Chiudi' }],
+        '<p style="font-size:11px;color:var(--text-muted);margin-top:6px;">' +
+        t('header.version', { version: __APP_VERSION__ }) +
+        '</p>',
+      [{ label: t('actions.close') }],
     );
   });
 
@@ -208,6 +251,6 @@ export function initHeader(): void {
         )
         .join('') +
       '</div>';
-    showModal(t('nav.menu') + ' — Lingua', bodyHtml, [{ label: t('actions.close') }]);
+    showModal(t('header.languageTitle'), bodyHtml, [{ label: t('actions.close') }]);
   });
 }

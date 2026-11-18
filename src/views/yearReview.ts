@@ -17,7 +17,7 @@
 import { getState } from '../lib/store';
 import { escapeHtml } from '../lib/utils';
 import { imgTag } from '../components/img';
-import { t } from '../lib/i18n';
+import { t, formatDuration } from '../lib/i18n';
 import { showToast } from '../components/toast';
 import type { Show } from '../types';
 
@@ -158,7 +158,7 @@ export function exportYearCard(stats: YearStats): void {
   try {
     canvas = document.createElement('canvas');
   } catch {
-    showToast('Canvas non supportato', 'error');
+    showToast(t('yearReview.canvasSupportato'), 'error');
     return;
   }
   const W = 1080;
@@ -167,7 +167,7 @@ export function exportYearCard(stats: YearStats): void {
   canvas.height = H;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    showToast('Canvas non supportato', 'error');
+    showToast(t('yearReview.canvasSupportato'), 'error');
     return;
   }
 
@@ -191,7 +191,7 @@ export function exportYearCard(stats: YearStats): void {
 
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  ctx.fillText('Il tuo ' + stats.year + ' in TV', W / 2, 170);
+  ctx.fillText(t('yearReview.cardTitle', { year: stats.year }), W / 2, 170);
 
   // Decorative line
   ctx.strokeStyle = '#ff6b35';
@@ -208,23 +208,23 @@ export function exportYearCard(stats: YearStats): void {
 
   ctx.fillStyle = '#b8b8c8';
   ctx.font = '32px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  ctx.fillText('episodi visti', W / 2, 370);
+  ctx.fillText(t('detail.episodesWatched'), W / 2, 370);
 
   // Hours
   const hours = Math.floor(stats.totalMinutes / 60);
   ctx.fillStyle = '#ff6b35';
   ctx.font = 'bold 80px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  ctx.fillText(hours + ' ore', W / 2, 460);
+  ctx.fillText(t('yearReview.hours', { h: hours }), W / 2, 460);
 
   ctx.fillStyle = '#b8b8c8';
   ctx.font = '28px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  ctx.fillText('di visione totale', W / 2, 500);
+  ctx.fillText(t('yearReview.visioneTotale'), W / 2, 500);
 
   // Top 5 shows
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('Top 5 serie', 80, 580);
+  ctx.fillText(t('yearReview.top5Serie'), 80, 580);
 
   ctx.font = '28px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   stats.topShows.forEach((s, i) => {
@@ -248,7 +248,7 @@ export function exportYearCard(stats: YearStats): void {
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('Genere dominante', 80, 920);
+  ctx.fillText(t('yearReview.dominantGenre'), 80, 920);
   ctx.fillStyle = '#ff6b35';
   ctx.font = '32px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.fillText(stats.dominantGenre, 80, 965);
@@ -256,7 +256,7 @@ export function exportYearCard(stats: YearStats): void {
   if (stats.longestSeason) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-    ctx.fillText('Stagione più longeva', 80, 1050);
+    ctx.fillText(t('yearReview.longestSeason'), 80, 1050);
     ctx.fillStyle = '#ff6b35';
     ctx.font = '32px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
     ctx.fillText(
@@ -270,7 +270,7 @@ export function exportYearCard(stats: YearStats): void {
   ctx.fillStyle = '#6e6e80';
   ctx.font = '24px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Generato con PloppyTV', W / 2, 1280);
+  ctx.fillText(t('yearReview.generatoPloppytv'), W / 2, 1280);
 
   // Sanitize year per il filename. Se year è NaN/0/negativo (non
   // dovrebbe mai succedere dopo le fix di computeYearStats, ma defense-in-depth),
@@ -286,12 +286,12 @@ export function exportYearCard(stats: YearStats): void {
   try {
     // Check toBlob availability (browser very old / env non-DOM).
     if (typeof canvas.toBlob !== 'function') {
-      showToast('Canvas non supportato', 'error');
+      showToast(t('yearReview.canvasSupportato'), 'error');
       return;
     }
     canvas.toBlob((blob) => {
       if (!blob) {
-        showToast('Errore export immagine', 'error');
+        showToast(t('yearReview.erroreExportImmagine'), 'error');
         return;
       }
       let url: string | null = null;
@@ -307,7 +307,7 @@ export function exportYearCard(stats: YearStats): void {
         downloadOk = true;
       } catch (e) {
         console.error('[yearReview] export download failed:', e);
-        showToast('Errore export immagine', 'error');
+        showToast(t('yearReview.erroreExportImmagine'), 'error');
       } finally {
         // Revoke sempre, anche se click throwa (leak prevention).
         if (url) {
@@ -325,7 +325,7 @@ export function exportYearCard(stats: YearStats): void {
   } catch (e) {
     // SecurityError (tainted canvas) o altri errori sincroni da toBlob.
     console.error('[yearReview] toBlob threw:', e);
-    showToast('Errore export immagine', 'error');
+    showToast(t('yearReview.erroreExportImmagine'), 'error');
   }
 }
 
@@ -400,9 +400,7 @@ export function renderYearReview(main: HTMLElement): void {
   }
 
   // Big stats grid
-  const hours = Math.floor(stats.totalMinutes / 60);
-  const mins = stats.totalMinutes % 60;
-  const timeLabel = hours > 0 ? hours + 'h' + (mins > 0 ? ' ' + mins + 'min' : '') : mins + 'min';
+  const timeLabel = formatDuration(stats.totalMinutes);
 
   html += '<div class="year-stats-grid">';
   html +=

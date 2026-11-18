@@ -55,7 +55,6 @@ function makeStats(over: Partial<StatsResult> = {}): StatsResult {
     totalMinutes: 0,
     totalDays: 0,
     remHours: 0,
-    timeLabel: '0min',
     totalProgress: 0,
     topGenres: [],
     topShows: [],

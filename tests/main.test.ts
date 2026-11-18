@@ -118,6 +118,7 @@ vi.mock('../src/components/modal', () => ({
 vi.mock('../src/components/header', () => ({
   initHeader: () => mockInitHeader(),
   updateBadges: () => mockUpdateBadges(),
+  applyStaticTranslations: vi.fn(),
 }));
 
 vi.mock('../src/components/search', () => ({
@@ -178,6 +179,8 @@ function resetMocks(): void {
   // FIX-18-08: init() now guards against double-init via a flag on window.
   // Clear it so each test starts fresh.
   delete (window as any).__ploppytvInit;
+  // jsdom ha navigator.language = en-US: fissa l'italiano per i testi attesi.
+  localStorage.setItem('ploppytv_prefs_v1', JSON.stringify({ lang: 'it' }));
 }
 
 function setHash(h: string): void {

@@ -6,6 +6,7 @@ import { MAX_QUERY_LENGTH } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal } from '../lib/utils';
 import { addShowToList } from '../lib/shows';
 import { showToast } from './toast';
+import { t } from '../lib/i18n';
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastSearchResults: TvmazeSearchResult[] = [];
@@ -58,13 +59,19 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         '<div class="search-result-actions">' +
         '<button class="btn btn-primary btn-sm" data-idx="' +
         idx +
-        '" data-list="watching">In corso</button>' +
+        '" data-list="watching">' +
+        t('nav.watching') +
+        '</button>' +
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
-        '" data-list="towatch">Da vedere</button>' +
+        '" data-list="towatch">' +
+        t('nav.towatch') +
+        '</button>' +
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
-        '" data-list="completed">Completata</button>' +
+        '" data-list="completed">' +
+        t('search.completata') +
+        '</button>' +
         '</div></div></div>'
       );
     })
@@ -114,7 +121,7 @@ async function doSearch(query: string): Promise<void> {
   const signal = searchAbortController.signal;
 
   if (!_searchResults) return;
-  _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>Ricerca in corso...</div>';
+  _searchResults.innerHTML = '<div class="loading"><div class="spinner"></div>' + t('search.searching') + '</div>';
   _searchResults.classList.add('active');
   setExpanded(true);
 
@@ -139,7 +146,7 @@ async function doSearch(query: string): Promise<void> {
             );
             const html = renderSearchResultsHTML(
               filtered.length > 0 ? filtered : altResults.slice(0, 10),
-              'Nessun risultato per "' + query + '". Risultati simili per "' + altQuery + '":',
+              t('search.noResultsAlt', { query, alt: altQuery }),
             );
             if (html) {
               _searchResults.innerHTML = html;
@@ -155,9 +162,7 @@ async function doSearch(query: string): Promise<void> {
         }
       }
       _searchResults.innerHTML =
-        '<div class="search-no-results">Nessuna serie trovata per "' +
-        escapeHtml(query) +
-        '". Prova con meno parole o la parola principale.</div>';
+        '<div class="search-no-results">' + t('search.notFoundHint', { query: escapeHtml(query) }) + '</div>';
       lastSearchResults = [];
       return;
     }
@@ -167,7 +172,7 @@ async function doSearch(query: string): Promise<void> {
       _searchResults.innerHTML = html;
     } else {
       _searchResults.innerHTML =
-        '<div class="search-no-results">Nessuna serie trovata per "' + escapeHtml(query) + '".</div>';
+        '<div class="search-no-results">' + t('search.noResults', { query: escapeHtml(query) }) + '</div>';
       lastSearchResults = [];
     }
   } catch (e: unknown) {
@@ -182,7 +187,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   if (!lastSearchResults[idx]) return;
   const show = lastSearchResults[idx].show;
   if (!show) {
-    showToast('Dati serie non validi', 'error');
+    showToast(t('search.datiSerieValidi'), 'error');
     return;
   }
   // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
@@ -218,7 +223,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     }
   } catch (e) {
     console.error('[search] selectSearchResult error:', e);
-    showToast('Errore aggiunta serie', 'error');
+    showToast(t('search.erroreAggiuntaSerie'), 'error');
   }
 }
 
@@ -242,7 +247,7 @@ export function initSearch(): void {
   _searchInput.setAttribute('aria-autocomplete', 'list');
   _searchInput.setAttribute('aria-controls', 'searchResults');
   _searchResults.setAttribute('role', 'listbox');
-  _searchResults.setAttribute('aria-label', 'Risultati di ricerca');
+  _searchResults.setAttribute('aria-label', t('search.risultatiRicerca'));
 
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -255,9 +260,7 @@ export function initSearch(): void {
       // Branch > MAX_QUERY_LENGTH deve abortire la search in-flight
       invalidateCurrentSearch();
       _searchResults!.innerHTML =
-        '<div class="search-no-results" role="status">Query troppo lunga (max ' +
-        MAX_QUERY_LENGTH +
-        ' caratteri)</div>';
+        '<div class="search-no-results" role="status">' + t('search.tooLong', { max: MAX_QUERY_LENGTH }) + '</div>';
       _searchResults!.classList.add('active');
       setExpanded(true);
       return;

@@ -35,6 +35,7 @@ const execArgv = nodeFlags.has('--webstorage')
 
 export default defineConfig({
   plugins: [virtualPwaRegisterPlugin],
+  define: { __APP_VERSION__: JSON.stringify('test') },
   test: {
     environment: 'jsdom',
     execArgv,

@@ -4,6 +4,7 @@ import { getState, changeCalendarWeek, resetCalendarWeek } from '../lib/store';
 import { computeCalendarAsync } from '../worker/client';
 import { escapeHtml, escapeAttr, formatDate, parseISODateLocal, isSameLocalDay } from '../lib/utils';
 import type { CalendarEpisode } from '../types';
+import { t } from '../lib/i18n';
 
 function safeNumLabel(v: unknown): string {
   if (typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v > 0) {
@@ -20,9 +21,15 @@ let _calendarRenderToken = 0;
 
 function renderCalendarSkeleton(main: HTMLElement): void {
   main.innerHTML =
-    '<h1 class="page-title">Calendario</h1>' +
-    '<p class="page-subtitle">Prossimi episodi delle tue serie in corso (basato su airdate TVMaze)</p>' +
-    '<div class="loading"><div class="spinner"></div>Calcolando episodi...</div>';
+    '<h1 class="page-title">' +
+    t('calendar.title') +
+    '</h1>' +
+    '<p class="page-subtitle">' +
+    t('calendar.prossimiEpisodiDelleTue') +
+    '</p>' +
+    '<div class="loading"><div class="spinner"></div>' +
+    t('calendar.calcolandoEpisodi') +
+    '</div>';
 }
 
 function renderCalendarContent(
@@ -37,8 +44,14 @@ function renderCalendarContent(
   const end = parseISODateLocal(weekEnd);
   if (!start || !end) {
     main.innerHTML =
-      '<h1 class="page-title">Calendario</h1>' +
-      '<div class="empty-state"><div class="empty-state-title">Errore date</div><div class="empty-state-text">Le date della settimana non sono valide. Riprova ad aprire il calendario.</div></div>';
+      '<h1 class="page-title">' +
+      t('calendar.title') +
+      '</h1>' +
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('calendar.erroreDate') +
+      '</div><div class="empty-state-text">' +
+      t('calendar.dateSettimanaSonoValide') +
+      '</div></div>';
     return;
   }
 
@@ -50,7 +63,15 @@ function renderCalendarContent(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const weekDays = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+  const weekDays = [
+    t('calendar.lunedi'),
+    t('calendar.martedi'),
+    t('calendar.mercoledi'),
+    t('calendar.giovedi'),
+    t('calendar.venerdi'),
+    t('calendar.sabato'),
+    t('calendar.domenica'),
+  ];
 
   // Raggruppa per giorno della settimana corrente (gli episodi con data malformata vengono saltati).
   const byDay: CalendarEpisode[][] = [[], [], [], [], [], [], []];
@@ -61,8 +82,8 @@ function renderCalendarContent(
     byDay[dayIdx].push(ep);
   }
 
-  let html = '<h1 class="page-title">Calendario</h1>';
-  html += '<p class="page-subtitle">Prossimi episodi delle tue serie in corso (basato su airdate TVMaze)</p>';
+  let html = '<h1 class="page-title">' + t('calendar.title') + '</h1>';
+  html += '<p class="page-subtitle">' + t('calendar.prossimiEpisodiDelleTue') + '</p>';
 
   const weekLabel =
     start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) +
@@ -70,13 +91,17 @@ function renderCalendarContent(
     end.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
   html +=
     '<div class="calendar-nav"><div class="calendar-nav-controls">' +
-    '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="-1" aria-label="Settimana precedente">‹</button>' +
+    '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="-1" aria-label="' +
+    t('calendar.prevWeek') +
+    '">‹</button>' +
     '<span class="calendar-nav-label">' +
     weekLabel +
     '</span>' +
-    '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="1" aria-label="Settimana successiva">›</button></div>' +
+    '<button class="btn btn-secondary btn-sm" data-action="changeWeek" data-delta="1" aria-label="' +
+    t('calendar.nextWeek') +
+    '">›</button></div>' +
     (state.calendarWeekOffset !== 0
-      ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">Oggi</button>'
+      ? '<button class="btn btn-secondary btn-sm" data-action="resetWeek">' + t('calendar.oggi') + '</button>'
       : '') +
     '</div>';
 
@@ -119,7 +144,7 @@ function renderCalendarContent(
                 '</div></div>',
             )
             .join('')
-        : '<div style="color:var(--text-muted);font-size:12px;">Nessun episodio</div>') +
+        : '<div style="color:var(--text-muted);font-size:12px;">' + t('calendar.nessunEpisodio') + '</div>') +
       '</div>';
   }
   html += '</div>';
@@ -130,11 +155,15 @@ function renderCalendarContent(
     const shown = afterWeek.slice(0, cap);
     const remaining = afterWeek.length - shown.length;
     html +=
-      '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
+      '<div class="section" style="margin-top:32px;"><h2 class="section-title">' +
+      t('calendar.arrivo') +
+      '</h2><div class="episode-list">';
     for (const ep of shown) {
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
-        : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);
+        : escapeHtml(ep.showName) +
+          ' · ' +
+          t('calendar.seasonEpisode', { season: safeNumLabel(ep.season), ep: safeNumLabel(ep.num) });
       html +=
         '<div class="episode-item" data-action="openShow" data-show-id="' +
         escapeAttr(ep.showId) +
@@ -152,21 +181,30 @@ function renderCalendarContent(
         '</div></div></div>';
     }
     if (remaining > 0) {
-      html += '<div class="episode-more">+ ' + remaining + ' altri episodi</div>';
+      html += '<div class="episode-more">' + t('calendar.more', { count: remaining }) + '</div>';
     }
     html += '</div></div>';
   }
 
-  html += '<div class="section" style="margin-top:32px;"><h2 class="section-title">Da vedere questa settimana</h2>';
+  html +=
+    '<div class="section" style="margin-top:32px;"><h2 class="section-title">' +
+    t('calendar.vedereQuestaSettimana') +
+    '</h2>';
   if (week.length === 0) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Tutto visto!</div><div class="empty-state-text">Nessun episodio in programmazione questa settimana.</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('calendar.tuttoVisto') +
+      '</div><div class="empty-state-text">' +
+      t('calendar.nessunEpisodioProgrammazioneQuesta') +
+      '</div></div>';
   } else {
     html += '<div class="episode-list">';
     for (const ep of week) {
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
-        : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);
+        : escapeHtml(ep.showName) +
+          ' · ' +
+          t('calendar.seasonEpisode', { season: safeNumLabel(ep.season), ep: safeNumLabel(ep.num) });
       html +=
         '<div class="episode-item" data-action="openShow" data-show-id="' +
         escapeAttr(ep.showId) +
@@ -182,10 +220,8 @@ function renderCalendarContent(
         ' • ' +
         formatDate(ep.date) +
         ' • ' +
-        ep.watchedCount +
-        '/' +
-        ep.totalEpisodes +
-        ' episodi visti</div></div></div>';
+        t('common.watchedOf', { watched: ep.watchedCount, total: ep.totalEpisodes }) +
+        '</div></div></div>';
     }
     html += '</div>';
   }
@@ -231,8 +267,14 @@ export async function renderCalendar(main: HTMLElement): Promise<void> {
     }
     console.error('[calendar] error:', e);
     main.innerHTML =
-      '<h1 class="page-title">Calendario</h1>' +
-      '<div class="empty-state"><div class="empty-state-title">Errore caricamento</div><div class="empty-state-text">Riprova ad aprire il calendario.</div></div>';
+      '<h1 class="page-title">' +
+      t('calendar.title') +
+      '</h1>' +
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('calendar.error.title') +
+      '</div><div class="empty-state-text">' +
+      t('calendar.riprovaAdAprireCalendario') +
+      '</div></div>';
   }
 }
 

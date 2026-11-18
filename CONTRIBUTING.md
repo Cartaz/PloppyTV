@@ -116,7 +116,7 @@ La config è in `eslint.config.js` (flat config ESLint 9). Estende `@eslint/js` 
 
 ### 5.4 Naming
 
-- **File**: `camelCase.ts` per moduli, `PascalCase.ts` per componenti React-style (ma qui non ne abbiamo). I file di test: `<nome>.test.ts`.
+- **File**: `camelCase.ts` per moduli, `PascalCase.ts` per componenti React-style (ma qui non ne abbiamo). I file di test: `tests/<modulo>.<aspetto>.test.ts` (es. `storage.multitab.test.ts`); preferisci test di comportamento con moduli reali e mock solo ai confini (rete, storage).
 - **Funzioni/variabili**: `camelCase`.
 - **Tipi/interfacce**: `PascalCase`.
 - **Costanti**: `UPPER_SNAKE_CASE` per valori primitivi (`API_BASE`), `camelCase` per oggetti/array.

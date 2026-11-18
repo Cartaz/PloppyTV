@@ -135,6 +135,22 @@ export function subscribeI18n(fn: () => void): () => void {
  * Esempio: t('library.results', { count: 5 }) → "5 risultati" (it) / "5 results" (en)
  * Fallback: se la chiave non esiste in _current, prova 'it', poi ritorna la key.
  */
+/** Durata leggibile ("2g 3h", "1h 30min", "45min") nella lingua corrente. */
+export function formatDuration(totalMinutes: number): string {
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const mins = totalMinutes % 60;
+  if (days > 0) return t('duration.daysHours', { d: days, h: hours });
+  if (hours > 0)
+    return mins > 0 ? t('duration.hoursMinutes', { h: hours, m: mins }) : t('duration.hours', { h: hours });
+  return t('duration.minutes', { m: totalMinutes });
+}
+
+/** Plurale semplice: usa `${key}.one` per count === 1, altrimenti `${key}.other`; {count} è sempre disponibile. */
+export function tn(key: string, count: number, params?: Record<string, string | number>): string {
+  return t(key + (count === 1 ? '.one' : '.other'), { count, ...params });
+}
+
 export function t(key: string, params?: Record<string, string | number>): string {
   let str = DICTS[_current][key];
   // Tratta valori non-stringa (null, number, ecc.) come mancanti.

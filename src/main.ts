@@ -4,7 +4,7 @@ import './styles/main.css';
 import { getState, subscribe, switchView, openShow } from './lib/store';
 import { isStorageOK, loadData } from './lib/storage';
 import { initModal, showModal } from './components/modal';
-import { initHeader, updateBadges } from './components/header';
+import { initHeader, updateBadges, applyStaticTranslations } from './components/header';
 import { initSearch } from './components/search';
 import { initExportImport } from './components/exportImport';
 import { initRenderer, render } from './components/renderer';
@@ -14,6 +14,7 @@ import { initKeyboard } from './lib/keyboard';
 import { initNotifications } from './lib/notifications';
 import { registerSW } from 'virtual:pwa-register';
 import { safeId } from './lib/utils';
+import { t } from './lib/i18n';
 
 // ===== Hash routing minimale per PWA shortcuts e deep link =====
 // PWA shortcuts in vite.config.ts puntano a ./index.html#dashboard, #discover,
@@ -92,7 +93,7 @@ function registerGlobalErrorHandlers(): void {
     }
     console.error('[PloppyTV] unhandled rejection:', event.reason);
     try {
-      showToast('Si è verificato un errore inatteso', 'error');
+      showToast(t('app.siVerificatoErroreInatteso'), 'error');
     } catch {
       // ignore — showToast potrebbe non essere disponibile
     }
@@ -108,9 +109,15 @@ function showFatalError(err: unknown): void {
     if (main) {
       main.innerHTML =
         '<div class="empty-state">' +
-        '<div class="empty-state-title">Errore di avvio</div>' +
-        '<div class="empty-state-text">Si è verificato un errore imprevisto. Ricarica la pagina per riprovare.</div>' +
-        '<button class="btn btn-primary" style="margin-top:12px;">Ricarica</button>' +
+        '<div class="empty-state-title">' +
+        t('app.erroreAvvio') +
+        '</div>' +
+        '<div class="empty-state-text">' +
+        t('app.siVerificatoErroreImprevisto') +
+        '</div>' +
+        '<button class="btn btn-primary" style="margin-top:12px;">' +
+        t('actions.reload') +
+        '</button>' +
         '</div>';
       main.querySelector('button')?.addEventListener('click', () => window.location.reload());
     }
@@ -143,12 +150,12 @@ function registerPWA(): void {
         // Nuova versione del SW disponibile (in stato waiting).
         // Toast message chiaro — il toast non è cliccabile,
         // il bottone di aggiornamento è in basso a destra.
-        showToast('Nuova versione disponibile (vedi pulsante in basso a destra)', 'warning');
+        showToast(t('app.nuovaVersioneDisponibileVedi'), 'warning');
         // Dedup — se un bottone è già visibile, non aggiungerne un altro.
         // Il toast è comunque re-mostrato ogni volta per ricordare all'utente.
         if (updateBtn) return;
         const reloadBtn = document.createElement('button');
-        reloadBtn.textContent = 'Aggiorna ora';
+        reloadBtn.textContent = t('toast.updateNow');
         reloadBtn.className = 'btn btn-primary btn-sm';
         reloadBtn.style.cssText =
           'position:fixed;bottom:20px;right:20px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.3);';
@@ -241,11 +248,17 @@ function init(): void {
     // Modalità privata: avvisa l'utente
     if (!isStorageOK()) {
       showModal(
-        'Modalità di navigazione privata',
-        '<p>Il tuo browser non permette il salvataggio locale (modalità privata o storage disabilitato).</p>' +
-          '<p>Puoi usare PloppyTV, ma <strong>tutti i dati andranno persi al ricaricamento</strong>.</p>' +
-          '<p>Per la persistenza, disattiva la modalità privata o abilita i cookie/storage nelle impostazioni.</p>',
-        [{ label: 'Ho capito', style: 'btn-primary' }],
+        t('modal.privateMode.title'),
+        '<p>' +
+          t('modal.privateMode.body1') +
+          '</p>' +
+          '<p>' +
+          t('modal.privateMode.body2') +
+          '</p>' +
+          '<p>' +
+          t('modal.privateMode.body3') +
+          '</p>',
+        [{ label: t('app.hoCapito'), style: 'btn-primary' }],
       );
     }
 
@@ -263,7 +276,10 @@ function init(): void {
     });
 
     // P2.7: re-render al cambio lingua
+    applyStaticTranslations();
     subscribeI18n(() => {
+      applyStaticTranslations();
+      updateBadges();
       render();
     });
 

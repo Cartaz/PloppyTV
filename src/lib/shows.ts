@@ -11,6 +11,7 @@ import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { updateBadges } from '../components/header';
 import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_PER_SHOW } from './constants';
+import { t } from './i18n';
 
 const _addShowInFlight = new Set<number>();
 
@@ -24,12 +25,12 @@ function findEpisode(show: Show, seasonNum: number, epNum: number): Episode | un
 
 export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Promise<Show | null> {
   if (!tvmazeShow || typeof tvmazeShow !== 'object' || tvmazeShow.id == null) {
-    showToast('Dati serie non validi', 'error');
+    showToast(t('search.datiSerieValidi'), 'error');
     return null;
   }
   const showId = safeId(tvmazeShow.id);
   if (!showId) {
-    showToast('ID serie non valido', 'error');
+    showToast(t('shows.idSerieValido'), 'error');
     return null;
   }
   // Valida `list` — un valore non in ALLOWED_LISTS causerebbe
@@ -37,24 +38,24 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
   // `if (list !== 'towatch') show.manualList = true` imposterebbe manualList=true,
   // lasciando lo stato inconsistente (list='towatch', manualList=true).
   if (!ALLOWED_LISTS.includes(list)) {
-    showToast('Lista non valida', 'error');
+    showToast(t('shows.listaValida'), 'error');
     return null;
   }
   const state = getState();
   if (state.shows.find((s) => s.id === showId)) {
-    showToast('Serie già presente nella tua lista', 'error');
+    showToast(t('toast.serieExists'), 'error');
     return null;
   }
   if (_addShowInFlight.has(showId)) {
-    showToast('Aggiunta in corso...', 'warning');
+    showToast(t('toast.adding'), 'warning');
     return null;
   }
   _addShowInFlight.add(showId);
-  showToast('Caricamento episodi...');
+  showToast(t('toast.loadingEpisodes'));
   try {
     const episodes = await getShowEpisodes(showId);
     if (getState().shows.find((s) => s.id === showId)) {
-      showToast('Serie già presente', 'error');
+      showToast(t('toast.serieExistsShort'), 'error');
       return null;
     }
     const show = buildShowFromTvmaze(tvmazeShow, episodes, list);
@@ -71,11 +72,11 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     if (!saveData()) {
       // rollback
       removeShowFromState(show.id);
-      showToast('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
+      showToast(t('shows.impossibileSalvareStoragePieno'), 'error');
       return null;
     }
     updateBadges();
-    showToast('Serie aggiunta: ' + show.name, 'success');
+    showToast(t('shows.added', { name: show.name }), 'success');
     if (
       ['dashboard', 'watching', 'towatch', 'completed'].includes(getState().currentView) &&
       !getState().currentShowId
@@ -93,32 +94,28 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
 }
 
 export function removeShow(showId: number, showName: string): void {
-  showModal(
-    'Rimuovere "' + showName + '"?',
-    '<p>La serie verrà rimossa dalla tua lista. Questa azione non può essere annullata.</p>',
-    [
-      { label: 'Annulla' },
-      {
-        label: 'Rimuovi',
-        style: 'btn-danger',
-        onClick: () => {
-          const snapshot = getState().shows.map((s) => ({ ...s }));
-          removeShowFromState(showId);
-          if (!saveData()) {
-            // Rollback: ripristina lo snapshot E ri-triggera il render
-            setState({ shows: snapshot });
-            emitChange();
-            showToast('Impossibile rimuovere (storage error o modifiche in altro tab)', 'error');
-            return;
-          }
-          updateBadges();
-          showToast('Serie rimossa', 'success');
-          setState({ currentView: 'dashboard', currentShowId: null });
+  showModal(t('shows.removeTitle', { name: showName }), '<p>' + t('modal.remove.body') + '</p>', [
+    { label: t('actions.cancel') },
+    {
+      label: t('actions.remove'),
+      style: 'btn-danger',
+      onClick: () => {
+        const snapshot = getState().shows.map((s) => ({ ...s }));
+        removeShowFromState(showId);
+        if (!saveData()) {
+          // Rollback: ripristina lo snapshot E ri-triggera il render
+          setState({ shows: snapshot });
           emitChange();
-        },
+          showToast(t('toast.removeError'), 'error');
+          return;
+        }
+        updateBadges();
+        showToast(t('toast.serieRemoved'), 'success');
+        setState({ currentView: 'dashboard', currentShowId: null });
+        emitChange();
       },
-    ],
-  );
+    },
+  ]);
 }
 
 /**
@@ -141,11 +138,11 @@ export function moveShowToList(showId: number, list: ListName): void {
   if (!saveData()) {
     show.list = prevList;
     show.manualList = prevManual;
-    showToast('Spostamento non salvato (modifiche in altro tab?)', 'error');
+    showToast(t('toast.moveError'), 'error');
     return;
   }
   updateBadges();
-  showToast('Serie spostata', 'success');
+  showToast(t('toast.serieMoved'), 'success');
   emitChange();
 }
 
@@ -163,7 +160,7 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
     ep.watched = prevWatched;
     show.list = prevList;
     show.manualList = prevManual;
-    showToast('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.notSaved'), 'error');
     return;
   }
   updateBadges();
@@ -185,7 +182,7 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
     show.seasons[seasonNum] = prevEps;
     show.list = prevList;
     show.manualList = prevManual;
-    showToast('Modifica non salvata (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.notSaved'), 'error');
     return;
   }
   updateBadges();
@@ -199,7 +196,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
   const id = safeId(showId);
   if (!id) return false;
   if (_refreshInFlight.has(id)) {
-    if (!opts?.silent) showToast('Aggiornamento già in corso...', 'warning');
+    if (!opts?.silent) showToast(t('shows.aggiornamentoGiaCorso'), 'warning');
     return false;
   }
   _refreshInFlight.add(id);
@@ -215,7 +212,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     // Se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
     // i dati utente (potrebbe essere un glitch temporaneo dell'API o un 200 OK vuoto).
     if (episodes.length === 0 && Object.keys(show.seasons).length > 0) {
-      if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
+      if (!opts?.silent) showToast(t('shows.nessunEpisodioRicevutoDati'), 'warning');
       return false;
     }
     // Un import, una rimozione o la sincronizzazione multi-tab può aver
@@ -228,7 +225,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     // nessun episodio utilizzabile: in quel caso preserviamo i dati esistenti.
     const refreshed = buildShowFromTvmaze({ id }, episodes, show.list);
     if (refreshed.totalEpisodes === 0 && show.totalEpisodes > 0) {
-      if (!opts?.silent) showToast('Nessun episodio ricevuto — dati non aggiornati', 'warning');
+      if (!opts?.silent) showToast(t('shows.nessunEpisodioRicevutoDati'), 'warning');
       return false;
     }
     const newSeasons = refreshed.seasons;
@@ -278,12 +275,12 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
       show.totalSeasons = prevTotalSeasons;
       show.list = prevList;
       show.manualList = prevManual;
-      showToast('Impossibile salvare aggiornamento (storage o modifiche in altro tab)', 'error');
+      showToast(t('shows.impossibileSalvareAggiornamentoStorage'), 'error');
       return false;
     }
     updateBadges();
     emitChange();
-    if (!opts?.silent) showToast('Dati serie aggiornati: ' + show.name, 'success');
+    if (!opts?.silent) showToast(t('shows.refreshed', { name: show.name }), 'success');
     return true;
   } catch (e: unknown) {
     if (!opts?.silent) showToast(apiErrorMessage(e, 'refresh'), 'error');
@@ -331,7 +328,7 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
 
   if (!saveData()) {
     ep.rating = prevRating;
-    showToast('Rating non salvato (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.ratingError'), 'error');
     return;
   }
   emitChange();
@@ -355,7 +352,7 @@ export function setEpisodeNote(showId: number, seasonNum: number, epNum: number,
 
   if (!saveData()) {
     ep.note = prevNote;
-    showToast('Nota non salvata (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.noteError'), 'error');
     return false;
   }
   emitChange();
@@ -379,11 +376,11 @@ export function addShowTag(showId: number, tag: string): boolean {
   // Dedup case-insensitive: se "Estate" esiste, "estate" non viene aggiunto.
   const lower = trimmed.toLowerCase();
   if (tags.some((t) => t.toLowerCase() === lower)) {
-    showToast('Tag già presente', 'warning');
+    showToast(t('tags.duplicate'), 'warning');
     return false;
   }
   if (tags.length >= MAX_TAGS_PER_SHOW) {
-    showToast('Massimo ' + MAX_TAGS_PER_SHOW + ' tag per serie', 'warning');
+    showToast(t('shows.maxTags', { max: MAX_TAGS_PER_SHOW }), 'warning');
     return false;
   }
 
@@ -392,7 +389,7 @@ export function addShowTag(showId: number, tag: string): boolean {
 
   if (!saveData()) {
     show.tags = prevTags;
-    showToast('Tag non salvato (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.tagError'), 'error');
     return false;
   }
   emitChange();
@@ -416,7 +413,7 @@ export function removeShowTag(showId: number, tag: string): void {
 
   if (!saveData()) {
     show.tags = prevTags;
-    showToast('Rimozione tag non salvata (storage error o modifiche in altro tab)', 'error');
+    showToast(t('toast.tagRemoveError'), 'error');
     return;
   }
   emitChange();

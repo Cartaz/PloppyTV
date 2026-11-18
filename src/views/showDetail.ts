@@ -17,6 +17,7 @@ import {
 import { showModal, closeModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
+import { t } from '../lib/i18n';
 
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
 let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -25,7 +26,9 @@ let _showDetailMain: HTMLElement | null = null;
 // ===== P2 helper: star rating HTML per episodio =====
 function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
   let html =
-    '<span class="ep-rating" role="group" aria-label="Rating episodio" ' +
+    '<span class="ep-rating" role="group" aria-label="' +
+    t('detail.ratingEpisodio') +
+    '" ' +
     'data-action="rateEpisode" data-show-id="' +
     showId +
     '" data-season="' +
@@ -60,7 +63,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
     '" data-ep="' +
     epNum +
     '" title="' +
-    (hasNote ? 'Modifica nota' : 'Aggiungi nota') +
+    (hasNote ? t('notes.editNote') : t('notes.addNote')) +
     '">' +
     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
     (hasNote ? '<span class="ep-note-dot"></span>' : '') +
@@ -72,7 +75,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
   const tags = show.tags ?? [];
   let html = '<div class="detail-tags-section">';
-  html += '<div class="detail-tags-label">Tag:</div>';
+  html += '<div class="detail-tags-label">' + t('detail.tag') + '</div>';
   html += '<div class="detail-tags-list">';
   for (const t of tags) {
     html +=
@@ -86,7 +89,12 @@ function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
       escapeAttr(t) +
       '">×</button></span>';
   }
-  html += '<button class="tag-add-btn" data-action="addTag" data-show-id="' + show.id + '">+ Aggiungi tag</button>';
+  html +=
+    '<button class="tag-add-btn" data-action="addTag" data-show-id="' +
+    show.id +
+    '">' +
+    t('detail.addTag') +
+    '</button>';
   html += '</div></div>';
   return html;
 }
@@ -129,12 +137,13 @@ export function renderShowDetail(main: HTMLElement): void {
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
   const statusLower = String(show.status || '').toLowerCase();
   const statusClass =
-    statusLower.includes('running') || statusLower.includes('in corso') ? 'status-running' : 'status-ended';
+    statusLower.includes('running') || statusLower.includes(t('detail.corso')) ? 'status-running' : 'status-ended';
 
   let html =
     '<button class="btn btn-secondary" data-action="closeShow" style="margin-bottom:20px;">' +
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>' +
-    'Torna indietro</button>';
+    t('actions.back') +
+    '</button>';
 
   html += '<div class="detail-header">';
   // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
@@ -151,7 +160,9 @@ export function renderShowDetail(main: HTMLElement): void {
       escapeAttr(bigImg) +
       '" alt="' +
       escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
+      '" loading="eager" decoding="async" data-fallback="' +
+      escapeAttr(t('detail.imageUnavailable')) +
+      '" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
       escapeAttr(show.image) +
       '">';
   } else if (show.image) {
@@ -161,9 +172,11 @@ export function renderShowDetail(main: HTMLElement): void {
       escapeAttr(show.image) +
       '" alt="' +
       escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="Immagine non disponibile" data-fallback-cls="detail-poster-placeholder">';
+      '" loading="eager" decoding="async" data-fallback="' +
+      escapeAttr(t('detail.imageUnavailable')) +
+      '" data-fallback-cls="detail-poster-placeholder">';
   } else {
-    html += '<div class="detail-poster-placeholder">Immagine non disponibile</div>';
+    html += '<div class="detail-poster-placeholder">' + t('detail.imageUnavailable') + '</div>';
   }
   html +=
     '<div class="detail-info">' +
@@ -195,10 +208,8 @@ export function renderShowDetail(main: HTMLElement): void {
     '">' +
     '<div class="detail-progress-meta">' +
     '<span>' +
-    watched +
-    ' / ' +
-    show.totalEpisodes +
-    ' episodi visti</span>' +
+    t('detail.watchedOf', { watched, total: show.totalEpisodes }) +
+    '</span>' +
     '<span>' +
     Math.round(progress) +
     '%</span></div>' +
@@ -225,31 +236,47 @@ export function renderShowDetail(main: HTMLElement): void {
     html +=
       '<button class="btn btn-primary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="watching">In corso</button>';
+      '" data-list="watching">' +
+      t('nav.watching') +
+      '</button>';
   if (show.list !== 'towatch')
     html +=
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="towatch">Da vedere</button>';
+      '" data-list="towatch">' +
+      t('nav.towatch') +
+      '</button>';
   if (show.list !== 'completed')
     html +=
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
-      '" data-list="completed">Completata</button>';
+      '" data-list="completed">' +
+      t('search.completata') +
+      '</button>';
   html +=
     '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' +
     show.id +
-    '" title="Aggiorna episodi e metadati da TVMaze">Aggiorna dati</button>';
+    '" title="' +
+    t('detail.aggiornaEpisodiMetadatiTvmaze') +
+    '">' +
+    t('detail.refreshData') +
+    '</button>';
   html +=
     '<button class="btn btn-danger" data-action="removeShow" data-show-id="' +
     show.id +
     '" data-show-name="' +
     escapeAttr(show.name) +
-    '">Rimuovi</button></div></div></div>';
+    '">' +
+    t('actions.remove') +
+    '</button></div></div></div>';
 
   if (seasons.length === 0) {
     html +=
-      '<div class="empty-state"><div class="empty-state-title">Nessun episodio disponibile</div><div class="empty-state-text">Questa serie non ha episodi registrati.</div></div>';
+      '<div class="empty-state"><div class="empty-state-title">' +
+      t('detail.noEpisodes') +
+      '</div><div class="empty-state-text">' +
+      t('detail.noEpisodes.desc') +
+      '</div></div>';
     main.innerHTML = html;
     return;
   }
@@ -264,8 +291,8 @@ export function renderShowDetail(main: HTMLElement): void {
       (isActive ? 'true' : 'false') +
       '" data-action="switchSeason" data-season="' +
       parseInt(s, 10) +
-      '">Stagione ' +
-      s +
+      '">' +
+      t('detail.season', { n: s }) +
       '</div>';
   }
   html += '</div>';
@@ -277,18 +304,22 @@ export function renderShowDetail(main: HTMLElement): void {
       show.id +
       '" data-season="' +
       state.currentSeason +
-      '" data-watched="1">Segna tutti come visti</button>' +
+      '" data-watched="1">' +
+      t('detail.markAllWatched') +
+      '</button>' +
       '<button class="btn btn-secondary btn-sm" data-action="markSeason" data-show-id="' +
       show.id +
       '" data-season="' +
       state.currentSeason +
-      '" data-watched="0">Segna tutti come non visti</button>' +
+      '" data-watched="0">' +
+      t('detail.markAllUnwatched') +
+      '</button>' +
       '</div>';
     const epsArr = show.seasons[state.currentSeason] ?? [];
     // P2.1: media rating stagione nella sezione actions
     const avgLabel = seasonAvgRating(epsArr);
     if (avgLabel) {
-      html += '<div class="season-rating-avg">Rating medio stagione' + avgLabel + '</div>';
+      html += '<div class="season-rating-avg">' + t('detail.seasonAvgRating') + avgLabel + '</div>';
     }
     html += '<div class="episode-list">';
     // Ordine per numero: dopo refresh o import gli episodi possono essere salvati fuori ordine.
@@ -296,12 +327,12 @@ export function renderShowDetail(main: HTMLElement): void {
     for (const ep of sortedEps) {
       const epTitle = ep.name
         ? escapeHtml(ep.name)
-        : '<span style="color:var(--text-muted);font-style:italic;">Episodio ' + ep.num + '</span>';
+        : '<span style="color:var(--text-muted);font-style:italic;">' + t('detail.episode', { n: ep.num }) + '</span>';
       const epNumberLabel = 'S' + state.currentSeason + 'E' + ep.num;
       const runtimeLabel = ep.runtime ? ' • ' + ep.runtime + ' min' : '';
       const ariaLabel = ep.name
         ? escapeAttr(ep.name + ' (' + epNumberLabel + ')')
-        : escapeAttr('Episodio ' + ep.num + ' (' + epNumberLabel + ')');
+        : escapeAttr(t('detail.episode', { n: ep.num }) + ' (' + epNumberLabel + ')');
       const hasNote = typeof ep.note === 'string' && ep.note.length > 0;
       html +=
         '<div class="episode-item ' +
@@ -435,7 +466,7 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
   const show = state.shows.find((s) => s.id === showId);
   const ep = show?.seasons[season]?.find((e) => e.num === epNum);
   if (!show || !ep) return;
-  const epName = ep.name || 'Episodio ' + epNum;
+  const epName = ep.name || t('detail.episode', { n: epNum });
   const currentNote = ep.note ?? '';
 
   const bodyHtml =
@@ -461,10 +492,10 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
     MAX_EPISODE_NOTE_LENGTH +
     '</div>';
 
-  showModal('Nota episodio', bodyHtml, [
-    { label: 'Annulla' },
+  showModal(t('notes.title'), bodyHtml, [
+    { label: t('actions.cancel') },
     {
-      label: 'Salva',
+      label: t('actions.save'),
       style: 'btn-primary',
       keepOpen: true,
       onClick: () => {
@@ -472,7 +503,7 @@ function openNoteEditor(showId: number, season: number, epNum: number): void {
         if (!ta) return;
         if (setEpisodeNote(showId, season, epNum, ta.value)) {
           closeModal();
-          showToast('Nota salvata', 'success');
+          showToast(t('notes.saved'), 'success');
         }
       },
     },
@@ -509,7 +540,9 @@ function openAddTagModal(showId: number): void {
   let suggestionsHtml = '';
   if (suggestions.length > 0) {
     suggestionsHtml =
-      '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">Suggerimenti:</div>' +
+      '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">' +
+      t('detail.suggerimenti') +
+      '</div>' +
       '<div class="tag-suggestions">' +
       suggestions
         .map((t) => '<button class="tag-suggestion" data-tag="' + escapeAttr(t) + '">' + escapeHtml(t) + '</button>')
@@ -520,13 +553,15 @@ function openAddTagModal(showId: number): void {
   const bodyHtml =
     '<input type="text" id="tagInput" class="tag-input" maxlength="' +
     MAX_TAG_LENGTH +
-    '" placeholder="Es. da rivedere, con Alice, estate 2026..." autocomplete="off">' +
+    '" placeholder="' +
+    t('tags.placeholder') +
+    '" autocomplete="off">' +
     suggestionsHtml;
 
-  showModal('Aggiungi tag a "' + show.name + '"', bodyHtml, [
-    { label: 'Annulla' },
+  showModal(t('detail.addTagTitle', { name: show.name }), bodyHtml, [
+    { label: t('actions.cancel') },
     {
-      label: 'Aggiungi',
+      label: t('actions.add'),
       style: 'btn-primary',
       // keepOpen=true + closeModal manuale on success.
       // Prima il modal si chiudeva SEMPRE (anche su fallimento: tag duplicato,
@@ -541,7 +576,7 @@ function openAddTagModal(showId: number): void {
         if (tag.length === 0) return;
         if (addShowTag(showId, tag)) {
           closeModal();
-          showToast('Tag aggiunto', 'success');
+          showToast(t('tags.added'), 'success');
         }
       },
     },
@@ -559,7 +594,7 @@ function openAddTagModal(showId: number): void {
           if (tag.length > 0) {
             if (addShowTag(showId, tag)) {
               closeModal();
-              showToast('Tag aggiunto', 'success');
+              showToast(t('tags.added'), 'success');
             }
           }
         }

@@ -34,7 +34,6 @@ export interface DiscoverGroups {
 async function fetchAllCandidates(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void,
 ): Promise<{ shows: TvmazeShow[]; failedPages: number[] }> {
   const sixMonthsAgo = recentOnly
     ? (() => {
@@ -49,29 +48,6 @@ async function fetchAllCandidates(
         return d;
       })()
     : null;
-
-  const total = pages.length;
-  let completed = 0;
-  let lastProgressText = '';
-  let progressRAF: number | null = null;
-  let progressDirty = false;
-
-  const scheduleProgress = (label: string) => {
-    progressDirty = true;
-    if (progressRAF) return;
-    progressRAF = requestAnimationFrame(() => {
-      progressRAF = null;
-      if (!progressDirty) return;
-      progressDirty = false;
-      const text = label + '... (' + completed + '/' + total + ' pagine)';
-      if (text === lastProgressText) return;
-      lastProgressText = text;
-      onProgress?.(text);
-    });
-  };
-
-  const label = recentOnly ? 'Caricamento ultimi arrivi' : 'Caricamento serie popolari';
-  scheduleProgress(label);
 
   // Concurrency limitato: batch di 3 pagine alla volta
   const CONCURRENCY = 3;
@@ -91,9 +67,6 @@ async function fetchAllCandidates(
           if (e instanceof ApiError && e.status === 404) return { idx: i + j, shows: [] as TvmazeShow[] };
           console.warn('Errore caricamento pagina ' + page + ':', e);
           return { idx: i + j, shows: [] as TvmazeShow[], failed: page };
-        } finally {
-          completed++;
-          scheduleProgress(label);
         }
       }),
     );
@@ -101,15 +74,6 @@ async function fetchAllCandidates(
       results[r.idx] = r.shows;
       if ('failed' in r && r.failed !== undefined) failedPages.push(r.failed);
     }
-  }
-
-  // Cancel any pending progress RAF so onProgress is not
-  // invoked after the fetch has settled. The RAF was scheduled in the last
-  // page's `finally` and would fire on the next animation frame, leaking a
-  // final callback to the caller who already received the resolved data.
-  if (progressRAF !== null) {
-    cancelAnimationFrame(progressRAF);
-    progressRAF = null;
   }
 
   const all: TvmazeShow[] = [];
@@ -223,9 +187,8 @@ function assignShowsToGroups(candidates: TvmazeShow[]): DiscoverGroups {
 async function fetchShowsByGenre(
   pages: number[],
   recentOnly: boolean,
-  onProgress?: (text: string) => void,
 ): Promise<{ groups: DiscoverGroups; failedPages: number[] }> {
-  const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly, onProgress);
+  const { shows, failedPages } = await fetchAllCandidates(pages, recentOnly);
   return { groups: assignShowsToGroups(shows), failedPages };
 }
 
@@ -283,10 +246,10 @@ function writeCache(key: string, groups: DiscoverGroups, failedPages: number[]):
   }
 }
 
-export async function getPopularShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+export async function getPopularShows(): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_CACHE_KEY);
   if (cached) return cached;
-  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false, onProgress);
+  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_POPULAR_PAGES, false);
   writeCache(DISCOVER_CACHE_KEY, groups, failedPages);
   return groups;
 }
@@ -306,10 +269,10 @@ export async function getRecentPages(): Promise<number[]> {
   return DISCOVER_RECENT_FALLBACK_PAGES;
 }
 
-export async function getRecentShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
+export async function getRecentShows(): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_RECENT_CACHE_KEY);
   if (cached) return cached;
-  const { groups, failedPages } = await fetchShowsByGenre(await getRecentPages(), true, onProgress);
+  const { groups, failedPages } = await fetchShowsByGenre(await getRecentPages(), true);
   writeCache(DISCOVER_RECENT_CACHE_KEY, groups, failedPages);
   return groups;
 }

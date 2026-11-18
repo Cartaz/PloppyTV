@@ -10,6 +10,7 @@ import { localISODate } from '../lib/utils';
 import { showToast } from './toast';
 import { showModal, closeAllModals, type ModalAction } from './modal';
 import { updateBadges } from './header';
+import { t, tn } from '../lib/i18n';
 
 const SUPPORTS_EXPORT =
   typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
@@ -43,25 +44,16 @@ function decodeArrayBuffer(buf: ArrayBuffer): string {
   return new TextDecoder('utf-8').decode(bytes.subarray(start));
 }
 
-/**
- * Pluralizza una parola italiana in base al numero.
- * feminine: 1 → "ignorata", 2+ → "ignorate", "nuova"/"nuove".
- * masculine: 1 → "duplicato"/"saltato", 2+ → "duplicati"/"saltati".
- */
-function pluralize(n: number, singular: string, plural: string): string {
-  return n === 1 ? singular : plural;
-}
-
 export function initExportImport(): void {
   document.getElementById('exportBtn')?.addEventListener('click', () => {
     if (!SUPPORTS_EXPORT) {
-      showToast('Esportazione non supportata da questo browser', 'error');
+      showToast(t('io.esportazioneSupportataQuestoBrowser'), 'error');
       return;
     }
     if (getState().shows.length === 0) {
-      showModal('Esporta backup', '<p>Non hai nessuna serie. Vuoi comunque esportare un backup vuoto?</p>', [
-        { label: 'Annulla' },
-        { label: 'Esporta comunque', style: 'btn-primary', onClick: doExport },
+      showModal(t('io.esportaBackup'), '<p>' + t('io.haiNessunaSerieVuoi') + '</p>', [
+        { label: t('actions.cancel') },
+        { label: t('io.esportaComunque'), style: 'btn-primary', onClick: doExport },
       ]);
       return;
     }
@@ -80,13 +72,13 @@ export function initExportImport(): void {
       return;
     }
     if (file.size > MAX_IMPORT_SIZE) {
-      showToast('File troppo grande (max ' + Math.round(MAX_IMPORT_SIZE / 1024 / 1024) + 'MB)', 'error');
+      showToast(t('io.fileTooBig', { max: Math.round(MAX_IMPORT_SIZE / 1024 / 1024) }), 'error');
       input.value = '';
       return;
     }
     const reader = new FileReader();
     reader.onerror = () => {
-      showToast('Errore lettura file', 'error');
+      showToast(t('io.erroreLetturaFile'), 'error');
       input.value = '';
     };
     // readAsArrayBuffer + BOM detection per supportare UTF-16.
@@ -97,7 +89,7 @@ export function initExportImport(): void {
         text = decodeArrayBuffer(buf);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast('File JSON non valido: ' + msg, 'error');
+        showToast(t('io.invalidJson', { msg }), 'error');
         input.value = '';
         return;
       }
@@ -107,7 +99,7 @@ export function initExportImport(): void {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
         // Non menzionare più UTF-16 (ora gestito).
-        showToast('File JSON non valido: ' + msg + ' (controlla che sia un file JSON valido e non corrotto)', 'error');
+        showToast(t('io.invalidJsonHint', { msg }), 'error');
         input.value = '';
         return;
       }
@@ -122,50 +114,37 @@ export function initExportImport(): void {
         const canonical = canonicalizeDataDocument(data);
         if (!canonical.ok) {
           if (canonical.code === 'unsupported-version') {
-            showToast(
-              'Backup creato da una versione più recente di PloppyTV — aggiorna l’app prima di importarlo',
-              'error',
-            );
+            showToast(t('io.backupCreatoVersionePiu'), 'error');
           } else if (canonical.code === 'invalid-version') {
-            showToast('Formato non valido: versione schema non valida', 'error');
+            showToast(t('io.formatoValidoVersioneSchema'), 'error');
           } else if (canonical.code === 'invalid-shows') {
-            showToast('Formato non valido: "shows" deve essere un array', 'error');
+            showToast(t('io.formatoValidoShowsDeve'), 'error');
           } else {
-            showToast('Formato non valido: il file deve contenere un oggetto JSON', 'error');
+            showToast(t('io.formatoValidoFileDeve'), 'error');
           }
           input.value = '';
           return;
         }
 
         if (canonical.document.sourceVersion === null) {
-          showToast('Backup senza versione schema — importo comunque best-effort', 'warning');
+          showToast(t('io.backupSenzaVersioneSchema'), 'warning');
         }
 
         const dedupedShows = canonical.document.shows;
         const skipped = canonical.document.skippedShows;
         const duplicates = canonical.document.duplicateShows;
         if (dedupedShows.length === 0) {
-          showToast('Nessuna serie valida nel file', 'error');
+          showToast(t('io.nessunaSerieValidaNel'), 'error');
           input.value = '';
           return;
         }
-        // Grammatica italiana singolare/plurale.
-        const skipMsg =
-          skipped > 0
-            ? ' (' +
-              skipped +
-              ' ' +
-              pluralize(skipped, 'ignorata per dati non validi', 'ignorate per dati non validi') +
-              (duplicates > 0
-                ? ', ' + duplicates + ' ' + pluralize(duplicates, 'duplicato saltato', 'duplicati saltati')
-                : '') +
-              ')'
-            : duplicates > 0
-              ? ' (' + duplicates + ' ' + pluralize(duplicates, 'duplicato saltato', 'duplicati saltati') + ')'
-              : '';
+        const skipParts: string[] = [];
+        if (skipped > 0) skipParts.push(tn('io.skippedInvalid', skipped));
+        if (duplicates > 0) skipParts.push(tn('io.skippedDuplicates', duplicates));
+        const skipMsg = skipParts.length > 0 ? ' (' + skipParts.join(', ') + ')' : '';
 
         const mergeAction: ModalAction = {
-          label: 'Unisci (smart)',
+          label: t('io.unisciSmart'),
           onClick: () => {
             // Snapshot per rollback in caso di save fallito
             const prevShows = getState().shows.map((s) => ({ ...s }));
@@ -184,25 +163,17 @@ export function initExportImport(): void {
             if (!saveData()) {
               // Rollback: ripristina lo snapshot precedente
               setShows(prevShows);
-              showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');
+              showToast(t('io.importAnnullatoStorageInsufficiente'), 'error');
               return;
             }
             updateBadges();
             emitChange();
-            // Grammatica italiana.
-            const addedWord = pluralize(added, 'Importata', 'Importate');
-            const nuoveWord = pluralize(added, 'nuova', 'nuove');
-            const aggiornateWord = pluralize(updated, 'aggiornata', 'aggiornate');
-            const serieWord = pluralize(updated, 'serie', 'serie');
-            showToast(
-              addedWord + ' ' + added + ' ' + nuoveWord + ', ' + aggiornateWord + ' ' + updated + ' ' + serieWord,
-              'success',
-            );
+            showToast(tn('io.mergeAdded', added) + ', ' + tn('io.mergeUpdated', updated), 'success');
           },
         };
 
         const replaceAction: ModalAction = {
-          label: 'Sostituisci tutto',
+          label: t('io.sostituisciTutto'),
           style: 'btn-danger',
           // keepOpen = true impedisce che il closeModal()
           // automatico dopo onClick chiuda il modale genitore prima che la
@@ -210,16 +181,18 @@ export function initExportImport(): void {
           keepOpen: true,
           onClick: () => {
             showModal(
-              'Conferma sostituzione',
-              '<p><strong>Attenzione:</strong> tutte le ' +
-                getState().shows.length +
-                ' serie attuali verranno cancellate e sostituite con le ' +
-                dedupedShows.length +
-                ' del backup.</p><p>Questa azione non può essere annullata.</p>',
+              t('io.confermaSostituzione'),
+              '<p><strong>' +
+                t('io.attenzione') +
+                '</strong> ' +
+                t('io.replaceWarning', { current: getState().shows.length, incoming: dedupedShows.length }) +
+                '</p><p>' +
+                t('io.questaAzionePuoEssere') +
+                '</p>',
               [
-                { label: 'Annulla' },
+                { label: t('actions.cancel') },
                 {
-                  label: 'Sì, sostituisci tutto',
+                  label: t('io.siSostituisciTutto'),
                   style: 'btn-danger',
                   onClick: () => {
                     // Snapshot per rollback
@@ -228,12 +201,12 @@ export function initExportImport(): void {
                     if (!saveData()) {
                       // Rollback al precedente stato
                       setShows(prev);
-                      showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');
+                      showToast(t('io.importAnnullatoStorageInsufficiente'), 'error');
                       return;
                     }
                     updateBadges();
                     emitChange();
-                    showToast('Backup importato (sostituzione)', 'success');
+                    showToast(t('io.backupImportatoSostituzione'), 'success');
                     // Chiudi entrambi i modali (genitore + figlia)
                     closeAllModals();
                   },
@@ -244,18 +217,19 @@ export function initExportImport(): void {
         };
 
         showModal(
-          'Importa backup',
-          '<p>Trovate ' +
-            dedupedShows.length +
-            ' serie valide' +
+          t('io.importaBackup'),
+          '<p>' +
+            t('io.found', { count: dedupedShows.length }) +
             skipMsg +
             '.</p>' +
-            '<p>Vuoi sostituire i dati attuali o unirli?</p>',
-          [{ label: 'Annulla' }, mergeAction, replaceAction],
+            '<p>' +
+            t('io.vuoiSostituireDatiAttuali') +
+            '</p>',
+          [{ label: t('actions.cancel') }, mergeAction, replaceAction],
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast('Errore elaborazione backup: ' + msg, 'error');
+        showToast(t('io.erroreElaborazioneBackup') + msg, 'error');
         input.value = '';
       }
     };
@@ -276,7 +250,7 @@ function doExport(): void {
     data = JSON.stringify(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
-    showToast('Errore serializzazione: ' + msg, 'error');
+    showToast(t('io.erroreSerializzazione') + msg, 'error');
     return;
   }
   try {
@@ -289,9 +263,9 @@ function doExport(): void {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('Backup esportato', 'success');
+    showToast(t('io.backupEsportato'), 'success');
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
-    showToast('Errore esportazione: ' + msg, 'error');
+    showToast(t('io.erroreEsportazione') + msg, 'error');
   }
 }

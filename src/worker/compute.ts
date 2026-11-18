@@ -42,18 +42,6 @@ export function computeStats(shows: Show[]): StatsResult {
   const totalMinutes = shows.reduce((sum, s) => sum + getWatchedCount(s) * (safeNum(s.runtime) || 45), 0);
   const totalDays = Math.floor(totalMinutes / 1440);
   const remHours = Math.floor((totalMinutes % 1440) / 60);
-  // timeLabel migliorato: include minuti residui se < 1h
-  const remMin = totalMinutes % 60;
-  let timeLabel: string;
-  if (totalDays > 0) {
-    timeLabel = totalDays + 'g ' + remHours + 'h';
-  } else if (totalMinutes >= 60) {
-    timeLabel = remHours + 'h' + (remMin > 0 ? ' ' + remMin + 'min' : '');
-  } else if (totalMinutes > 0) {
-    timeLabel = totalMinutes + 'min';
-  } else {
-    timeLabel = '0min';
-  }
 
   // Generi
   const genreStats: Record<string, { episodes: number; shows: Set<number> }> = {};
@@ -69,7 +57,8 @@ export function computeStats(shows: Show[]): StatsResult {
     //     `localeCompare`). Now filtered out before they enter genreStats.
     const rawGenres = Array.isArray(s.genres) ? s.genres.filter((g): g is string => typeof g === 'string') : [];
     const dedupedGenres = Array.from(new Set(rawGenres));
-    const genres = dedupedGenres.length ? dedupedGenres : ['Senza genere'];
+    // '' = senza genere: l'etichetta tradotta la sceglie la vista (il worker non conosce la lingua).
+    const genres = dedupedGenres.length ? dedupedGenres : [''];
     for (const g of genres) {
       if (!genreStats[g]) genreStats[g] = { episodes: 0, shows: new Set() };
       genreStats[g].episodes += watched;
@@ -108,7 +97,6 @@ export function computeStats(shows: Show[]): StatsResult {
     totalMinutes,
     totalDays,
     remHours,
-    timeLabel,
     totalProgress,
     topGenres,
     topShows,

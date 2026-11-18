@@ -108,7 +108,6 @@ export interface StatsResult {
   totalMinutes: number;
   totalDays: number;
   remHours: number;
-  timeLabel: string;
   totalProgress: number;
   topGenres: Array<{ genre: string; episodes: number; shows: number }>;
   topShows: Array<{

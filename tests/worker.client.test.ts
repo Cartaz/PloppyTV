@@ -8,6 +8,7 @@
 //    over message dispatch, timeouts, and onerror.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { formatDuration } from '../src/lib/i18n';
 import type { Show, WorkerRequest, WorkerResponse, StatsResult } from '../src/types';
 import { makeShow, makeShowWithSeasons, markWatchedFirst } from './helpers';
 
@@ -62,7 +63,7 @@ describe('[worker] computeStats', () => {
     expect(r.totalMinutes).toBe(0);
     expect(r.totalDays).toBe(0);
     expect(r.remHours).toBe(0);
-    expect(r.timeLabel).toBe('0min');
+    expect(formatDuration(r.totalMinutes)).toBe('0min');
     expect(r.totalProgress).toBe(0);
     expect(r.topGenres).toEqual([]);
     expect(r.topShows).toEqual([]);
@@ -72,14 +73,14 @@ describe('[worker] computeStats', () => {
     const s = makeShowWithSeasons({ 1: 2 }, { runtime: 0, id: 1 });
     markWatchedFirst(s, 1, 2);
     expect(statsOf([s]).totalMinutes).toBe(90); // 2 × 45
-    expect(statsOf([s]).timeLabel).toBe('1h 30min');
+    expect(formatDuration(statsOf([s]).totalMinutes)).toBe('1h 30min');
   });
 
   it('runtime="60" (string) → safeNum parses to 60', () => {
     const s = makeShowWithSeasons({ 1: 2 }, { runtime: '60' as unknown as number, id: 1 });
     markWatchedFirst(s, 1, 2);
     expect(statsOf([s]).totalMinutes).toBe(120);
-    expect(statsOf([s]).timeLabel).toBe('2h');
+    expect(formatDuration(statsOf([s]).totalMinutes)).toBe('2h');
   });
 
   it('runtime=NaN/undefined/null → default 45', () => {
@@ -93,21 +94,21 @@ describe('[worker] computeStats', () => {
   it('timeLabel boundaries: 60min→"1h", 90min→"1h 30min", 1440min→"1g 0h", 1500min→"1g 1h"', () => {
     const s60 = makeShowWithSeasons({ 1: 1 }, { runtime: 60, id: 1 });
     markWatchedFirst(s60, 1, 1);
-    expect(statsOf([s60]).timeLabel).toBe('1h');
+    expect(formatDuration(statsOf([s60]).totalMinutes)).toBe('1h');
 
     const s90 = makeShowWithSeasons({ 1: 2 }, { runtime: 45, id: 2 });
     markWatchedFirst(s90, 1, 2);
-    expect(statsOf([s90]).timeLabel).toBe('1h 30min');
+    expect(formatDuration(statsOf([s90]).totalMinutes)).toBe('1h 30min');
 
     const s1440 = makeShowWithSeasons({ 1: 32 }, { runtime: 45, id: 3 });
     markWatchedFirst(s1440, 1, 32);
     expect(statsOf([s1440]).totalMinutes).toBe(1440);
-    expect(statsOf([s1440]).timeLabel).toBe('1g 0h');
+    expect(formatDuration(statsOf([s1440]).totalMinutes)).toBe('1g 0h');
 
     const s1500 = makeShowWithSeasons({ 1: 25 }, { runtime: 60, id: 4 });
     markWatchedFirst(s1500, 1, 25);
     expect(statsOf([s1500]).totalMinutes).toBe(1500);
-    expect(statsOf([s1500]).timeLabel).toBe('1g 1h');
+    expect(formatDuration(statsOf([s1500]).totalMinutes)).toBe('1g 1h');
   });
 
   it('topGenres: multi-genre show counts watched eps in EACH genre (sum > totalWatched)', () => {
@@ -124,12 +125,12 @@ describe('[worker] computeStats', () => {
     expect(r.totalWatched).toBe(10);
   });
 
-  it('topGenres: show with no genres → "Senza genere"', () => {
+  it('topGenres: show with no genres → "" (label chosen by the view)', () => {
     const s = makeShowWithSeasons({ 1: 2 }, { genres: [] as string[], id: 1 });
     markWatchedFirst(s, 1, 2);
     const r = statsOf([s]);
     expect(r.topGenres).toHaveLength(1);
-    expect(r.topGenres[0].genre).toBe('Senza genere');
+    expect(r.topGenres[0].genre).toBe('');
     expect(r.topGenres[0].episodes).toBe(2);
   });
 
@@ -442,7 +443,6 @@ describe('[client] computeStatsAsync', () => {
       totalMinutes: 0,
       totalDays: 0,
       remHours: 0,
-      timeLabel: '0min',
       totalProgress: 0,
       topGenres: [],
       topShows: [],
@@ -465,7 +465,7 @@ describe('[client] computeStatsAsync', () => {
     const result = await computeStatsAsync(shows);
     // Fallback computes: 2 watched × 60 = 120 min
     expect(result.totalMinutes).toBe(120);
-    expect(result.timeLabel).toBe('2h');
+    expect(formatDuration(result.totalMinutes)).toBe('2h');
   });
 
   it('falls back after WORKER_TIMEOUT_MS timeout when worker never responds', async () => {
