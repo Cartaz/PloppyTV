@@ -146,27 +146,9 @@ export function renderShowDetail(main: HTMLElement): void {
     '</button>';
 
   html += '<div class="detail-header">';
-  // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
-  // Regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
-  // Typeof guard su show.image — se corrotto a non-string
-  // (numero/oggetto), `.replace` avrebbe throwato TypeError. normalize valida,
-  // ma defense-in-depth contro dati importati malevoli/corrotti.
-  const bigImg =
-    typeof show.image === 'string' ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/') : null;
-  if (bigImg && show.image && bigImg !== show.image) {
-    // Catena: original -> medium -> placeholder
-    html +=
-      '<img class="detail-poster" src="' +
-      escapeAttr(bigImg) +
-      '" alt="' +
-      escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="' +
-      escapeAttr(t('detail.imageUnavailable')) +
-      '" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
-      escapeAttr(show.image) +
-      '">';
-  } else if (show.image) {
-    // Solo medium disponibile
+  // Poster: l'URL medium del CDN TVMaze (quello salvato). La variante
+  // "original_untouched" pesa >1 MB; "original_portrait" non esiste (404).
+  if (show.image) {
     html +=
       '<img class="detail-poster" src="' +
       escapeAttr(show.image) +

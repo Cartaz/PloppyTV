@@ -78,67 +78,23 @@ describe('renderShowDetail — show not found', () => {
 // ============================================================================
 // bigImg URL replace bug
 // ============================================================================
-describe('renderShowDetail — bigImg URL replace', () => {
-  it('TVMaze medium_portrait URL → original_portrait URL (CORRECT case)', () => {
+describe('renderShowDetail — poster', () => {
+  it('uses the stored TVMaze medium URL directly (the "original_portrait" variant does not exist)', () => {
     const url = 'https://static.tvmaze.com/uploads/images/medium_portrait/100/250000.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
+    setState({ currentShowId: 1, shows: [makeShow({ id: 1, image: url })] });
     renderShowDetail(getMain());
     const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    expect(img).toBeTruthy();
-    expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
-    expect(img.dataset.fallbackSrc).toBe(url);
+    expect(img.getAttribute('src')).toBe(url);
+    expect(img.dataset.fallbackSrc).toBeUndefined();
     expect(img.dataset.fallback).toBe('Immagine non disponibile');
     expect(img.dataset.fallbackCls).toBe('detail-poster-placeholder');
   });
 
-  it('pathological URL with multiple "medium" — regex matches only /medium_(portrait|landscape)/ — URL unchanged (FIXED)', () => {
-    // FIX BUG-14-03: la regex /\/medium_(portrait|landscape)\// non matcha
-    // URL non-standard come questo (medium-shows, medium_poster) → bigImg === show.image
-    // → si cade nel branch "solo medium disponibile" (no data-fallback-src).
-    const url = 'https://cdn.example.com/medium-shows/medium_poster/x.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
+  it('renders the placeholder when the show has no poster', () => {
+    setState({ currentShowId: 1, shows: [makeShow({ id: 1, image: null })] });
     renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // FIX: URL invariato (nessuna corruzione). bigImg === show.image → solo-medium branch.
-    expect(img.getAttribute('src')).toBe(url);
-    // Nessun data-fallback-src (solo-medium branch non lo imposta).
-    expect(img.dataset.fallbackSrc).toBeUndefined();
-  });
-
-  it('show.image already original (no "medium") → bigImg===show.image → solo-medium branch', () => {
-    const url = 'https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // solo-medium branch: src is the same, NO data-fallback-src attribute
-    expect(img.getAttribute('src')).toBe(url);
-    expect(img.dataset.fallbackSrc).toBeUndefined();
-    expect(img.dataset.fallback).toBe('Immagine non disponibile');
-  });
-
-  it('show.image=null → placeholder div rendered', () => {
-    const show = makeShow({ id: 1, image: null });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const ph = document.querySelector('.detail-poster-placeholder');
-    expect(ph).toBeTruthy();
-    expect(ph?.textContent).toBe('Immagine non disponibile');
-  });
-
-  it('show.image with "medium" substring in filename only — regex no match → URL unchanged (FIXED)', () => {
-    // FIX BUG-14-03: la regex non matcha "medium" dentro un filename, solo
-    // path-segment TVMaze `/medium_portrait/` o `/medium_landscape/`.
-    const url = 'https://cdn.example.com/posters/show-medium-cover.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // FIX: URL invariato (filename non corrotto). bigImg === show.image → solo-medium branch.
-    expect(img.getAttribute('src')).toBe(url);
-    expect(img.dataset.fallbackSrc).toBeUndefined();
+    expect(document.querySelector('.detail-poster')).toBeNull();
+    expect(document.querySelector('.detail-poster-placeholder')?.textContent).toBe('Immagine non disponibile');
   });
 });
 

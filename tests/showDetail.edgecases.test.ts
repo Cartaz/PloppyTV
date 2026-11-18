@@ -217,46 +217,6 @@ describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
 });
 
 // ============================================================================
-// BUG-A11-05: show.image non-string doesn't crash renderShowDetail
-// ============================================================================
-describe('BUG-A11-05: show.image non-string guarded (no .replace TypeError)', () => {
-  it('show.image as number → no crash (no .replace TypeError on non-string)', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { image: unknown }).image = 42;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    // typeof 42 !== 'string' → bigImg = null → falls to solo-medium branch (42 truthy).
-    const img = document.querySelector('.detail-poster') as HTMLImageElement | null;
-    expect(img).toBeTruthy();
-  });
-
-  it('show.image as object → no crash', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { image: unknown }).image = { medium: 'x' };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-  });
-
-  it('show.image as 0 (falsy non-string) → placeholder branch, no crash', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { image: unknown }).image = 0;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    const placeholder = document.querySelector('.detail-poster-placeholder');
-    expect(placeholder).toBeTruthy();
-  });
-
-  it('show.image as valid string URL → original_portrait replace works (no regression)', () => {
-    const url = 'https://static.tvmaze.com/uploads/images/medium_portrait/100/250000.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
-  });
-});
-
-// ============================================================================
 // BUG-A11-10: addTag modal stays open on failure (duplicate/max)
 // ============================================================================
 describe('BUG-A11-10: addTag modal stays open on failure', () => {
