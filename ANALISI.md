@@ -131,9 +131,17 @@ Esito per problema: A1, A2, A3, M1–M8 e B1–B10 risolti. Di B11 (hook di test
 ### Cosa resta aperto
 
 - **Advisory di sviluppo non risolvibili oggi.** `picomatch` ≤ 4.0.7 è segnalato e non esiste ancora una versione corretta. Riguarda solo gli strumenti di build e test, non l'app pubblicata, e in CI non blocca.
-- **Branch remoti già fusi** (31 `audit/*`, `fix/*`, …): non li ho cancellati perché è un'operazione sul repository GitHub.
-- **Hook di test nel codice di produzione** (B11): `_resetXForTesting` e i flag globali su `window` sono rimasti, perché servono ancora a più file di test.
-- **Titoli dei test**: molti `describe` ereditati dai vecchi file probe contengono ancora ID come `BUG-A6-07`. È cosmetico, l'ho lasciato.
-- **Nomi delle chiavi i18n** generate automaticamente: sono slug italiani (es. `io.esportaBackup`). Funzionano, ma rinominarle sarebbe più leggibile.
-- **Versione**: portata a 1.3.0 (schema dati 3). Il tag `v1.3.0` va creato al rilascio, dopo il merge.
-- **Verifica nel browser**: tutto è verificato con typecheck, lint, build e i test jsdom (compresi interfaccia inglese, routing e flusso completo). L'app non è stata provata a mano in un browser vero.
+
+## 5. Dopo la release 1.3.0 (18 novembre 2026)
+
+Chiusi i punti rimasti aperti, sul branch `chore/post-release-cleanup`:
+
+- **Branch remoti**: cancellati tutti e 30 (20 fusi in `main` o con PR fusa, 10 branch di appoggio per la CI senza PR); su GitHub resta solo `main`.
+- **Release**: tag `v1.3.0` e release su GitHub; tag `v1.2.1` creato sul commit di rilascio `edc0dc5`; note della 1.3.0 in `docs/`.
+- **Prova nel browser** sul sito pubblicato (profilo anonimo, dati demo): aggiunta da ricerca, episodi, nota con `<` e `&` dopo ricaricamento, deep link, Indietro/Avanti, Scopri "Ultimi arrivi", statistiche, interfaccia in inglese. Tutto funzionante; trovati e corretti due difetti:
+  - il poster del dettaglio serie causava un 404 a ogni apertura (URL "originale" inesistente sul CDN TVMaze);
+  - lo stato della serie restava in inglese ("ENDED").
+- **Hook di test** (B11): rimossi. `initKeyboard`, `initNotifications`, `initImageFallback` e `initSearch` restituiscono la propria funzione di cleanup; il reset dei filtri della libreria è `clearLibraryFilters()`, usato anche dal pulsante; via i flag globali su `window` (resta solo l'helper di debug attivo in sviluppo).
+- **Chiavi i18n**: le 106 generate automaticamente hanno nomi descrittivi (`io.exportTitle`, `calendar.noEpisodesWeek`, …).
+- **Test**: nessun ID `BUG-xx`/`FIX-xx` nei titoli e nei commenti (356 occorrenze).
+- **Screenshot veri** nel README al posto del segnaposto.
