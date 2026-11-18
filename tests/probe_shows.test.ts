@@ -195,11 +195,11 @@ describe('addShowToList', () => {
     expect(updateBadges).toHaveBeenCalledTimes(1);
   });
 
-  it('manualList semantics: towatch=false, watching=true, completed=true', async () => {
+  it('manualList semantics: towatch=false, watching=true, completed=reconciled (all watched)', async () => {
     const cases: Array<['towatch' | 'watching' | 'completed', boolean]> = [
       ['towatch', false],
       ['watching', true],
-      ['completed', true],
+      ['completed', false],
     ];
     for (const [list, expectedManual] of cases) {
       resetState();
@@ -213,12 +213,21 @@ describe('addShowToList', () => {
     }
   });
 
-  it('adding to completed with 0 watched: stays completed (manualList blocks demote)', async () => {
+  it('adding to completed marks every episode as watched', async () => {
+    vi.mocked(getShowEpisodes).mockResolvedValue(makeTvmazeEpisodes());
     const r = await addShowToList(makeTvmazeShow(42), 'completed');
     expect(r).not.toBeNull();
     expect(r!.list).toBe('completed');
+    const eps = Object.values(r!.seasons).flat();
+    expect(eps.length).toBeGreaterThan(0);
+    expect(eps.every((ep) => ep.watched)).toBe(true);
+  });
+
+  it('adding to completed a show with no episodes keeps the user choice', async () => {
+    vi.mocked(getShowEpisodes).mockResolvedValue([]);
+    const r = await addShowToList(makeTvmazeShow(43), 'completed');
+    expect(r!.list).toBe('completed');
     expect(r!.manualList).toBe(true);
-    // No updateShowListStatus called in addShowToList, so list stays as user chose.
   });
 
   it('invalid tvmazeShow returns null', async () => {

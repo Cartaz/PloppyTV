@@ -37,7 +37,7 @@ import {
   DISCOVER_TARGET_OTHER,
   DISCOVER_CACHE_KEY,
   DISCOVER_CACHE_TTL,
-  DISCOVER_RECENT_PAGES,
+  DISCOVER_RECENT_FALLBACK_PAGES,
   GENRE_CAROUSELS,
 } from '../src/lib/constants';
 import type { TvmazeShow } from '../src/types';
@@ -98,7 +98,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     const oldShow = makeShow(3, { premiered: '2023-01-01' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [futureShow, recentShow, oldShow];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [futureShow, recentShow, oldShow];
       return [];
     });
 
@@ -121,7 +121,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     const todayShow = makeShow(1, { premiered: '2024-06-15' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [todayShow];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [todayShow];
       return [];
     });
 
@@ -405,7 +405,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     const validRecent = makeShow(2, { premiered: '2024-04-01' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [emptyPremiered, validRecent];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [emptyPremiered, validRecent];
       return [];
     });
 
@@ -426,7 +426,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     const validRecent = makeShow(2, { premiered: '2024-04-01' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [invalidPremiered, validRecent];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [invalidPremiered, validRecent];
       return [];
     });
 
@@ -518,7 +518,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     const feb28 = makeShow(2, { premiered: '2024-02-28' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [feb29, feb28];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [feb29, feb28];
       return [];
     });
 

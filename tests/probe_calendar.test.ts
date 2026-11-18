@@ -717,17 +717,6 @@ describe('Agent-16 calendar: DST & date arithmetic', () => {
 // ============================================================
 
 describe('Agent-16 calendar: contract notes (limitations, not bugs)', () => {
-  it('calendar displays at most 1 episode per watching show (findNextEpisode contract)', async () => {
-    // The worker/fallback uses findNextEpisode which returns ONLY the first unwatched ep.
-    // So a show with 2 new episodes in the same week shows only the first.
-    // (Cannot test the worker here since computeCalendarAsync is mocked; document the contract.)
-    const main = makeMain();
-    mockCal({ week: [makeCalEp({ showId: 1, showName: 'Show A', num: 1, date: '2024-03-12' })] });
-    await renderCalendar(main);
-    const eps = main.querySelectorAll('.calendar-episode');
-    expect(eps).toHaveLength(1);
-  });
-
   it('episode click target is openShow (does not jump to specific episode — UX limitation)', async () => {
     const main = makeMain();
     mockCal({ week: [makeCalEp({ showId: 42, season: 3, num: 7, date: '2024-03-12' })] });

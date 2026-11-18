@@ -8,8 +8,9 @@
 // riattivarla a un orario arbitrario.
 
 import { getState } from './store';
-import { findNextEpisode, parseISODateLocal } from './utils';
-import { PREFS_KEY, NOTIF_LEAD_TIME_MS, NOTIF_RESCHEDULE_INTERVAL_MS, NOTIF_MAX_DELAY_MS } from './constants';
+import type { Show } from '../types';
+import { unwatchedEpisodesByAirdate, type DatedEpisode } from './utils';
+import { PREFS_KEY, NOTIF_HOUR, NOTIF_RESCHEDULE_INTERVAL_MS, NOTIF_MAX_DELAY_MS } from './constants';
 import { t } from './i18n';
 
 interface Prefs {
@@ -147,13 +148,23 @@ function notificationIconUrl(): string {
   }
 }
 
+/** Mezzanotte locale di oggi: un episodio con airdate di oggi è ancora "in uscita". */
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Prima uscita non vista da oggi in poi (chi è indietro riceve comunque l'avviso). */
+function nextUpcomingEpisode(show: Show): DatedEpisode | null {
+  const today = startOfToday();
+  return unwatchedEpisodesByAirdate(show).find((ep) => ep.date >= today) ?? null;
+}
+
 /**
- * Schedula notifiche per i prossimi episodi delle serie in "watching".
- * Per ogni serie, prende il nextEpisode (se ha airdate nel futuro) e
- * schedula una notifica 1 ora prima.
- *
- * Le notifiche con tempo negativo (episodio già passato o lead time superato)
- * vengono saltate.
+ * Schedula una notifica per la prossima uscita di ogni serie "watching".
+ * TVMaze fornisce solo la data (senza orario), quindi l'avviso parte alle
+ * NOTIF_HOUR locali del giorno di uscita.
  */
 export function scheduleNotifications(): void {
   clearScheduledNotifications();
@@ -162,41 +173,24 @@ export function scheduleNotifications(): void {
 
   const state = getState();
   const now = Date.now();
-  let scheduledCount = 0;
 
   for (const show of state.shows) {
     if (show.list !== 'watching') continue;
-    const nextEp = findNextEpisode(show);
-    if (!nextEp || !nextEp.airdate) continue;
+    const nextEp = nextUpcomingEpisode(show);
+    if (!nextEp) continue;
 
-    // Parsa l'airdate. Gli episodi TVMaze hanno solo data (senza orario),
-    // quindi assumiamo ora di messa in onda = mezzanotte locale.
-    // Una notifica 1h prima della mezzanotte = 23:00 del giorno precedente.
-    // Questo è un limite accettabile per una PWA hobby.
-    const epDate = parseISODateLocal(nextEp.airdate);
-    if (!epDate) continue;
+    const notifDate = new Date(nextEp.date);
+    notifDate.setHours(NOTIF_HOUR, 0, 0, 0);
+    const notifTime = notifDate.getTime();
 
-    const epTime = epDate.getTime();
-    const notifTime = epTime - NOTIF_LEAD_TIME_MS;
-
-    // Salta se la notifica dovrebbe già essere passata (con un margine di 1 minuto)
+    // Già passata (margine di 1 minuto) o oltre il limite di setTimeout
+    // (2^31-1 ms): il re-schedule periodico la riprenderà più avanti.
     if (notifTime <= now + 60000) continue;
-
-    // BUG-A8-04 (FIXED): salta se la notifica eccede il delay massimo sicuro
-    // per setTimeout (2^31-1 ms ~ 24.85 giorni). Prima il guard era 30 giorni
-    // (2.59B ms > 2^31-1), causando overflow int32 e fire immediato del timer.
-    // Ora usiamo NOTIF_MAX_DELAY_MS (24 giorni) — il re-schedule periodico
-    // ogni 6h riprendera' le notifiche quando rientrano in finestra.
     if (notifTime > now + NOTIF_MAX_DELAY_MS) continue;
 
     const showName = show.name;
     const season = nextEp.season;
     const epNum = nextEp.num;
-
-    // BUG-A8-11 (FIXED): defense-in-depth — se season/epNum non sono finiti
-    // (non dovrebbe succedere dopo BUG-A3-07, ma per sicurezza), salta la
-    // notifica invece di creare un body/tag malformato ("SNaNEInfinity").
-    if (!Number.isFinite(season) || !Number.isFinite(epNum)) continue;
 
     const timer = setTimeout(() => {
       const title = t('notifications.episodeAirs', {
@@ -217,17 +211,12 @@ export function scheduleNotifications(): void {
     }, notifTime - now);
 
     _scheduledTimers.push(timer);
-    scheduledCount++;
   }
 
   // Re-scheduling periodico per cogliere nuovi episodi/airdate
   _rescheduleTimer = setTimeout(() => {
     scheduleNotifications();
   }, NOTIF_RESCHEDULE_INTERVAL_MS);
-
-  if (scheduledCount > 0) {
-    console.warn('[notifications] ' + scheduledCount + ' notifications scheduled');
-  }
 }
 
 /**
@@ -283,24 +272,14 @@ export function getNextNotifiableEpisode(): {
 } | null {
   const state = getState();
   let earliest: { showName: string; season: number; num: number; airdate: string; time: number } | null = null;
-  const now = Date.now();
 
   for (const show of state.shows) {
     if (show.list !== 'watching') continue;
-    const nextEp = findNextEpisode(show);
-    if (!nextEp || !nextEp.airdate) continue;
-    const epDate = parseISODateLocal(nextEp.airdate);
-    if (!epDate) continue;
-    const time = epDate.getTime();
-    if (time <= now) continue;
+    const nextEp = nextUpcomingEpisode(show);
+    if (!nextEp) continue;
+    const time = nextEp.date.getTime();
     if (!earliest || time < earliest.time) {
-      earliest = {
-        showName: show.name,
-        season: nextEp.season,
-        num: nextEp.num,
-        airdate: nextEp.airdate,
-        time,
-      };
+      earliest = { showName: show.name, season: nextEp.season, num: nextEp.num, airdate: nextEp.airdate, time };
     }
   }
   if (!earliest) return null;

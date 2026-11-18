@@ -329,10 +329,13 @@ export function initSearch(): void {
       if (list) selectSearchResult(idx, list);
       return;
     }
+    // Il clic sulla riga seleziona soltanto: l'aggiunta richiede uno dei
+    // pulsanti lista (o Invio), così un clic involontario non modifica i dati.
     const item = target.closest('.search-result-item') as HTMLElement | null;
     if (item) {
-      const idx = Number(item.dataset.idx);
-      selectSearchResult(idx, 'watching');
+      const items = _searchResults!.querySelectorAll('.search-result-item');
+      searchSelectedIdx = Array.prototype.indexOf.call(items, item);
+      updateSearchSelection(items);
     }
   });
 

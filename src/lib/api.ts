@@ -150,3 +150,12 @@ export async function getShowsPage(page: number, signal?: AbortSignal): Promise<
   const r = await apiGet<TvmazeShow[]>('/shows?page=' + encodeURIComponent(page), signal);
   return Array.isArray(r) ? r : [];
 }
+
+/** Mappa `{ [showId]: updatedAt }` delle serie aggiornate nel periodo. */
+export async function getUpdatedShowIds(since: 'day' | 'week', signal?: AbortSignal): Promise<number[]> {
+  const r = await apiGet<Record<string, unknown>>('/updates/shows?since=' + since, signal);
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return [];
+  return Object.keys(r)
+    .map(Number)
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+}

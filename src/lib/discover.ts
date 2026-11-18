@@ -1,13 +1,15 @@
 // Discover: serie popolari + ultimi arrivi con cache 1h
 
 import type { TvmazeShow } from '../types';
-import { getShowsPage, ApiError } from './api';
+import { getShowsPage, getUpdatedShowIds, ApiError } from './api';
 import {
   DISCOVER_CACHE_KEY,
   DISCOVER_RECENT_CACHE_KEY,
   DISCOVER_CACHE_TTL,
   DISCOVER_POPULAR_PAGES,
-  DISCOVER_RECENT_PAGES,
+  DISCOVER_RECENT_FALLBACK_PAGES,
+  DISCOVER_RECENT_PAGE_COUNT,
+  TVMAZE_SHOWS_PER_PAGE,
   DISCOVER_TARGET_PER_GENRE,
   DISCOVER_TARGET_OTHER,
   DISCOVER_TOTAL_TARGET,
@@ -84,6 +86,9 @@ async function fetchAllCandidates(
           const pageShows = await getShowsPage(page);
           return { idx: i + j, shows: Array.isArray(pageShows) ? pageShows : [] };
         } catch (e) {
+          // L'indice /shows di TVMaze è in ritardo rispetto agli ID più nuovi:
+          // l'ultima pagina può non esistere ancora. È vuota, non un errore.
+          if (e instanceof ApiError && e.status === 404) return { idx: i + j, shows: [] as TvmazeShow[] };
           console.warn('Errore caricamento pagina ' + page + ':', e);
           return { idx: i + j, shows: [] as TvmazeShow[], failed: page };
         } finally {
@@ -286,10 +291,25 @@ export async function getPopularShows(onProgress?: (text: string) => void): Prom
   return groups;
 }
 
+/** Le ultime pagine di `/shows`, ricavate dall'ID più alto aggiornato di recente. */
+export async function getRecentPages(): Promise<number[]> {
+  try {
+    const ids = await getUpdatedShowIds('week');
+    if (ids.length > 0) {
+      const last = Math.floor(Math.max(...ids) / TVMAZE_SHOWS_PER_PAGE);
+      const first = Math.max(0, last - DISCOVER_RECENT_PAGE_COUNT + 1);
+      return Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    }
+  } catch (e) {
+    console.warn('[discover] /updates/shows non disponibile, uso pagine di riserva:', e);
+  }
+  return DISCOVER_RECENT_FALLBACK_PAGES;
+}
+
 export async function getRecentShows(onProgress?: (text: string) => void): Promise<DiscoverGroups> {
   const cached = readCache(DISCOVER_RECENT_CACHE_KEY);
   if (cached) return cached;
-  const { groups, failedPages } = await fetchShowsByGenre(DISCOVER_RECENT_PAGES, true, onProgress);
+  const { groups, failedPages } = await fetchShowsByGenre(await getRecentPages(), true, onProgress);
   writeCache(DISCOVER_RECENT_CACHE_KEY, groups, failedPages);
   return groups;
 }

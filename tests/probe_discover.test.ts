@@ -37,7 +37,7 @@ import {
   DISCOVER_CACHE_KEY,
   DISCOVER_RECENT_CACHE_KEY,
   DISCOVER_POPULAR_PAGES,
-  DISCOVER_RECENT_PAGES,
+  DISCOVER_RECENT_FALLBACK_PAGES,
 } from '../src/lib/constants';
 import type { TvmazeShow } from '../src/types';
 
@@ -302,7 +302,7 @@ describe('Agent-07 probe: discover.ts', () => {
     const oldShow = makeShow(2, { premiered: '2023-01-01' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [recentShow, oldShow];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [recentShow, oldShow];
       return [];
     });
 
@@ -338,7 +338,7 @@ describe('Agent-07 probe: discover.ts', () => {
     const oct1Show = makeShow(2, { premiered: '2023-10-01' });
 
     mockedGetShowsPage.mockImplementation(async (page: number) => {
-      if (page === DISCOVER_RECENT_PAGES[0]) return [sep30Show, oct1Show];
+      if (page === DISCOVER_RECENT_FALLBACK_PAGES[0]) return [sep30Show, oct1Show];
       return [];
     });
 

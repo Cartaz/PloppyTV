@@ -45,14 +45,15 @@ export const DISCOVER_TARGET_PER_GENRE = 20;
 export const DISCOVER_TARGET_OTHER = 30;
 export const DISCOVER_TOTAL_TARGET = 6 * DISCOVER_TARGET_PER_GENRE + DISCOVER_TARGET_OTHER;
 
-// Pagine TVMaze `/shows?page=N`. TVMaze aggiunge ~250 show per pagina.
-// Le pagine "recenti" sono state scelte empiricamente: corrispondono a show
-// con `premiered` negli ultimi ~6 mesi al momento della scrittura.
-// IMPORTANTE: page 372 era out-of-range (HTTP 404) ed è stata rimossa.
-// Queste pagine dovrebbero essere refreshate periodicamente (o calcolate
-// dinamicamente in base alla data corrente).
+// Pagine TVMaze `/shows?page=N`: 250 serie per pagina, ordinate per ID
+// (pagina = floor(id / 250)), quindi le ultime pagine contengono le serie
+// aggiunte più di recente. "Ultimi arrivi" ricava l'ultima pagina dall'ID più
+// alto in `/updates/shows` e legge le DISCOVER_RECENT_PAGE_COUNT precedenti.
+export const TVMAZE_SHOWS_PER_PAGE = 250;
 export const DISCOVER_POPULAR_PAGES = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-export const DISCOVER_RECENT_PAGES = [340, 345, 350, 355, 358, 360, 362, 365, 367, 370];
+export const DISCOVER_RECENT_PAGE_COUNT = 8;
+/** Usate solo se `/updates/shows` non risponde (ultima pagina valida al 18/11/2026: 382). */
+export const DISCOVER_RECENT_FALLBACK_PAGES = [375, 376, 377, 378, 379, 380, 381, 382];
 
 export const GENRE_CAROUSELS = ['Science-Fiction', 'Crime', 'Action', 'Thriller', 'Comedy', 'Drama'];
 
@@ -70,8 +71,8 @@ export const MAX_TAGS_PER_SHOW = 20;
 /** Chiave localStorage per le preferenze utente (lingua, notifiche, ecc.). P2.7/P2.9 */
 export const PREFS_KEY = 'ploppytv_prefs_v1';
 
-/** Lead time (ms) per le notifiche push: 1 ora prima dell'episodio. P2.9 */
-export const NOTIF_LEAD_TIME_MS = 60 * 60 * 1000;
+/** Ora locale (0-23) della notifica nel giorno di uscita: TVMaze dà solo la data. */
+export const NOTIF_HOUR = 9;
 /** Intervallo di re-scheduling delle notifiche (ogni 6 ore). P2.9 */
 export const NOTIF_RESCHEDULE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 

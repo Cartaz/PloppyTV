@@ -368,3 +368,33 @@ export function findNextEpisode<T extends HasSeasons>(
   }
   return null;
 }
+
+export interface DatedEpisode {
+  season: number;
+  num: number;
+  airdate: string;
+  name: string | null;
+  /** Mezzanotte locale del giorno di uscita. */
+  date: Date;
+}
+
+/**
+ * Episodi non visti con una data di uscita valida, in ordine cronologico
+ * (a parità di data: stagione, poi numero). Base di calendario e notifiche:
+ * contano le uscite reali, non solo il primo episodio non visto.
+ */
+export function unwatchedEpisodesByAirdate(show: HasSeasons | null): DatedEpisode[] {
+  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return [];
+  const result: DatedEpisode[] = [];
+  for (const [key, eps] of Object.entries(show.seasons)) {
+    const season = Number(key);
+    if (!Number.isInteger(season) || season <= 0 || !Array.isArray(eps)) continue;
+    for (const ep of eps) {
+      if (!ep || ep.watched === true || !Number.isInteger(ep.num) || ep.num <= 0) continue;
+      const date = ep.airdate ? parseISODateLocal(ep.airdate) : null;
+      if (!date || !ep.airdate) continue;
+      result.push({ season, num: ep.num, airdate: ep.airdate, name: ep.name ?? null, date });
+    }
+  }
+  return result.sort((a, b) => a.date.getTime() - b.date.getTime() || a.season - b.season || a.num - b.num);
+}

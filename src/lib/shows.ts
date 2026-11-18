@@ -51,8 +51,14 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     }
     const show = buildShowFromTvmaze(tvmazeShow, episodes, list);
     // Se l'utente ha scelto esplicitamente una lista, marchiala come manuale
-    // così reconcileList/updateShowListStatus non la retrocederanno.
+    // così updateShowListStatus non la retrocederà.
     if (list !== 'towatch') show.manualList = true;
+    // "Completata" significa già vista: senza segnare gli episodi la serie
+    // risulterebbe completata con 0 episodi visti (stats e calendario incoerenti).
+    if (list === 'completed') {
+      for (const eps of Object.values(show.seasons)) for (const ep of eps) ep.watched = true;
+      updateShowListStatus(show);
+    }
     replaceShow(show);
     if (!saveData()) {
       // rollback

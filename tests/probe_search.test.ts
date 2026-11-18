@@ -440,18 +440,19 @@ describe('search.ts probe', () => {
     expect(mockAddShowToList.mock.calls[0][1]).toBe('towatch');
   });
 
-  it('click on result item (not button) selects with list=watching', async () => {
-    mockSearchShows.mockResolvedValue([makeResult(1, 'A')]);
+  it('click on result item (not a list button) only selects it — no accidental add', async () => {
+    mockSearchShows.mockResolvedValue([makeResult(1, 'A'), makeResult(2, 'B')]);
     mockAddShowToList.mockResolvedValue(null);
     fireInput('foo');
     await vi.advanceTimersByTimeAsync(350);
     await vi.advanceTimersByTimeAsync(0);
 
-    const item = document.querySelector('.search-result-item') as HTMLElement;
-    item.click();
+    const items = document.querySelectorAll('.search-result-item');
+    (items[1] as HTMLElement).click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(mockAddShowToList).toHaveBeenCalledTimes(1);
-    expect(mockAddShowToList.mock.calls[0][1]).toBe('watching');
+    expect(mockAddShowToList).not.toHaveBeenCalled();
+    expect(items[1].classList.contains('selected')).toBe(true);
+    expect(items[1].getAttribute('aria-selected')).toBe('true');
   });
 
   it('MAX_QUERY_LENGTH branch triggers only when > 100 chars (dead code under input maxlength)', async () => {

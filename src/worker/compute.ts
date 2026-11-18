@@ -12,7 +12,7 @@
 //     in both worker and main-thread contexts, so this is safe.
 
 import type { Show, StatsResult, CalendarEpisode } from '../types';
-import { getWatchedCount, findNextEpisode, parseISODateLocal, localISODate, safeNum } from '../lib/utils';
+import { getWatchedCount, localISODate, safeNum, unwatchedEpisodesByAirdate, type DatedEpisode } from '../lib/utils';
 
 /**
  * Sanitize a `weekOffset` input.
@@ -171,24 +171,25 @@ export function computeCalendar(
 
   for (const show of validShows) {
     if (show.list !== 'watching') continue;
-    const nextEp = findNextEpisode(show);
-    if (!nextEp || !nextEp.airdate) continue;
-    const epDate = parseISODateLocal(nextEp.airdate);
-    if (!epDate) continue;
-    // Valida nextEp.num (era "S1Eundefined" quando num mancava)
-    const num = safeNum(nextEp.num);
-    const epObj: CalendarEpisode = {
+    const watchedCount = getWatchedCount(show);
+    const toEntry = (ep: DatedEpisode): CalendarEpisode => ({
       showId: show.id,
       showName: show.name,
       totalEpisodes: show.totalEpisodes,
-      watchedCount: getWatchedCount(show),
-      season: nextEp.season,
-      num,
-      name: nextEp.name ?? null,
-      date: localISODate(epDate),
-    };
-    if (epDate >= startOfWeek && epDate <= weekEnd) week.push(epObj);
-    else if (epDate > weekEnd) afterWeek.push(epObj);
+      watchedCount,
+      season: ep.season,
+      num: ep.num,
+      name: ep.name,
+      date: localISODate(ep.date),
+    });
+    // Tutte le uscite non viste della settimana, più la prima successiva
+    // (una per serie) per la sezione "In arrivo".
+    let nextAfterWeek: DatedEpisode | null = null;
+    for (const ep of unwatchedEpisodesByAirdate(show)) {
+      if (ep.date >= startOfWeek && ep.date <= weekEnd) week.push(toEntry(ep));
+      else if (ep.date > weekEnd && !nextAfterWeek) nextAfterWeek = ep;
+    }
+    if (nextAfterWeek) afterWeek.push(toEntry(nextAfterWeek));
   }
   afterWeek.sort((a, b) => a.date.localeCompare(b.date));
   week.sort((a, b) => a.date.localeCompare(b.date));
