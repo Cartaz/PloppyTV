@@ -4,9 +4,10 @@ export const API_BASE = 'https://api.tvmaze.com';
 export const STORAGE_KEY = 'ploppytv_data_v1';
 export const BACKUP_KEY = 'ploppytv_data_backup';
 export const SCHEMA_VERSION = 2;
+/** Avviso spazio: il documento salvato (×2 con il backup) si avvicina a ~5 MB. */
+export const QUOTA_WARN_KB = 2250;
 
 export const API_TIMEOUT_MS = 10000;
-export const MIN_SEARCH_INTERVAL_MS = 300;
 export const MAX_QUERY_LENGTH = 100;
 export const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
 

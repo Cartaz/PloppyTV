@@ -824,3 +824,49 @@ describe('main error boundaries', () => {
     expect(mockOpenShow).not.toHaveBeenCalled();
   });
 });
+
+describe('main.ts — state → hash sync', () => {
+  async function bootAndGetListener(): Promise<() => void> {
+    await import('../src/main');
+    await vi.advanceTimersByTimeAsync(0);
+    return mockSubscribe.mock.calls[0][0] as () => void;
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('records each view change as a history entry', async () => {
+    setHash('#dashboard');
+    const onChange = await bootAndGetListener();
+    const before = window.history.length;
+    __setState({ currentView: 'calendar', currentShowId: null });
+    onChange();
+    expect(window.location.hash).toBe('#calendar');
+    __setState({ currentShowId: 42 });
+    onChange();
+    expect(window.location.hash).toBe('#show/42');
+    expect(window.history.length).toBe(before + 2);
+  });
+
+  it('does not overwrite the initial deep link before applying it', async () => {
+    setHash('#stats');
+    await import('../src/main');
+    expect(window.location.hash).toBe('#stats');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockSwitchView).toHaveBeenCalledWith('stats');
+  });
+
+  it('replaces (not pushes) when the page was opened without a hash', async () => {
+    setHash('');
+    const before = window.history.length;
+    await bootAndGetListener();
+    expect(window.location.hash).toBe('#dashboard');
+    expect(window.history.length).toBe(before);
+  });
+});

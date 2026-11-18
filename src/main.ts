@@ -52,11 +52,29 @@ function applyHash(): void {
   }
 }
 
+// Stato → hash: ogni cambio di vista o serie aperta diventa una voce di
+// cronologia, così Indietro/Avanti e i link condivisi funzionano. Attivo solo
+// dopo aver applicato l'hash iniziale, per non sovrascrivere un deep link.
+let _routingReady = false;
+
+function syncHashFromState(): void {
+  if (!_routingReady) return;
+  const state = getState();
+  const wanted = '#' + (state.currentShowId ? 'show/' + state.currentShowId : state.currentView);
+  if (window.location.hash === wanted) return;
+  if (window.location.hash) window.history.pushState(null, '', wanted);
+  else window.history.replaceState(null, '', wanted);
+}
+
 function setupHashRouting(): void {
   window.addEventListener('hashchange', applyHash);
   // Applica l'hash iniziale (es. se l'utente apre la PWA da uno shortcut)
   // dopo che i dati sono caricati e il primo render è stato fatto.
-  setTimeout(applyHash, 0);
+  setTimeout(() => {
+    applyHash();
+    _routingReady = true;
+    syncHashFromState();
+  }, 0);
 }
 
 // Global error handlers per errori non catturati e rejection
@@ -239,6 +257,7 @@ function init(): void {
     render();
     subscribe(() => {
       render();
+      syncHashFromState();
       // P2.9: re-schedula notifiche quando lo stato cambia
       window.dispatchEvent(new CustomEvent('ploppytv:reschedule-notifications'));
     });

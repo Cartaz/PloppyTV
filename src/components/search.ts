@@ -2,7 +2,7 @@
 
 import type { ListName, TvmazeSearchResult } from '../types';
 import { searchShows, apiErrorMessage } from '../lib/api';
-import { MAX_QUERY_LENGTH, MIN_SEARCH_INTERVAL_MS } from '../lib/constants';
+import { MAX_QUERY_LENGTH } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal } from '../lib/utils';
 import { addShowToList } from '../lib/shows';
 import { showToast } from './toast';
@@ -12,7 +12,6 @@ let lastSearchResults: TvmazeSearchResult[] = [];
 let searchSeq = 0;
 let searchAbortController: AbortController | null = null;
 let searchSelectedIdx = -1;
-let lastSearchTime = 0;
 
 let _searchInput: HTMLInputElement | null = null;
 let _searchResults: HTMLElement | null = null;
@@ -109,13 +108,6 @@ function clearSearchState(): void {
 }
 
 async function doSearch(query: string): Promise<void> {
-  const now = Date.now();
-  if (now - lastSearchTime < MIN_SEARCH_INTERVAL_MS) {
-    searchTimeout = setTimeout(() => doSearch(query), MIN_SEARCH_INTERVAL_MS - (now - lastSearchTime));
-    return;
-  }
-  lastSearchTime = now;
-
   if (searchAbortController) searchAbortController.abort();
   searchAbortController = new AbortController();
   const mySeq = ++searchSeq;

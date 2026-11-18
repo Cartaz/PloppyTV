@@ -9,7 +9,7 @@
 // indistinguibile da quello iniziale.
 
 import type { SavedData, Show } from '../types';
-import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY } from './constants';
+import { SCHEMA_VERSION, STORAGE_KEY, BACKUP_KEY, QUOTA_WARN_KB } from './constants';
 import { getState, setShows, setStorageDisabled, setQuotaWarned, emitChange } from './store';
 import { canonicalizeDataDocument } from './dataDocument';
 import { showToast } from '../components/toast';
@@ -78,9 +78,10 @@ export function saveData(): boolean {
     return false;
   }
 
-  // Size threshold uses UTF-8 byte length (TextEncoder), non char count.
+  // Il documento viene scritto due volte (principale + backup), quindi la
+  // soglia d'avviso vale per metà della quota tipica di localStorage (~5 MB).
   const sizeKB = Math.round(new TextEncoder().encode(serialized).length / 1024);
-  if (sizeKB > 4500 && !state._quotaWarned) {
+  if (sizeKB > QUOTA_WARN_KB && !state._quotaWarned) {
     showToast('Attenzione: dati vicini al limite (' + sizeKB + 'KB). Usa Esporta per backup.', 'warning');
     setQuotaWarned(true);
   }

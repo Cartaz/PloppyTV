@@ -45,7 +45,7 @@ vi.mock('../src/lib/normalize', () => ({
 }));
 
 import { saveData, loadData } from '../src/lib/storage';
-import { STORAGE_KEY, BACKUP_KEY, SCHEMA_VERSION } from '../src/lib/constants';
+import { STORAGE_KEY, BACKUP_KEY, SCHEMA_VERSION, QUOTA_WARN_KB } from '../src/lib/constants';
 
 // ===== In-memory localStorage stub with controllable quota behaviour =====
 class QuotaError extends Error {
@@ -581,7 +581,7 @@ describe('BUG-04-07 FIXED: size threshold uses UTF-8 bytes', () => {
 
     const r = saveData();
     expect(r).toBe(true);
-    // FIXED: quota warning now fires (UTF-8 byte size > 4500 KB).
+    // FIXED: quota warning now fires (UTF-8 byte size > QUOTA_WARN_KB).
     const quotaWarnCalls = showToastMock.mock.calls.filter(
       (c) => typeof c[0] === 'string' && String(c[0]).includes('limite'),
     );
@@ -599,9 +599,7 @@ describe('BUG-04-07 FIXED: size threshold uses UTF-8 bytes', () => {
     const codeSizeKB = Math.round(charLen / 1024);
     const utf8SizeKB = Math.round(utf8Bytes / 1024);
     expect(utf8SizeKB).toBeGreaterThan(codeSizeKB);
-    // The fixed code uses utf8SizeKB; the old buggy code used codeSizeKB.
-    expect(utf8SizeKB).toBeGreaterThan(4500);
-    expect(codeSizeKB).toBeLessThanOrEqual(4500);
+    expect(utf8SizeKB).toBeGreaterThan(QUOTA_WARN_KB);
   });
 });
 
@@ -709,5 +707,23 @@ describe('BACKUP_KEY write failure ignored (sanity)', () => {
     expect(readShows(mem)).toEqual([{ id: 1, name: 'new' }]);
     // BACKUP_KEY was NOT written (write threw, error ignored)
     expect(mem.store.has(BACKUP_KEY)).toBe(false);
+  });
+});
+
+describe('quota warning accounts for the backup copy', () => {
+  it('warns once the document passes QUOTA_WARN_KB (two copies are written)', () => {
+    putSavedData(mem, [], 1000);
+    loadData();
+    _state.shows = [{ id: 1, name: 'x'.repeat((QUOTA_WARN_KB + 10) * 1024) }];
+    expect(saveData()).toBe(true);
+    expect(showToastMock.mock.calls.some((c) => String(c[0]).includes('limite'))).toBe(true);
+  });
+
+  it('stays quiet below the threshold', () => {
+    putSavedData(mem, [], 1000);
+    loadData();
+    _state.shows = [{ id: 1, name: 'x'.repeat((QUOTA_WARN_KB - 10) * 1024) }];
+    expect(saveData()).toBe(true);
+    expect(showToastMock.mock.calls.some((c) => String(c[0]).includes('limite'))).toBe(false);
   });
 });
