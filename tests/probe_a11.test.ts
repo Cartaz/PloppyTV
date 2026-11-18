@@ -24,7 +24,7 @@ import { makeShow, makeShowWithSeasons, makeEpisode } from './helpers';
 interface MockModalCall {
   title: string;
   bodyHtml: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   actions: any[];
 }
 let _lastModalCall: MockModalCall | null = null;
@@ -331,7 +331,7 @@ describe('BUG-A11-04: episode list guards non-array seasons[currentSeason]', () 
 describe('BUG-A11-06: episode list skips null/undefined items', () => {
   it('array with null/undefined episodes → skipped, no TypeError', () => {
     const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     show.seasons = { 1: [null as any, makeEpisode({ num: 2, id: 12 }), undefined as any, makeEpisode({ num: 1, id: 11 })] };
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     expect(() => renderShowDetail(getMain())).not.toThrow();
@@ -487,7 +487,7 @@ describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
   it('other show has tags with non-string elements → only strings added', () => {
     const showA = makeShow({ id: 1, tags: [] });
     const showB = makeShow({ id: 2, tags: [] });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (showB as unknown as { tags: any[] }).tags = ['Valid', 42, null, { x: 1 }, 'Also'];
     setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
     const main = getMain();

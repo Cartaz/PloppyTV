@@ -289,7 +289,7 @@ function makeGetterBombShow(): Show {
 }
 
 describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + no leak', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -384,7 +384,7 @@ describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + n
 });
 
 describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no hang)', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;

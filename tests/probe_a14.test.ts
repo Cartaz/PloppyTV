@@ -46,13 +46,13 @@ type ToBlobBehavior = 'success' | 'null' | 'throw' | 'no-callback';
 let _toBlobBehavior: ToBlobBehavior = 'success';
 let _toBlobCalls = 0;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function setupCanvasMock(ctxOk: boolean): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   (HTMLCanvasElement.prototype as any).getContext = function () {
     return ctxOk ? makeFakeCtx() : null;
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   (HTMLCanvasElement.prototype as any).toBlob = function (callback: (b: Blob | null) => void) {
     _toBlobCalls++;
     if (_toBlobBehavior === 'throw') {
@@ -721,7 +721,7 @@ describe('BUG-A14-08: canvas methods not available', () => {
   });
 
   it('shows error toast when toBlob is not a function', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (HTMLCanvasElement.prototype as any).toBlob = undefined;
     exportYearCard(makeStats());
     expect(toastHasError()).toBe(true);

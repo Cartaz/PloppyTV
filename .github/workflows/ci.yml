@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
   push:
-    branches: [main, master]
+    branches: [main]
 
 permissions:
   contents: read
@@ -17,35 +17,47 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
 
   lint:
-    name: ESLint + Prettier
+    name: ESLint + Prettier + Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
-      - name: Dependency audit
+      # L'app pubblicata non ha dipendenze runtime: il gate blocca qualsiasi
+      # dipendenza di produzione vulnerabile.
+      - name: Dependency audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
+      # Le dipendenze di sviluppo hanno advisory senza versione corretta
+      # (es. picomatch <=4.0.7): report visibile ma non bloccante.
+      - name: Dependency audit (dev tooling, informational)
         run: npm audit --audit-level=high
+        continue-on-error: true
 
   test:
-    name: Vitest + Coverage
+    name: Vitest + Coverage (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.22.1 è il minimo dichiarato in package.json#engines; 26 è .nvmrc.
+        node: ['22', '26']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run test:coverage

@@ -254,7 +254,7 @@ describe('apiGet — empty body contract', () => {
   it('iterating null directly throws TypeError (simulates refreshShowEpisodes loop)', () => {
     // refreshShowEpisodes (shows.ts L215) does `for (const ep of episodes)`.
     expect(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       for (const _ep of (null as unknown as never[])) {
         // never reached
       }

@@ -375,7 +375,7 @@ describe('[worker] computeCalendar', () => {
 // ============================================================
 
 describe('[client] computeStatsAsync', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -634,7 +634,7 @@ describe('[client] computeStatsAsync', () => {
 });
 
 describe('[client] computeCalendarAsync', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
