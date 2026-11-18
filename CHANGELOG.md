@@ -4,6 +4,13 @@ Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il forma
 
 ## [Unreleased]
 
+Nessuna modifica.
+
+## [1.3.1] — Correzioni dopo la 1.3.0 (novembre 2026)
+
+**Tag:** `v1.3.1`
+**Data compatibility:** invariata, schema dati 3.
+
 ### Corretto
 
 - Dettaglio serie: il poster non genera più una richiesta 404 a ogni apertura (l'URL "originale" costruito dall'app non esiste sul CDN TVMaze); viene usato direttamente il poster medio.
@@ -14,6 +21,10 @@ Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il forma
 - Niente più hook di test nel codice dell'app: `initKeyboard`, `initNotifications`, `initImageFallback` e `initSearch` restituiscono la propria funzione di cleanup; i test usano moduli freschi.
 - Chiavi i18n generate automaticamente rinominate con nomi descrittivi; titoli e commenti dei test senza ID `BUG-xx`.
 - Note della 1.3.0 in `docs/RELEASE_NOTES_v1.3.0.md`; tag `v1.2.1` creato sul commit di rilascio.
+
+### Documentazione
+
+- Screenshot reali nel README (dashboard, dettaglio serie, Scopri, statistiche) al posto del segnaposto SVG; `screenshots/README.md` spiega come rigenerarli.
 
 ## [1.3.0] — Pulizia e correzioni (novembre 2026)
 

@@ -134,7 +134,7 @@ Esito per problema: A1, A2, A3, M1–M8 e B1–B10 risolti. Di B11 (hook di test
 
 ## 5. Dopo la release 1.3.0 (18 novembre 2026)
 
-Chiusi i punti rimasti aperti, sul branch `chore/post-release-cleanup`:
+Chiusi i punti rimasti aperti (PR #14, rilasciata come **1.3.1**):
 
 - **Branch remoti**: cancellati tutti e 30 (20 fusi in `main` o con PR fusa, 10 branch di appoggio per la CI senza PR); su GitHub resta solo `main`.
 - **Release**: tag `v1.3.0` e release su GitHub; tag `v1.2.1` creato sul commit di rilascio `edc0dc5`; note della 1.3.0 in `docs/`.

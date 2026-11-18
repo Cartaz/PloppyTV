@@ -11,7 +11,7 @@ Screenshot reali della PWA usati nel README e nelle release notes.
 | `discover.webp` | Scopri, caroselli per genere | 1280×800 |
 | `stats.webp` | Statistiche | 1280×800 |
 
-Generati il 18 novembre 2026 dalla build di produzione (v1.3.0 più le correzioni successive), con una libreria demo di 6 serie aggiunte dalla ricerca TVMaze. Poster, titoli e trame sono forniti da [TVMaze](https://www.tvmaze.com).
+Generati il 18 novembre 2026 dalla build di produzione della v1.3.1, con una libreria demo di 6 serie aggiunte dalla ricerca TVMaze. Poster, titoli e trame sono forniti da [TVMaze](https://www.tvmaze.com).
 
 ## Come rigenerarli
 
