@@ -1,5 +1,5 @@
 // Test: src/views/showDetail.ts
-// Covers: BUG-A11-01..10 (seasonAvgRating NaN/Infinity, episode sorting,
+// Covers:..10 (seasonAvgRating NaN/Infinity, episode sorting,
 // non-array tags/genres/seasons guards, openNoteEditor guards, openAddTagModal
 // suggestions guard, addTag modal keepOpen on failure, show.image non-string),
 // plus P2 interaction tests (star rating toggle, note editor save, tag add via
@@ -128,9 +128,9 @@ beforeEach(() => {
 });
 
 // ============================================================================
-// BUG-A11-01: seasonAvgRating filters NaN/Infinity ratings
+// seasonAvgRating filters NaN/Infinity ratings
 // ============================================================================
-describe('BUG-A11-01: seasonAvgRating rejects NaN/Infinity/negative ratings', () => {
+describe('seasonAvgRating rejects NaN/Infinity/negative ratings', () => {
   it('NaN rating in episode → no "NaN" in season-rating-avg output', () => {
     const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
@@ -185,9 +185,9 @@ describe('BUG-A11-01: seasonAvgRating rejects NaN/Infinity/negative ratings', ()
 });
 
 // ============================================================================
-// BUG-A11-02: episodes sorted by num before render
+// Episodes sorted by num before render
 // ============================================================================
-describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
+describe('episodes sorted by num (not storage order)', () => {
   it('episodes stored out of order → rendered in num order', () => {
     const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
     show.seasons = {
@@ -217,9 +217,9 @@ describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
 });
 
 // ============================================================================
-// BUG-A11-10: addTag modal stays open on failure (duplicate/max)
+// addTag modal stays open on failure (duplicate/max)
 // ============================================================================
-describe('BUG-A11-10: addTag modal stays open on failure', () => {
+describe('addTag modal stays open on failure', () => {
   function openAddTagModal(): void {
     const show = makeShow({ id: 1, tags: [] });
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });

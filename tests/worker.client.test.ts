@@ -375,7 +375,7 @@ describe('[worker] computeCalendar', () => {
 // Part 2: Client — computeStatsAsync / computeCalendarAsync (mocked Worker)
 // ============================================================
 
-describe('[client] computeStatsAsync', () => {
+describe('computeStatsAsync', () => {
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -539,14 +539,14 @@ describe('[client] computeStatsAsync', () => {
     expect(messageHandlers).toHaveLength(0);
   });
 
-  // ---- BUG-08-01 (FIXED): onerror disables worker ----
+  // ---- (FIXED): onerror disables worker ----
   // Previously `_worker.onerror` only logged — did NOT set `_workerSupported = false`.
   // After a script/load error, every subsequent request reused the cached broken
   // worker → postMessage to a dead worker → timeout wait → main-thread fallback,
   // on EVERY request forever. Now onerror sets `_workerSupported = false` and
   // `_worker = null`, so the next call goes straight to the main-thread fallback
   // (no postMessage, no timeout wait). This test asserts the CORRECT behavior.
-  it('onerror disables worker so subsequent requests skip it (BUG-08-01 fixed)', async () => {
+  it('onerror disables worker so subsequent requests skip it', async () => {
     const { computeStatsAsync } = await importClient();
     const shows = [makeShowWithSeasons({ 1: 3 }, { id: 1, runtime: 60 })];
     markWatchedFirst(shows[0], 1, 2);
@@ -570,7 +570,7 @@ describe('[client] computeStatsAsync', () => {
     await p2;
   });
 
-  // ---- BUG-08-02 (mitigated): timeout raised to 3000ms ----
+  // ---- (mitigated): timeout raised to 3000ms ----
   // For large libraries the worker may legitimately take >500ms to compute stats.
   // Previously the client times out at 500ms and runs the SAME computation on the
   // main thread (blocking the UI), while the worker keeps running (wasted work).
@@ -604,7 +604,7 @@ describe('[client] computeStatsAsync', () => {
     expect(mockWorker.postMessage).toHaveBeenCalledTimes(1);
   });
 
-  // ---- Regression (BUG-08-03): fallback path must produce identical results to worker path ----
+  // ---- Regression: fallback path must produce identical results to worker path ----
   // Both the worker and the main-thread fallback now delegate to the shared
   // pure `computeStats` in `src/worker/compute.ts` (single source of truth).
   // This test verifies the wiring: the worker path (via self.onmessage) and
@@ -632,7 +632,7 @@ describe('[client] computeStatsAsync', () => {
   });
 });
 
-describe('[client] computeCalendarAsync', () => {
+describe('computeCalendarAsync', () => {
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -725,7 +725,7 @@ describe('[client] computeCalendarAsync', () => {
     expect(r.weekEnd).toBe('2024-03-17');
   });
 
-  // Regression (BUG-08-03 + BUG-16-03): worker and fallback both delegate to
+  // Regression: worker and fallback both delegate to
   // the shared `computeCalendar` in `src/worker/compute.ts` (which applies
   // `safeWeekOffset` internally), so behavior is identical regardless of
   // worker availability — including for NaN/Infinity weekOffset.
@@ -759,12 +759,12 @@ describe('[client] computeCalendarAsync', () => {
     });
   });
 
-  // BUG-16-03 (FIXED): `computeCalendarFallback` previously lacked the worker's
+  // `computeCalendarFallback` previously lacked the worker's
   // `safeOffset` guard, so NaN/Infinity weekOffset produced Invalid Date
   // ("NaN-NaN-NaN" weekStart/weekEnd). After the refactor, both paths share
   // `computeCalendar` from `./compute.ts`, which applies `safeWeekOffset`
   // internally → non-finite offsets collapse to 0 (current week).
-  it('BUG-16-03: fallback path handles NaN/Infinity weekOffset (no Invalid Date)', async () => {
+  it('fallback path handles NaN/Infinity weekOffset (no Invalid Date)', async () => {
     (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;
@@ -781,7 +781,7 @@ describe('[client] computeCalendarAsync', () => {
     }
   });
 
-  it('BUG-16-03: fallback path floors non-integer weekOffset (matches worker)', async () => {
+  it('fallback path floors non-integer weekOffset (matches worker)', async () => {
     (globalThis as unknown as { Worker: typeof Worker }).Worker = vi.fn(function () {
       throw new Error('unsupported');
     }) as unknown as typeof Worker;

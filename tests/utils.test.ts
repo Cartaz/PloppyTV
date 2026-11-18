@@ -219,7 +219,7 @@ describe('escapeHtml + escapeAttr', () => {
 
 describe('getPosterUrl', () => {
   it('preferisce medium, poi original, poi null', () => {
-    // BUG-01-d: getPosterUrl ora valida via safeImageUrl (richiede http/https).
+    // getPosterUrl ora valida via safeImageUrl (richiede http/https).
     expect(
       getPosterUrl({
         image: {

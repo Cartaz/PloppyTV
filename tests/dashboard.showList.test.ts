@@ -1,10 +1,6 @@
 // Test: src/views/dashboard.ts + src/views/showList.ts
 //
 // Copre i bug trovati/fixati in questo round:
-//  - BUG-A10-01 [HIGH]: goldBtn click handler non re-bound su re-render.
-//  - BUG-A10-02 [MEDIUM]: _activeTag persisteva across list switches; user trapped.
-//  - BUG-A10-03 [MEDIUM]: showList keyboard a11y rotta senza dashboard render preventivo.
-//  - BUG-A10-04 [MEDIUM]: goldEp.ep.num interpolato raw (XSS via stato corrotto).
 //
 // Inoltre regression su XSS surface già coperta (show.name, tag, title, data-show-id),
 // edge case numerici (NaN progress, totalEpisodes=0), e interazioni chip filter.
@@ -65,10 +61,10 @@ function corruptShow(opts: {
 }
 
 // ============================================================
-// BUG-A10-01: goldBtn click handler non re-bound su re-render
+// goldBtn click handler non re-bound su re-render
 // ============================================================
 
-describe('BUG-A10-01: goldBtn click re-bound on re-render', () => {
+describe('goldBtn click re-bound on re-render', () => {
   it('goldBtn is clickable on first render', () => {
     const s = makeShowWithSeasons({ 1: 2 }, { id: 42, name: 'Gold', list: 'watching' });
     markWatchedFirst(s, 1, 1);
@@ -81,7 +77,7 @@ describe('BUG-A10-01: goldBtn click re-bound on re-render', () => {
     expect(getState().currentShowId).toBe(42);
   });
 
-  it('goldBtn is STILL clickable after re-render (BUG-A10-01 fixed)', () => {
+  it('goldBtn is STILL clickable after re-render', () => {
     const s = makeShowWithSeasons({ 1: 2 }, { id: 42, name: 'Gold', list: 'watching' });
     markWatchedFirst(s, 1, 1);
     (s.seasons[1][0] as any).rating = 5;
@@ -138,7 +134,7 @@ describe('BUG-A10-01: goldBtn click re-bound on re-render', () => {
     expect(toast.className).toContain('warning');
   });
 
-  it('keydown listener does NOT accumulate across re-renders (regression for BUG-13-05)', () => {
+  it('keydown listener does NOT accumulate across re-renders', () => {
     const s = makeShowWithSeasons({ 1: 5 }, { id: 1, name: 'Kbd', list: 'watching' });
     setShows([s]);
     renderDashboard(main);
@@ -158,10 +154,10 @@ describe('BUG-A10-01: goldBtn click re-bound on re-render', () => {
 });
 
 // ============================================================
-// BUG-A10-02: _activeTag persisteva across list switches
+// _activeTag persisteva across list switches
 // ============================================================
 
-describe('BUG-A10-02: _activeTag reset on list switch + always-clearable', () => {
+describe('_activeTag reset on list switch + always-clearable', () => {
   it('resets _activeTag when switching to a different list', () => {
     const w = makeShowWithSeasons({ 1: 2 }, { id: 1, name: 'W', list: 'watching' });
     (w as any).tags = ['drama'];
@@ -251,10 +247,10 @@ describe('BUG-A10-02: _activeTag reset on list switch + always-clearable', () =>
 });
 
 // ============================================================
-// BUG-A10-03: showList keyboard a11y senza dashboard render preventivo
+// showList keyboard a11y senza dashboard render preventivo
 // ============================================================
 
-describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
+describe('showList keyboard nav without dashboard first', () => {
   it('Enter on a focused show-card triggers click (no prior renderDashboard)', () => {
     const s = makeShowWithSeasons({ 1: 5 }, { id: 7, name: 'Kbd', list: 'watching' });
     setShows([s]);
@@ -327,10 +323,10 @@ describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
 });
 
 // ============================================================
-// BUG-A10-04: goldEp.ep.num XSS via stato corrotto
+// goldEp.ep.num XSS via stato corrotto
 // ============================================================
 
-describe('BUG-A10-04: goldEp.ep.num coercion (XSS defense-in-depth)', () => {
+describe('goldEp.ep.num coercion (XSS defense-in-depth)', () => {
   it('does NOT interpolate raw HTML when ep.num is a malicious string', () => {
     const s = makeShowWithSeasons({ 1: 1 }, { id: 1, name: 'Gold', list: 'watching' });
     markWatchedFirst(s, 1, 1);
@@ -465,7 +461,7 @@ describe('XSS regression — escaping surface', () => {
     expect(chip).not.toBeNull();
     chip.click();
     // _activeTag is now set. Remove the show: tag-filter-bar still renders
-    // (BUG-A10-02 fix: always show "Tutti" when _activeTag is set).
+    // ( fix: always show "Tutti" when _activeTag is set).
     setShows([]);
     renderShowList(main, 'watching', 'Watching');
     expect(main.innerHTML).toContain('empty-state');
@@ -645,7 +641,7 @@ describe('Cross-check — shared showCardHtml', () => {
     expect(dashCard).toBe(listCard);
   });
 
-  it('showList clamps progress (uses showCardHtml) — BUG-13-01 parity', () => {
+  it('showList clamps progress (uses showCardHtml)', () => {
     const s = corruptShow({ id: 1, name: 'Overflow', list: 'watching', totalEpisodes: 3, watched: 5 });
     setShows([s]);
     renderShowList(main, 'watching', 'Watching');

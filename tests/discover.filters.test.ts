@@ -1,17 +1,17 @@
 // Test: NEW edge cases in src/lib/discover.ts
-// These tests are distinct from discover.groups.test.ts (BUG-07-xx) and cover
+// These tests are distinct from discover.groups.test.ts and cover
 // gaps the existing suite misses:
-//   BUG-A7-01: recentOnly includes shows premiered in the FUTURE.
-//   BUG-A7-02: progressRAF leaks — onProgress fires after fetch settles.
-//   BUG-A7-03: readCache returns groups with non-array genre values.
-//   BUG-A7-04: non-numeric weight (string) passes filter → NaN sort.
-//   BUG-A7-05: non-numeric rating.average → NaN sort.
-//   BUG-A7-06: multi-genre show redirected to _other when a secondary genre
+//   recentOnly includes shows premiered in the FUTURE.
+//   ProgressRAF leaks — onProgress fires after fetch settles.
+//   readCache returns groups with non-array genre values.
+//   Non-numeric weight (string) passes filter → NaN sort.
+//   Non-numeric rating.average → NaN sort.
+//   Multi-genre show redirected to _other when a secondary genre
 //              has space (primary at cap).
-//   BUG-A7-07: cache TTL boundary (exactly TTL ms old → expired).
-//   BUG-A7-08: dedup across pages (same id on two pages → single entry).
-//   BUG-A7-09: empty pages array → no crash, empty groups.
-//   BUG-A7-10: show with empty-string premiered excluded from recent.
+//   Cache TTL boundary (exactly TTL ms old → expired).
+//   Dedup across pages (same id on two pages → single entry).
+//   Empty pages array → no crash, empty groups.
+//   Show with empty-string premiered excluded from recent.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -88,8 +88,8 @@ afterEach(() => {
 
 // ---------- tests ----------
 
-describe('Agent-A7 probe: discover.ts new edge cases', () => {
-  it('BUG-A7-01 [Medium]: recentOnly EXCLUDES shows premiered in the future', async () => {
+describe('discover.ts new edge cases', () => {
+  it('recentOnly EXCLUDES shows premiered in the future', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-06-15T12:00:00'));
 
@@ -113,7 +113,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).not.toContain(3);
   });
 
-  it('BUG-A7-01 boundary: show premiered TODAY is included (not treated as future)', async () => {
+  it('01 boundary: show premiered TODAY is included (not treated as future)', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-06-15T15:00:00'));
 
@@ -130,7 +130,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(1);
   });
 
-  it('BUG-A7-03 [Low]: readCache rejects cache with non-array genre value → fresh fetch', async () => {
+  it('readCache rejects cache with non-array genre value → fresh fetch', async () => {
     localStorage.setItem(
       DISCOVER_CACHE_KEY,
       JSON.stringify({ cachedAt: Date.now(), groups: { _other: [], Drama: 'not-an-array' } }),
@@ -148,7 +148,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(Array.isArray((groups as unknown as Record<string, unknown>).Drama)).toBe(true);
   });
 
-  it('BUG-A7-03 variant: readCache rejects cache with non-array _other → fresh fetch', async () => {
+  it('03 variant: readCache rejects cache with non-array _other → fresh fetch', async () => {
     localStorage.setItem(
       DISCOVER_CACHE_KEY,
       JSON.stringify({ cachedAt: Date.now(), groups: { _other: 42, Drama: [] } }),
@@ -161,7 +161,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(Array.isArray((groups as unknown as Record<string, unknown>)._other)).toBe(true);
   });
 
-  it('BUG-A7-03: valid cache (all arrays) is still accepted (no regression)', async () => {
+  it('valid cache (all arrays) is still accepted (no regression)', async () => {
     const cachedGroups: Record<string, unknown> = { _other: [], Drama: [makeShow(77)] };
     for (const g of GENRE_CAROUSELS) if (g !== 'Drama') cachedGroups[g] = [];
     localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), groups: cachedGroups }));
@@ -176,7 +176,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).not.toContain(99);
   });
 
-  it('BUG-A7-04 [Low]: non-numeric weight (string "abc") excluded from candidates', async () => {
+  it('non-numeric weight (string "abc") excluded from candidates', async () => {
     const stringWeight = makeShow(1, { weight: 'abc' as unknown as number });
     const nanWeight = makeShow(2, { weight: NaN });
     const infWeight = makeShow(3, { weight: Infinity });
@@ -200,7 +200,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(5); // 50
   });
 
-  it('BUG-A7-05 [Low]: non-numeric rating.average coerced to 0 (no NaN sort, no crash)', async () => {
+  it('non-numeric rating.average coerced to 0 (no NaN sort, no crash)', async () => {
     const s1 = makeShow(1, { weight: 50, rating: { average: 'abc' as unknown as number } });
     const s2 = makeShow(2, { weight: 50, rating: { average: 'def' as unknown as number } });
     const s3 = makeShow(3, { weight: 50, rating: { average: null } });
@@ -222,7 +222,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(4);
   });
 
-  it('BUG-A7-06 [Medium]: multi-genre show fills secondary genre when primary at cap', async () => {
+  it('multi-genre show fills secondary genre when primary at cap', async () => {
     // Fill Comedy to its cap (DISCOVER_TARGET_PER_GENRE).
     const comedies: TvmazeShow[] = [];
     for (let i = 1; i <= DISCOVER_TARGET_PER_GENRE; i++) {
@@ -252,7 +252,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(comedyIds.length).toBe(DISCOVER_TARGET_PER_GENRE);
   });
 
-  it('BUG-A7-06 variant: genres order [Comedy, Drama] — same result (order-independent)', async () => {
+  it('06 variant: genres order [Comedy, Drama] — same result (order-independent)', async () => {
     const comedies: TvmazeShow[] = [];
     for (let i = 1; i <= DISCOVER_TARGET_PER_GENRE; i++) {
       comedies.push(makeShow(i, { genres: ['Comedy'], weight: 100 - i }));
@@ -271,7 +271,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(dramaIds).toContain(99);
   });
 
-  it('BUG-A7-06 spillover: all matching genres at cap → goes to _other (FASE 2)', async () => {
+  it('06 spillover: all matching genres at cap → goes to _other (FASE 2)', async () => {
     // Fill BOTH Comedy and Drama to cap.
     const shows: TvmazeShow[] = [];
     let id = 1;
@@ -308,7 +308,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(otherIds.length).toBeLessThanOrEqual(DISCOVER_TARGET_OTHER);
   });
 
-  it('BUG-A7-07 [Low]: cache TTL boundary — exactly TTL ms old is EXPIRED', async () => {
+  it('cache TTL boundary — exactly TTL ms old is EXPIRED', async () => {
     vi.useFakeTimers();
     const now = Date.now();
     vi.setSystemTime(now);
@@ -332,7 +332,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(1); // fresh fetch
   });
 
-  it('BUG-A7-07 boundary: cache TTL-1 ms old is still VALID', async () => {
+  it('07 boundary: cache TTL-1 ms old is still VALID', async () => {
     vi.useFakeTimers();
     const now = Date.now();
     vi.setSystemTime(now);
@@ -353,7 +353,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(77);
   });
 
-  it('BUG-A7-08 [Low]: duplicate show id across pages → single entry in groups', async () => {
+  it('duplicate show id across pages → single entry in groups', async () => {
     const dup = makeShow(42, { genres: ['Drama'], weight: 90 });
     // Page 0 and page 1 both return the same show (id 42).
     mockedGetShowsPage.mockImplementation(async (page: number) => {
@@ -369,7 +369,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(count42).toBe(1);
   });
 
-  it('BUG-A7-09 [Low]: all pages return empty arrays → empty groups, no crash, cache still written', async () => {
+  it('all pages return empty arrays → empty groups, no crash, cache still written', async () => {
     mockedGetShowsPage.mockImplementation(async () => []);
 
     const groups = await getPopularShows();
@@ -383,7 +383,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(localStorage.getItem(DISCOVER_CACHE_KEY)).not.toBeNull();
   });
 
-  it('BUG-A7-10 [Low]: show with empty-string premiered excluded from recent', async () => {
+  it('show with empty-string premiered excluded from recent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-06-15T12:00:00'));
 
@@ -403,7 +403,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(2);
   });
 
-  it('BUG-A7-11 [Low]: show with invalid premiered date (2024-02-30) excluded from recent', async () => {
+  it('show with invalid premiered date (2024-02-30) excluded from recent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-06-15T12:00:00'));
 
@@ -424,7 +424,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(2);
   });
 
-  it('BUG-A7-12 [Low]: show with whitespace-only name excluded (falsy-ish check)', async () => {
+  it('show with whitespace-only name excluded (falsy-ish check)', async () => {
     // `!show.name` filters empty string but NOT " " (whitespace is truthy).
     // This test documents current behavior: " " passes the filter (not a bug per se,
     // but the view would render a blank card). We assert the count is consistent.
@@ -445,7 +445,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).toContain(2);
   });
 
-  it('BUG-A7-13 [Low]: partial page failure → partial results returned, no cache write', async () => {
+  it('partial page failure → partial results returned, no cache write', async () => {
     // Page 2 throws, others succeed. Result should include shows from pages 0,1,3+
     // but cache must NOT be written (failedPages.length > 0).
     mockedGetShowsPage.mockImplementation(async (page: number) => {
@@ -465,7 +465,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(localStorage.getItem(DISCOVER_CACHE_KEY)).toBeNull();
   });
 
-  it('BUG-A7-14 [Low]: invalidateDiscoverCache + resetDiscoverLoad allows fresh fetch', async () => {
+  it('invalidateDiscoverCache + resetDiscoverLoad allows fresh fetch', async () => {
     // First fetch populates cache.
     mockedGetShowsPage.mockImplementation(async () => [makeShow(1)]);
     await getPopularShows();
@@ -487,7 +487,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(ids).not.toContain(1);
   });
 
-  it('BUG-A7-15 [Low]: findShowInDiscoverGroups — empty groups array returns null', async () => {
+  it('findShowInDiscoverGroups — empty groups array returns null', async () => {
     // Direct import to test the helper.
     const { findShowInDiscoverGroups } = await import('../src/lib/discover');
     expect(findShowInDiscoverGroups(1, [])).toBeNull();
@@ -495,7 +495,7 @@ describe('Agent-A7 probe: discover.ts new edge cases', () => {
     expect(findShowInDiscoverGroups(1, [{ _other: [], Drama: [] }])).toBeNull();
   });
 
-  it('BUG-A7-16 [Low]: recentOnly — Feb 29 leap year boundary (Aug 29 → Feb 29 included)', async () => {
+  it('recentOnly — Feb 29 leap year boundary (Aug 29 → Feb 29 included)', async () => {
     vi.useFakeTimers();
     // 2024 is a leap year. 6 months before Aug 29 is Feb 29 (leap day).
     vi.setSystemTime(new Date('2024-08-29T12:00:00'));

@@ -1,6 +1,6 @@
 // Test: edge-case & bug-hunt tests for src/lib/store.ts
 //
-// Each test maps to a specific BUG-A2-XX fix in store.ts. Tests are written
+// Each test maps to a specific-XX fix in store.ts. Tests are written
 // to FAIL on the pre-fix code and PASS on the post-fix code.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -31,9 +31,9 @@ function resetState(): void {
 }
 
 // ---------------------------------------------------------------------------
-// BUG-A2-02 [HIGH] setShows/setState shallow-copy difensivo
+// 02 [HIGH] setShows/setState shallow-copy difensivo
 // ---------------------------------------------------------------------------
-describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
+describe('setShows/setState defensive shallow-copy', () => {
   beforeEach(resetState);
 
   it("setShows non condivide la reference dell'array con il caller", () => {
@@ -55,9 +55,9 @@ describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
 });
 
 // ---------------------------------------------------------------------------
-// BUG-A2-07 [MEDIUM] emitChange snapshot dei listener (reentrancy-safe)
+// 07 [MEDIUM] emitChange snapshot dei listener (reentrancy-safe)
 // ---------------------------------------------------------------------------
-describe('BUG-A2-07: emitChange listener iteration is reentrancy-safe', () => {
+describe('emitChange listener iteration is reentrancy-safe', () => {
   beforeEach(resetState);
 
   it("listener iscritto durante l'emit NON firea nello stesso flush", async () => {
@@ -156,9 +156,9 @@ describe('BUG-A2-07: emitChange listener iteration is reentrancy-safe', () => {
 });
 
 // ---------------------------------------------------------------------------
-// BUG-A2-08 [LOW] subscribe valida che fn sia una funzione
+// 08 [LOW] subscribe valida che fn sia una funzione
 // ---------------------------------------------------------------------------
-describe('BUG-A2-08: subscribe validates fn is a function', () => {
+describe('subscribe validates fn is a function', () => {
   beforeEach(resetState);
 
   it('subscribe(null) è no-op, ritorna unsubscribe no-op', () => {
@@ -191,7 +191,7 @@ describe('BUG-A2-08: subscribe validates fn is a function', () => {
 // ---------------------------------------------------------------------------
 // Combinatorial / edge case stress
 // ---------------------------------------------------------------------------
-describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
+describe('edge: combinazioni + immutabilità post-fix', () => {
   beforeEach(resetState);
 
   it('updateShowListStatus: edge cases misti non producono stati invalidi', () => {
@@ -220,7 +220,7 @@ describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
 // ---------------------------------------------------------------------------
 // Regression: existing behaviors must be preserved
 // ---------------------------------------------------------------------------
-describe('BUG-A2 regression: existing behaviors preserved', () => {
+describe('regression: existing behaviors preserved', () => {
   beforeEach(resetState);
 
   it('setShows con array valido funziona normalmente', () => {

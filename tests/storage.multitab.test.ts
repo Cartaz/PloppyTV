@@ -156,18 +156,18 @@ afterEach(() => {
 });
 
 // ============================================================
-// BUG-04-02 (FIXED): _lastSavedAt is now advanced only AFTER a
+// _lastSavedAt is now advanced only AFTER a
 // successful write (or successful stripped recovery write). On
 // write failure, _lastSavedAt stays at its pre-attempt value, so
 // the next saveData CAS check matches storage and the save proceeds.
 // ============================================================
-describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () => {
+describe('_lastSavedAt advanced only after write succeeds', () => {
   it('unrecoverable QuotaExceeded leaves _lastSavedAt intact → next save succeeds', () => {
     // Scenario: tab A loads savedAt=1000. User edits. Tab A's saveData:
     //   - CAS read: storage=1000, _lastSavedAt=1000 → CAS passes
     //   - savedAt = Date.now() (e.g. 5000)
     //   - setItem throws QuotaExceeded
-    //   - BUG-04-05 re-check CAS: storage still 1000, _lastSavedAt=1000 → match → proceed
+    //   - re-check CAS: storage still 1000, _lastSavedAt=1000 → match → proceed
     //   - stripped write ALSO throws QuotaExceeded (truly no space)
     //   - inner catch → "Spazio esaurito" toast, return false
     //   - _lastSavedAt was NOT advanced (H3 fix) → still 1000
@@ -210,12 +210,12 @@ describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () 
 });
 
 // ============================================================
-// BUG-04-03 (FIXED): storage event with newValue=null no longer
+// Storage event with newValue=null no longer
 // wipes this tab's in-memory shows. If local shows exist, the
 // handler shows a toast and skips the wipe (preserving in-memory
 // data and any pending edits). Only wipes if local shows is empty.
 // ============================================================
-describe('BUG-04-03 FIXED: storage event null newValue preserves local data', () => {
+describe('storage event null newValue preserves local data', () => {
   it('other tab clears storage → this tab preserves shows + shows toast', () => {
     _state.shows = [
       { id: 1, name: 'A' },
@@ -265,13 +265,13 @@ describe('CAS revision includes key presence', () => {
 });
 
 // ============================================================
-// BUG-04-04 (FIXED): when modal is open (or _localDirty), the
+// When modal is open (or _localDirty), the
 // storage event handler does NOT advance _lastSavedAt to newSavedAt.
 // It leaves _lastSavedAt at its pre-event value, so the next saveData
 // CAS check mismatches (storage has newSavedAt, _lastSavedAt has the
 // older value) → CAS fails → other tab's data is preserved.
 // ============================================================
-describe('BUG-04-04 FIXED: modal-open storage event does NOT enable stale overwrite', () => {
+describe('modal-open storage event does NOT enable stale overwrite', () => {
   it('modal open → _lastSavedAt NOT advanced, next save CAS-fails, other tab preserved', () => {
     // Tab A: loaded shows=[A1,A2], savedAt=1000
     _state.shows = [
@@ -319,13 +319,13 @@ describe('BUG-04-04 FIXED: modal-open storage event does NOT enable stale overwr
 });
 
 // ============================================================
-// BUG-04-05 (FIXED): QuotaExceeded recovery now re-checks CAS
+// QuotaExceeded recovery now re-checks CAS
 // before the stripped write. If another tab wrote between our
 // CAS read and the failing write, recovery is aborted (returns
 // false, shows "modifiche in altro tab" toast) — the other tab's
 // newer data is preserved.
 // ============================================================
-describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
+describe('QuotaExceeded recovery re-checks CAS', () => {
   it('quota error after CAS check → recovery aborted, other tab data preserved', () => {
     // Setup: tab A loaded shows=[] at savedAt=1000.
     putSavedData(mem, [], 1000);
@@ -336,7 +336,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
     //   savedAt = Date.now()
     //   _lastSavedAt NOT advanced (H3 fix)
     //   setItem throws QuotaExceeded
-    //   BUG-04-05 re-check CAS: storage now has 2000 (tab B wrote) → mismatch → abort
+    //   05 re-check CAS: storage now has 2000 (tab B wrote) → mismatch → abort
     //
     // To simulate "another tab wrote savedAt=2000 BETWEEN tab A's CAS read
     // and tab A's write", we stub getItem to return the 1000 snapshot for
@@ -367,7 +367,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
     }) as (k: string) => string | null;
 
     // First STORAGE_KEY write throws QuotaExceeded; stripped write would succeed
-    // (but the BUG-04-05 re-check aborts before reaching it).
+    // (but the re-check aborts before reaching it).
     let firstAttempt = false;
     mem.quotaFailOn = (key, _value) => {
       if (key === STORAGE_KEY && !firstAttempt) {
@@ -401,7 +401,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
 });
 
 // ============================================================
-// BUG-04-06: Multi-tab CAS TOCTOU. localStorage has no atomic
+// Multi-tab CAS TOCTOU. localStorage has no atomic
 // CAS, so two tabs can both read savedAt=X, both pass the CAS
 // check, both write — last writer wins, earlier writer's data is
 // lost silently (no warning, no toast). The CAS only catches the
@@ -409,7 +409,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
 // _lastSavedAt. Verified by simulating two "tabs" with the same
 // module-private _lastSavedAt baseline.
 // ============================================================
-describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
+describe('multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
   it('two concurrent writers both pass CAS, second silently overwrites first', () => {
     // Simulate the race: tab A and tab B both loaded savedAt=1000.
     // Tab A's CAS reads 1000, matches _lastSavedAt=1000 → passes.
@@ -561,12 +561,12 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
 });
 
 // ============================================================
-// BUG-04-07 (FIXED): quota size threshold now uses UTF-8 byte
+// Quota size threshold now uses UTF-8 byte
 // length (TextEncoder.encode(...).length) instead of char count.
 // For Italian accented chars (2 bytes UTF-8) and emoji (4 bytes),
 // the warning now fires at the correct threshold.
 // ============================================================
-describe('BUG-04-07 FIXED: size threshold uses UTF-8 bytes', () => {
+describe('size threshold uses UTF-8 bytes', () => {
   it('sizeKB is accurate for multibyte content (Italian/emoji) — warning fires', () => {
     // 'à' is U+00E0 = 2 UTF-8 bytes but 1 JS char. A string of 4,600,000 'à'
     // chars has length 4,600,000 (4,492 KB by the old char-count formula —
@@ -604,12 +604,12 @@ describe('BUG-04-07 FIXED: size threshold uses UTF-8 bytes', () => {
 });
 
 // ============================================================
-// BUG-04-08 (FIXED): on successful loadData (valid JSON path),
+// On successful loadData (valid JSON path),
 // all `ploppytv_corrupted_*` forensic keys are removed. Repeated
 // corruption no longer spams localStorage. (Corrupted loadData
 // paths still write a forensic key for diagnostics.)
 // ============================================================
-describe('BUG-04-08 FIXED: corrupted_* keys cleaned on successful load', () => {
+describe('corrupted_* keys cleaned on successful load', () => {
   it('loadData writes corrupted raw to ploppytv_corrupted_<ts> (corrupted path)', () => {
     // Use fake timers so Date.now() advances predictably → unique keys
     vi.useFakeTimers();
@@ -638,7 +638,7 @@ describe('BUG-04-08 FIXED: corrupted_* keys cleaned on successful load', () => {
     vi.useRealTimers();
   });
 
-  it('FIXED: subsequent successful loadData cleans up corrupted_* keys', () => {
+  it('subsequent successful loadData cleans up corrupted_* keys', () => {
     // First: produce a corrupted key via a corrupted loadData
     mem.store.set(STORAGE_KEY, '{bad json');
     loadData();

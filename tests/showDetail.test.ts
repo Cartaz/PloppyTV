@@ -101,8 +101,8 @@ describe('renderShowDetail — poster', () => {
 // ============================================================================
 // progress not clamped
 // ============================================================================
-describe('renderShowDetail — progress not clamped (BUG-14-02 FIXED)', () => {
-  it('watched > totalEpisodes → width clamped to 100%, label clamped to 100% (FIXED)', () => {
+describe('renderShowDetail — progress not clamped', () => {
+  it('watched > totalEpisodes → width clamped to 100%, label clamped to 100%', () => {
     // 5 episodes in season, all watched, but totalEpisodes=3 (stale)
     const show = makeShowWithSeasons({ 1: 5 }, { id: 1, totalEpisodes: 3 });
     markWatchedFirst(show, 1, 5);
@@ -169,8 +169,8 @@ describe('renderShowDetail — seasons filter+sort', () => {
     expect(document.querySelector('.empty-state-title')?.textContent).toBe('Nessun episodio disponibile');
   });
 
-  it('pathological non-integer season key "1.5" — REJECTED by filter (FIXED BUG-14-04)', () => {
-    // FIX BUG-14-04: il filter ora usa /^\d+$/ (regex stretta) invece di
+  it('pathological non-integer season key "1.5" — REJECTED by filter', () => {
+    // Il filter ora usa /^\d+$/ (regex stretta) invece di
     // !isNaN(parseInt(k,10)) che accettava "1.5". Ora "1.5" è filtrato →
     // seasons.length === 0 → empty-state, nessun tab.
     const show = makeShow({ id: 1 }) as unknown as Show & { seasons: Record<string, unknown> };
@@ -503,7 +503,7 @@ describe('renderShowDetail — auto-refresh trigger', () => {
     expect(refreshShowEpisodes).not.toHaveBeenCalled();
   });
 
-  it('refreshShowEpisodes IS called when names are empty string (BUG-06-03 FIXED by Subagent 3)', () => {
+  it('refreshShowEpisodes IS called when names are empty string', () => {
     // Subagent 3 fixed showNeedsEpisodeNames to also treat empty string as missing
     // (ep.name == null || ep.name === ''). So now refreshShowEpisodes IS called.
     const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
@@ -622,7 +622,7 @@ describe('bindShowDetailEvents — event delegation', () => {
 // ============================================================================
 // bindShowDetailEvents — listener accumulation (HIGH severity bug, FIXED)
 // ============================================================================
-describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', () => {
+describe('bindShowDetailEvents — listener accumulation', () => {
   it('re-bind on same main leaves only ONE active listener', () => {
     // bindShowDetailEvents rimuove il listener precedente prima di aggiungerne uno nuovo.
     // prima che bindShowDetailEvents ne aggiunga uno nuovo. Quindi N cicli di
@@ -661,7 +661,7 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     expect(toggleEpisode).toHaveBeenCalledTimes(3);
   });
 
-  it('listener accumulation FIXED — markSeason fires EXACTLY once after 2 binds', () => {
+  it('listener accumulation markSeason fires EXACTLY once after 2 binds', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
     show.seasons[1][1].name = 'Ep 2';
@@ -705,7 +705,7 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
 // ============================================================================
 // H17 a11y — keyboard accessible episode-item and season-tab
 // ============================================================================
-describe('H17 a11y — episode-item and season-tab keyboard accessible (FIXED)', () => {
+describe('H17 a11y — episode-item and season-tab keyboard accessible', () => {
   it('episode-item has role=button, tabindex=0, aria-label', () => {
     const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';

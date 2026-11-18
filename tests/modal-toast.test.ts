@@ -1,15 +1,6 @@
 // Test: src/components/modal.ts + src/components/toast.ts
 //
-// Copre i BUG-A15-0X fixati in questo task:
-//  - BUG-A15-01: initModal double-bind guard (no duplicate ESC/Tab/click listeners)
-//  - BUG-A15-02: onClick reentrancy (pop, swap, closeAllModals) — identity check
-//  - BUG-A15-03: focus trap selector include textarea, select, summary
-//  - BUG-A15-04: focus trap quando non ci sono focusable o activeElement non
-//    focusable ma dentro il dialog (es. titolo tabindex=-1)
-//  - BUG-A15-05: body/actions puliti quando lo stack si svuota
-//  - BUG-A15-06: aria-labelledby rimosso quando titolo vuoto / stack vuoto
-//  - BUG-A15-07: dismissToast API + timer cleared
-//  - BUG-A15-08: showToast null/undefined → stringa vuota (non "null"/"undefined")
+// Copre i-0X fixati in questo task:
 //
 // Inoltre: stack 3+ livelli, ESC chiude solo top, memory (no duplicate listener
 // su reopen), toast replacement (timer reset).
@@ -70,9 +61,9 @@ function fireKey(key: string, shiftKey = false): KeyboardEvent {
 }
 
 // =====================================================================
-// BUG-A15-01: initModal double-bind guard
+// initModal double-bind guard
 // =====================================================================
-describe('BUG-A15-01: initModal double-bind guard', () => {
+describe('initModal double-bind guard', () => {
   it('chiamare initModal più volte NON duplica il listener ESC (single pop per ESC)', () => {
     initModal();
     initModal();
@@ -112,9 +103,9 @@ describe('BUG-A15-01: initModal double-bind guard', () => {
 });
 
 // =====================================================================
-// BUG-A15-02: onClick reentrancy — identity-based check
+// onClick reentrancy — identity-based check
 // =====================================================================
-describe('BUG-A15-02: onClick reentrancy (pop / swap / closeAll gestiti)', () => {
+describe('onClick reentrancy (pop / swap / closeAll gestiti)', () => {
   it('onClick che chiama closeModal NON causa double-pop', () => {
     showModal('A', '<p>a</p>', [
       {
@@ -191,7 +182,7 @@ describe('BUG-A15-02: onClick reentrancy (pop / swap / closeAll gestiti)', () =>
     expect(isModalOpen()).toBe(false);
   });
 
-  it('regression: onClick che pusha un figlio → skip auto-close (BUG-09-01)', () => {
+  it('regression: onClick che pusha un figlio → skip auto-close', () => {
     showModal('Parent', '<p>p</p>', [
       {
         label: 'Open child',
@@ -206,9 +197,9 @@ describe('BUG-A15-02: onClick reentrancy (pop / swap / closeAll gestiti)', () =>
 });
 
 // =====================================================================
-// BUG-A15-03: focus trap include textarea, select, summary
+// Focus trap include textarea, select, summary
 // =====================================================================
-describe('BUG-A15-03: focus trap include textarea/select/summary', () => {
+describe('focus trap include textarea/select/summary', () => {
   it("Tab dall'ultimo focusable (button) wraps al primo (textarea)", () => {
     showModal('Note', '<textarea id="note" class="note-textarea"></textarea>', [{ label: 'Save' }]);
     const ta = document.getElementById('note') as HTMLTextAreaElement;
@@ -252,9 +243,9 @@ describe('BUG-A15-03: focus trap include textarea/select/summary', () => {
 });
 
 // =====================================================================
-// BUG-A15-04: focus trap quando non ci sono focusable / activeElement non focusable
+// Focus trap quando non ci sono focusable / activeElement non focusable
 // =====================================================================
-describe('BUG-A15-04: focus trap con no focusable / title focused', () => {
+describe('focus trap con no focusable / title focused', () => {
   it('Tab è bloccato quando la modale non ha elementi focusable', () => {
     showModal('Info', '<p>just text, no inputs</p>', []);
     const titleEl = document.getElementById('modalTitle')!;
@@ -303,9 +294,9 @@ describe('BUG-A15-04: focus trap con no focusable / title focused', () => {
 });
 
 // =====================================================================
-// BUG-A15-05: body e actions puliti quando lo stack si svuota
+// Body e actions puliti quando lo stack si svuota
 // =====================================================================
-describe('BUG-A15-05: body/actions puliti su stack empty', () => {
+describe('body/actions puliti su stack empty', () => {
   it('modalBody e modalActions sono vuoti dopo closeModal (stack empty)', () => {
     showModal('A', '<p id="stale">sensitive data</p>', [{ label: 'OK' }]);
     expect(document.getElementById('stale')).not.toBeNull();
@@ -337,9 +328,9 @@ describe('BUG-A15-05: body/actions puliti su stack empty', () => {
 });
 
 // =====================================================================
-// BUG-A15-06: aria-labelledby rimosso quando titolo vuoto / stack empty
+// Aria-labelledby rimosso quando titolo vuoto / stack empty
 // =====================================================================
-describe('BUG-A15-06: aria-labelledby condizionato al titolo', () => {
+describe('aria-labelledby condizionato al titolo', () => {
   it('showModal con titolo vuoto → aria-labelledby assente', () => {
     showModal('', '<p>body</p>', [{ label: 'OK' }]);
     const overlay = document.getElementById('modal')!;
@@ -371,9 +362,9 @@ describe('BUG-A15-06: aria-labelledby condizionato al titolo', () => {
 });
 
 // =====================================================================
-// BUG-A15-08: showToast null/undefined msg
+// showToast null/undefined msg
 // =====================================================================
-describe('BUG-A15-08: showToast null/undefined msg → empty string', () => {
+describe('showToast null/undefined msg → empty string', () => {
   it('showToast(undefined) mostra testo vuoto, non "undefined"', () => {
     vi.useFakeTimers();
     showToast(undefined as unknown as string, 'success');
@@ -417,9 +408,9 @@ describe('BUG-A15-08: showToast null/undefined msg → empty string', () => {
 });
 
 // =====================================================================
-// BUG-A15-09: showModal con actions null/undefined (defensive guard)
+// showModal con actions null/undefined (defensive guard)
 // =====================================================================
-describe('BUG-A15-09: showModal con actions null/undefined', () => {
+describe('showModal con actions null/undefined', () => {
   it('showModal con null actions non crasha', () => {
     expect(() => showModal('T', '<p>x</p>', null as unknown as [])).not.toThrow();
     expect(isModalOpen()).toBe(true);

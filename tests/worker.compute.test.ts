@@ -6,11 +6,6 @@
 //  - client.ts: test by mocking global Worker constructor (same as worker.client.test.ts).
 //
 // Covers:
-//  - BUG-A9-01/02/03: safeShows filter (null/undefined/non-object entries, non-array input)
-//  - BUG-A9-04: genre dedup + non-string genre filtering
-//  - BUG-A9-05: client postMessage DataCloneError → fallback + no leak
-//  - BUG-A9-06: client fallback computeStats/computeCalendar throws → reject (no hang)
-//  - BUG-A9-10: worker non-object message → clean error response
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { formatDuration } from '../src/lib/i18n';
@@ -25,7 +20,7 @@ import '../src/worker/stats.worker';
 // Part 1: compute.ts — direct tests (pure functions)
 // ============================================================
 
-describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () => {
+describe('topGenres — dedup + non-string filtering', () => {
   it('duplicate genres in same show → episodes counted once per genre (not double)', () => {
     const s = makeShowWithSeasons({ 1: 5 }, { id: 1, genres: ['Drama', 'Drama', 'Drama'] });
     markWatchedFirst(s, 1, 5);
@@ -125,10 +120,10 @@ describe('[compute] BUG-A9-04: topGenres — dedup + non-string filtering', () =
 });
 
 // ============================================================
-// Part 2: stats.worker.ts — non-object message guard (BUG-A9-10)
+// Part 2: stats.worker.ts — non-object message guard
 // ============================================================
 
-describe('[worker] BUG-A9-10: non-object message guard', () => {
+describe('[worker]: non-object message guard', () => {
   let workerResponses: WorkerResponse[];
   let originalPostMessage: typeof self.postMessage;
 
@@ -220,7 +215,7 @@ function makeGetterBombShow(): Show {
   return s;
 }
 
-describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + no leak', () => {
+describe('postMessage throws DataCloneError → fallback + no leak', () => {
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -314,7 +309,7 @@ describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + n
   });
 });
 
-describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no hang)', () => {
+describe('fallback compute throws → promise rejects (no hang)', () => {
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -364,13 +359,13 @@ describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no ha
     }) as unknown as typeof Worker;
     const { computeStatsAsync } = await importClient();
     const evilShows = [makeGetterBombShow()];
-    // Without BUG-A9-06 fix: the executor's sync throw auto-rejects (this
+    // Without fix: the executor's sync throw auto-rejects (this
     // path already worked). But we verify it rejects rather than hangs.
     await expect(computeStatsAsync(evilShows)).rejects.toThrow('getter bomb');
   });
 
   it('worker emits error + fallback computeStats throws → rejects (not hangs)', async () => {
-    // This is the KEY test for BUG-A9-06: the fallback runs inside an event
+    // This is the KEY test for: the fallback runs inside an event
     // handler (NOT the Promise executor). Before the fix, a throw here was
     // NOT caught by the Promise constructor → promise hung forever.
     const { computeStatsAsync } = await importClient();
@@ -452,7 +447,7 @@ describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no ha
   });
 
   it('stats: postMessage throws + fallback computeStats throws → rejects (not hangs)', async () => {
-    // Combined: BUG-A9-05 path (postMessage throws) + BUG-A9-06 path
+    // Combined: path (postMessage throws) + path
     // (fallback also throws). The postMessage catch must cleanup and then
     // runFallbackOrReject must reject.
     const { computeStatsAsync } = await importClient();
@@ -472,7 +467,7 @@ describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no ha
 // Part 4: Regression — existing behavior preserved
 // ============================================================
 
-describe('[compute] regression: existing behavior preserved', () => {
+describe('regression: existing behavior preserved', () => {
   it('empty shows → all zeros, timeLabel "0min"', () => {
     const r = computeStats([]);
     expect(r.totalShows).toBe(0);

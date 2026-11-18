@@ -2,15 +2,15 @@
 //
 // Covers:
 //   discover.ts:
-//     - BUG-A12-01: rating.average XSS in modal body (raw interpolation)
-//     - BUG-A12-02: runtime XSS in modal body (raw interpolation)
-//     - BUG-A12-03: data-show-id not escaped (attribute breakout)
-//     - BUG-A12-04: rating.average === 0 displayed as "N/D" (truthy check)
+//     Rating.average XSS in modal body (raw interpolation)
+//     Runtime XSS in modal body (raw interpolation)
+//     Data-show-id not escaped (attribute breakout)
+//     Rating.average === 0 displayed as "N/D" (truthy check)
 //     - empty carousel genre skipped, _other rendered with "Altro" title
 //   library.ts:
-//     - BUG-A12-05: non-string tag element crashes applyFilters
-//     - BUG-A12-06: non-string show.name crashes applyFilters
-//     - BUG-A12-07: dropdown hidden when filter set but no options (stale filter)
+//     Non-string tag element crashes applyFilters
+//     Non-string show.name crashes applyFilters
+//     Dropdown hidden when filter set but no options (stale filter)
 //     - combined AND filters, clear button, empty states, case-insensitive search
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -128,7 +128,7 @@ function makeLibShow(over: Record<string, unknown> = {}): Record<string, unknown
 // DISCOVER VIEW TESTS
 // ============================================================
 
-describe('Agent-A12 probe: discover view', () => {
+describe('discover view', () => {
   let storeMod: typeof Store;
   let discoverMod: typeof Discover;
 
@@ -164,9 +164,9 @@ describe('Agent-A12 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-01: rating.average XSS in modal body
+  // Rating.average XSS in modal body
   // ===================================================================
-  describe('BUG-A12-01: rating.average XSS in modal body (FIXED)', () => {
+  describe('rating.average XSS in modal body', () => {
     it('rating.average as HTML string → modal body does NOT contain raw <img> tag', async () => {
       const xssPayload = '<img src=x onerror=alert(1)>';
       const show = makeTvmazeShow(1, { rating: { average: xssPayload } });
@@ -246,9 +246,9 @@ describe('Agent-A12 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-02: runtime XSS in modal body
+  // Runtime XSS in modal body
   // ===================================================================
-  describe('BUG-A12-02: runtime XSS in modal body (FIXED)', () => {
+  describe('runtime XSS in modal body', () => {
     it('runtime as HTML string → modal body does NOT contain raw <img> tag', async () => {
       const xssPayload = '<img src=x onerror=alert(1)>';
       const show = makeTvmazeShow(1, { runtime: xssPayload });
@@ -325,9 +325,9 @@ describe('Agent-A12 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-03: data-show-id not escaped
+  // Data-show-id not escaped
   // ===================================================================
-  describe('BUG-A12-03: data-show-id escaped (FIXED)', () => {
+  describe('data-show-id escaped', () => {
     it('show.id as quote-containing string → no attribute breakout', async () => {
       // Simulate corrupted cache where id is a string with quote/HTML
       const show = makeTvmazeShow(1);
@@ -367,9 +367,9 @@ describe('Agent-A12 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-04: rating.average === 0 displayed as "N/D" (truthy check)
+  // Rating.average === 0 displayed as "N/D" (truthy check)
   // ===================================================================
-  describe('BUG-A12-04: rating.average === 0 displays "0/10" (FIXED)', () => {
+  describe('rating.average === 0 displays "0/10"', () => {
     it('rating.average = 0 → modal body shows "0/10" (not "N/D")', async () => {
       const show = makeTvmazeShow(1, { rating: { average: 0 } });
       mockFindShowInDiscoverGroups.mockReturnValue(show);
@@ -467,7 +467,7 @@ describe('Agent-A12 probe: discover view', () => {
 // LIBRARY VIEW TESTS
 // ============================================================
 
-describe('Agent-A12 probe: library view', () => {
+describe('library view', () => {
   let storeMod: typeof Store;
   let libraryMod: typeof Library;
 
@@ -490,9 +490,9 @@ describe('Agent-A12 probe: library view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-06: non-string show.name crashes applyFilters
+  // Non-string show.name crashes applyFilters
   // ===================================================================
-  describe('BUG-A12-06: non-string show.name does not crash (FIXED)', () => {
+  describe('non-string show.name does not crash', () => {
     it('show.name as number does not throw on text search', async () => {
       const show = makeLibShow({ name: 12345 as unknown });
       storeMod.setState({ shows: [show as unknown as never] });
@@ -535,9 +535,9 @@ describe('Agent-A12 probe: library view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-07: dropdown hidden when filter set but no options
+  // Dropdown hidden when filter set but no options
   // ===================================================================
-  describe('BUG-A12-07: dropdown rendered when filter is set (FIXED)', () => {
+  describe('dropdown rendered when filter is set', () => {
     it('network filter set but no networks available → dropdown still rendered', () => {
       const showNoNet = makeLibShow({ network: 'N/D' });
       const showWithNet = makeLibShow({ id: 1, network: 'ABC' });

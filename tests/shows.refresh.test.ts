@@ -116,7 +116,7 @@ beforeEach(() => {
 
 // ===== Tests =====
 
-describe('BUG-A6-01: refreshShowEpisodes preserves rating and note', () => {
+describe('refreshShowEpisodes preserves rating and note', () => {
   it('preserves rating and note when episode matched by id', async () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 42, list: 'watching' });
     show.seasons[1][0].watched = true;
@@ -177,7 +177,7 @@ describe('BUG-A6-01: refreshShowEpisodes preserves rating and note', () => {
   });
 });
 
-describe('BUG-A6-02: refreshShowEpisodes skips episodes with num=0', () => {
+describe('refreshShowEpisodes skips episodes with num=0', () => {
   it('does not add episodes with number=0', async () => {
     setShows([makeShowWithSeasons({ 1: 2 }, { id: 42 })]);
     vi.mocked(getShowEpisodes).mockResolvedValue([
@@ -193,7 +193,7 @@ describe('BUG-A6-02: refreshShowEpisodes skips episodes with num=0', () => {
   });
 });
 
-describe('BUG-A6-03: refreshShowEpisodes dedups episodes by num', () => {
+describe('refreshShowEpisodes dedups episodes by num', () => {
   it('keeps only first episode when duplicates exist (same season+num)', async () => {
     setShows([makeShowWithSeasons({ 1: 0 }, { id: 42 })]);
     vi.mocked(getShowEpisodes).mockResolvedValue([
@@ -211,7 +211,7 @@ describe('BUG-A6-03: refreshShowEpisodes dedups episodes by num', () => {
   });
 });
 
-describe('BUG-A6-04: refreshShowEpisodes does not wipe on empty API response', () => {
+describe('refreshShowEpisodes does not wipe on empty API response', () => {
   it('preserves existing episodes when API returns empty array', async () => {
     const show = makeShowWithSeasons({ 1: 3 }, { id: 42, list: 'watching' });
     markWatchedFirst(show, 1, 2);
@@ -236,7 +236,7 @@ describe('BUG-A6-04: refreshShowEpisodes does not wipe on empty API response', (
   });
 });
 
-describe('BUG-A6-06: refreshShowEpisodes handles corrupted show.seasons', () => {
+describe('refreshShowEpisodes handles corrupted show.seasons', () => {
   it('returns false when show.seasons is null', async () => {
     const show = makeShow({ id: 42 }) as Show;
     (show as { seasons: unknown }).seasons = null;
@@ -262,7 +262,7 @@ describe('BUG-A6-06: refreshShowEpisodes handles corrupted show.seasons', () => 
   });
 });
 
-describe('BUG-A6-10: addShowToList validates list parameter', () => {
+describe('addShowToList validates list parameter', () => {
   it('rejects invalid list name', async () => {
     const result = await addShowToList(makeTvmazeShow(42), 'invalid' as never);
     expect(result).toBeNull();

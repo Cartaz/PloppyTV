@@ -2,26 +2,7 @@
 // Test: img.ts, imageFallback.ts, renderer.ts, header.ts
 //
 // Verifies (post-fix):
-// - BUG-A17-01 (Medium, FIXED): imgTag valida src con safeImageUrl — rifiuta
-//   javascript:, data:, URL non-http(s). Prima interpolava src raw dopo solo
-//   escapeAttr (che non blocca scheme pericolosi).
-// - BUG-A17-02 (Medium, FIXED): imgTag escapa cls e extraStyle in TUTTI gli
-//   attributi (class, data-fallback-cls, style). Prima il placeholder <div>
-//   interpolava extraStyle raw nel style attribute → XSS se conteneva ".
-// - BUG-A17-03 (High, FIXED): imageFallback loop infinito con fallbackSrc
-//   relativo. Ora usa flag data-fallback-src-tried invece di confronto stringa.
 // - imageFallback: initImageFallback ritorna il dispose del listener.
-// - BUG-A17-05 (Medium, FIXED): renderer getMain ritorna null invece di crashare.
-// - BUG-A17-06 (Medium, FIXED): renderer usa safeId per data-show-id.
-// - BUG-A17-07 (Medium, FIXED): renderer safeImport usa data-action (CSP-safe).
-// - BUG-A17-08 (High, FIXED): renderer salta bindShowDetailEvents quando
-//   renderShowDetail baila (closeShow nullato currentShowId).
-// - BUG-A17-09 (Low, FIXED): header updateBadges defensive guard su shows non-array.
-// - BUG-A17-10 (High, FIXED): header initHeader idempotency guard.
-// - BUG-A17-11 (Medium, FIXED): header sidebar scroll lock + restore.
-// - BUG-A17-12 (Medium, FIXED): header ESC chiude sidebar mobile.
-// - BUG-A17-13 (Medium, FIXED): header delegated [data-lang] handler (no setTimeout).
-// - BUG-A17-14 (Low, FIXED): header langBtn escapa codici locale.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { imgTag } from '../src/components/img';
@@ -82,10 +63,10 @@ afterEach(() => {
 });
 
 // ============================================================
-// img.ts — BUG-A17-01: safeImageUrl validation
+// img.ts —: safeImageUrl validation
 // ============================================================
 
-describe('BUG-A17-01: imgTag validates src with safeImageUrl', () => {
+describe('imgTag validates src with safeImageUrl', () => {
   it('javascript: URL → placeholder div (not <img src="javascript:">)', () => {
     const html = imgTag('javascript:alert(1)', 'Alt', 'poster');
     expect(html).not.toContain('<img');
@@ -150,10 +131,10 @@ describe('BUG-A17-01: imgTag validates src with safeImageUrl', () => {
 });
 
 // ============================================================
-// img.ts — BUG-A17-02: escape cls and extraStyle in all attributes
+// img.ts —: escape cls and extraStyle in all attributes
 // ============================================================
 
-describe('BUG-A17-02: imgTag escapes cls and extraStyle', () => {
+describe('imgTag escapes cls and extraStyle', () => {
   it('placeholder div: extraStyle with quote is escaped (no XSS)', () => {
     // Before fix: style="' + extraStyle + '" → style="width:40px" onclick="alert(1)"
     // After fix: style="' + escapeAttr(extraStyle) + '" → safe.
@@ -202,10 +183,10 @@ describe('BUG-A17-02: imgTag escapes cls and extraStyle', () => {
 });
 
 // ============================================================
-// imageFallback.ts — BUG-A17-03: infinite loop with relative fallbackSrc
+// imageFallback.ts —: infinite loop with relative fallbackSrc
 // ============================================================
 
-describe('BUG-A17-03: imageFallback no infinite loop with relative fallbackSrc', () => {
+describe('imageFallback no infinite loop with relative fallbackSrc', () => {
   beforeEach(() => {
     initFallback();
   });
@@ -335,10 +316,10 @@ describe('imageFallback dispose removes the listener', () => {
 });
 
 // ============================================================
-// renderer.ts — BUG-A17-05: getMain null safety
+// renderer.ts —: getMain null safety
 // ============================================================
 
-describe('BUG-A17-05: renderer getMain null safety', () => {
+describe('renderer getMain null safety', () => {
   it('initRenderer does not crash when mainContent missing', async () => {
     document.body.innerHTML = ''; // no mainContent
     vi.doMock('../src/components/imageFallback', () => ({ initImageFallback: vi.fn() }));
@@ -350,10 +331,10 @@ describe('BUG-A17-05: renderer getMain null safety', () => {
 });
 
 // ============================================================
-// renderer.ts — BUG-A17-06: safeId for data-show-id
+// renderer.ts —: safeId for data-show-id
 // ============================================================
 
-describe('BUG-A17-06: renderer uses safeId for data-show-id', () => {
+describe('renderer uses safeId for data-show-id', () => {
   async function setupRendererWithOpenShowSpy(): Promise<{
     openShowSpy: ReturnType<typeof vi.fn>;
     clickButton: (showId: string) => void;
@@ -420,10 +401,10 @@ describe('BUG-A17-06: renderer uses safeId for data-show-id', () => {
 });
 
 // ============================================================
-// renderer.ts — BUG-A17-07: safeImport uses data-action (CSP-safe)
+// renderer.ts —: safeImport uses data-action (CSP-safe)
 // ============================================================
 
-describe('BUG-A17-07: safeImport error UI uses data-action not inline onclick', () => {
+describe('safeImport error UI uses data-action not inline onclick', () => {
   it('error fallback button has data-action="reloadPage", no inline onclick', async () => {
     vi.doMock('../src/components/imageFallback', () => ({ initImageFallback: vi.fn() }));
     vi.doMock('../src/components/header', () => ({ updateBadges: vi.fn() }));
@@ -481,10 +462,10 @@ describe('BUG-A17-07: safeImport error UI uses data-action not inline onclick', 
 });
 
 // ============================================================
-// renderer.ts — BUG-A17-08: skip bind when renderShowDetail bails
+// renderer.ts —: skip bind when renderShowDetail bails
 // ============================================================
 
-describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail bails', () => {
+describe('renderer skips bindShowDetailEvents when renderShowDetail bails', () => {
   it('openShow(non-existent) → renderShowDetail bails → bind NOT called', async () => {
     const bindSpy = vi.fn();
     // Mock showDetail: renderShowDetail calls closeShow (simulating bail).
@@ -560,10 +541,10 @@ describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail 
 });
 
 // ============================================================
-// header.ts — BUG-A17-09: updateBadges defensive guard
+// header.ts —: updateBadges defensive guard
 // ============================================================
 
-describe('BUG-A17-09: updateBadges handles non-array shows', () => {
+describe('updateBadges handles non-array shows', () => {
   it('state.shows = null → badges set to 0 (no crash)', async () => {
     document.body.innerHTML =
       '<span id="badge-watching">9</span>' +
@@ -595,10 +576,10 @@ describe('BUG-A17-09: updateBadges handles non-array shows', () => {
 });
 
 // ============================================================
-// header.ts — BUG-A17-10: initHeader idempotency guard
+// header.ts —: initHeader idempotency guard
 // ============================================================
 
-describe('BUG-A17-10: initHeader idempotency guard', () => {
+describe('initHeader idempotency guard', () => {
   it('calling initHeader twice does not double-register nav-item listeners', async () => {
     // Set up DOM with nav-items.
     document.body.innerHTML =
@@ -629,10 +610,10 @@ describe('BUG-A17-10: initHeader idempotency guard', () => {
 });
 
 // ============================================================
-// header.ts — BUG-A17-11: sidebar scroll lock + restore
+// header.ts —: sidebar scroll lock + restore
 // ============================================================
 
-describe('BUG-A17-11: sidebar scroll lock and restore', () => {
+describe('sidebar scroll lock and restore', () => {
   beforeEach(async () => {
     vi.doMock('../src/lib/store', async () => {
       const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
@@ -680,10 +661,10 @@ describe('BUG-A17-11: sidebar scroll lock and restore', () => {
 });
 
 // ============================================================
-// header.ts — BUG-A17-12: ESC closes sidebar
+// header.ts —: ESC closes sidebar
 // ============================================================
 
-describe('BUG-A17-12: ESC closes sidebar mobile', () => {
+describe('ESC closes sidebar mobile', () => {
   beforeEach(async () => {
     vi.doMock('../src/lib/store', async () => {
       const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
@@ -746,10 +727,10 @@ describe('BUG-A17-12: ESC closes sidebar mobile', () => {
 });
 
 // ============================================================
-// header.ts — BUG-A17-13: delegated [data-lang] handler
+// header.ts —: delegated [data-lang] handler
 // ============================================================
 
-describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () => {
+describe('delegated [data-lang] click handler (no setTimeout)', () => {
   beforeEach(async () => {
     vi.doMock('../src/lib/store', async () => {
       const actual = await vi.importActual<typeof import('../src/lib/store')>('../src/lib/store');
@@ -824,10 +805,10 @@ describe('BUG-A17-13: delegated [data-lang] click handler (no setTimeout)', () =
 });
 
 // ============================================================
-// header.ts — BUG-A17-14: langBtn escapes locale codes
+// header.ts —: langBtn escapes locale codes
 // ============================================================
 
-describe('BUG-A17-14: langBtn escapes locale codes in HTML', () => {
+describe('langBtn escapes locale codes in HTML', () => {
   it('language button data-lang is properly quoted in attribute', async () => {
     document.body.innerHTML = '<button id="langBtn"></button><div id="mainContent"></div>';
 

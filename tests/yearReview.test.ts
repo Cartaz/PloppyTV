@@ -1,11 +1,11 @@
 // Test: src/views/yearReview.ts
 //
 // Covers:
-//   - computeYearStats edge cases (BUG-A14-01..04, 10, 14)
-//   - exportYearCard canvas error handling (BUG-A14-05..09): tainted canvas
+//   - computeYearStats edge cases (..04, 10, 14)
+//   - exportYearCard canvas error handling (..09): tainted canvas
 //     SecurityError (mocked toBlob throw), null blob, click failure, blob URL
 //     leak prevention, toBlob not available, filename year sanitization
-//   - renderYearReview with corrupted data (BUG-A14-12, 13) + XSS via showName
+//   - renderYearReview with corrupted data (, 13) + XSS via showName
 //
 // jsdom non ha canvas reale: getContext() ritorna null e toBlob() non chiama
 // il callback. Per testare il flow di export, mockiamo HTMLCanvasElement.prototype
@@ -161,19 +161,19 @@ function makeShowWithWatchedEpsInYear(
   });
 }
 
-// ===== computeYearStats: BUG-A14-01 (watched strict === true) =====
+// ===== computeYearStats: (watched strict === true) =====
 
-// ===== computeYearStats: BUG-A14-02 (airdate must be string) =====
+// ===== computeYearStats: (airdate must be string) =====
 
-// ===== computeYearStats: BUG-A14-03 (runtime must be finite number) =====
+// ===== computeYearStats: (runtime must be finite number) =====
 
-// ===== computeYearStats: BUG-A14-04 (show.seasons null/undefined/array) =====
+// ===== computeYearStats: (show.seasons null/undefined/array) =====
 
-// ===== computeYearStats: BUG-A14-10 (empty/non-string genres) =====
+// ===== computeYearStats: (empty/non-string genres) =====
 
-// ===== computeYearStats: BUG-A14-14 (year validation) =====
+// ===== computeYearStats: (year validation) =====
 
-describe('BUG-A14-14: year validation', () => {
+describe('year validation', () => {
   const validShow = makeShowWithWatchedEpsInYear(1, 'A', 2023, 3);
 
   it('returns empty stats for NaN year', () => {
@@ -281,7 +281,7 @@ describe('computeYearStats: happy path', () => {
   });
 });
 
-// ===== exportYearCard: BUG-A14-05 (showName null/undefined in canvas) =====
+// ===== exportYearCard: (showName null/undefined in canvas) =====
 
 function makeStats(over: Partial<YearStats> = {}): YearStats {
   return {
@@ -296,7 +296,7 @@ function makeStats(over: Partial<YearStats> = {}): YearStats {
   };
 }
 
-describe('BUG-A14-05: showName null/undefined in canvas', () => {
+describe('showName null/undefined in canvas', () => {
   it('does not throw when showName is null', () => {
     const stats = makeStats({
       topShows: [{ showId: 1, showName: null as unknown as string, image: null, watched: 5 }],
@@ -326,9 +326,9 @@ describe('BUG-A14-05: showName null/undefined in canvas', () => {
   });
 });
 
-// ===== exportYearCard: BUG-A14-06 (toBlob SecurityError / tainted canvas) =====
+// ===== exportYearCard: (toBlob SecurityError / tainted canvas) =====
 
-describe('BUG-A14-06: toBlob SecurityError (tainted canvas)', () => {
+describe('toBlob SecurityError (tainted canvas)', () => {
   it('shows error toast when toBlob throws synchronously', () => {
     _toBlobBehavior = 'throw';
     exportYearCard(makeStats());
@@ -360,9 +360,9 @@ describe('BUG-A14-06: toBlob SecurityError (tainted canvas)', () => {
   });
 });
 
-// ===== exportYearCard: BUG-A14-07 (revokeObjectURL always called) =====
+// ===== exportYearCard: (revokeObjectURL always called) =====
 
-describe('BUG-A14-07: revokeObjectURL always called (leak prevention)', () => {
+describe('revokeObjectURL always called (leak prevention)', () => {
   it('revokes blob URL on successful download', () => {
     _toBlobBehavior = 'success';
     exportYearCard(makeStats());
@@ -395,9 +395,9 @@ describe('BUG-A14-07: revokeObjectURL always called (leak prevention)', () => {
   });
 });
 
-// ===== exportYearCard: BUG-A14-08 (toBlob / getContext not available) =====
+// ===== exportYearCard: (toBlob / getContext not available) =====
 
-describe('BUG-A14-08: canvas methods not available', () => {
+describe('canvas methods not available', () => {
   it('shows error toast when getContext returns null', () => {
     setupCanvasMock(false);
     exportYearCard(makeStats());
@@ -413,9 +413,9 @@ describe('BUG-A14-08: canvas methods not available', () => {
   });
 });
 
-// ===== exportYearCard: BUG-A14-09 (filename year sanitization) =====
+// ===== exportYearCard: (filename year sanitization) =====
 
-describe('BUG-A14-09: filename year sanitization', () => {
+describe('filename year sanitization', () => {
   function captureAnchorDownload(): {
     createSpy: MockInstance;
     getDownload: () => string | undefined;
@@ -567,7 +567,7 @@ describe('renderYearReview: XSS defense', () => {
   });
 });
 
-describe('renderYearReview: year button click (BUG-A14-11)', () => {
+describe('renderYearReview: year button click', () => {
   it('changes selected year on valid button click', () => {
     const show = makeShowWithWatchedEpsInYear(1, 'A', 2023, 2);
     show.seasons[2] = [makeEpisode({ num: 1, id: 2001, watched: true, airdate: '2022-01-01', runtime: 45 })];
