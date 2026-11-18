@@ -53,7 +53,6 @@ import {
   setEpisodeNote,
   addShowTag,
   removeShowTag,
-  getAllUserTags,
   getRandomGoldEpisode,
 } from '../src/lib/shows';
 import { getState, setState, setShows } from '../src/lib/store';
@@ -237,23 +236,6 @@ describe('BUG-A6-04: refreshShowEpisodes does not wipe on empty API response', (
   });
 });
 
-describe('BUG-A6-05: refreshShowEpisodes handles non-array API response', () => {
-  it('returns false when API returns null', async () => {
-    setShows([makeShowWithSeasons({ 1: 2 }, { id: 42 })]);
-    vi.mocked(getShowEpisodes).mockResolvedValue(null as never);
-    const result = await refreshShowEpisodes(42);
-    expect(result).toBe(false);
-    expect(showToast).toHaveBeenCalledWith('Risposta API non valida', 'error');
-  });
-
-  it('returns false when API returns an object', async () => {
-    setShows([makeShowWithSeasons({ 1: 2 }, { id: 42 })]);
-    vi.mocked(getShowEpisodes).mockResolvedValue({ not: 'array' } as never);
-    const result = await refreshShowEpisodes(42);
-    expect(result).toBe(false);
-  });
-});
-
 describe('BUG-A6-06: refreshShowEpisodes handles corrupted show.seasons', () => {
   it('returns false when show.seasons is null', async () => {
     const show = makeShow({ id: 42 }) as Show;
@@ -277,127 +259,6 @@ describe('BUG-A6-06: refreshShowEpisodes handles corrupted show.seasons', () => 
     setShows([show]);
     const result = await refreshShowEpisodes(42);
     expect(result).toBe(false);
-  });
-});
-
-describe('BUG-A6-07: toggle/mark/setRating/setNote guard corrupted show.seasons', () => {
-  it('toggleEpisode does not crash when show.seasons is undefined', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons?: unknown }).seasons = undefined;
-    setShows([show]);
-    expect(() => toggleEpisode(42, 1, 1)).not.toThrow();
-    expect(showToast).not.toHaveBeenCalled();
-  });
-
-  it('toggleEpisode does not crash when seasonArr is not an array (string)', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons: unknown }).seasons = { 1: 'not-an-array' };
-    setShows([show]);
-    expect(() => toggleEpisode(42, 1, 1)).not.toThrow();
-  });
-
-  it('markSeasonWatched does not crash when show.seasons is null', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons: unknown }).seasons = null;
-    setShows([show]);
-    expect(() => markSeasonWatched(42, 1, true)).not.toThrow();
-  });
-
-  it('markSeasonWatched does not crash when seasonArr is not an array', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons: unknown }).seasons = { 1: { not: 'array' } };
-    setShows([show]);
-    expect(() => markSeasonWatched(42, 1, true)).not.toThrow();
-  });
-
-  it('setEpisodeRating does not crash when show.seasons is undefined', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons?: unknown }).seasons = undefined;
-    setShows([show]);
-    expect(() => setEpisodeRating(42, 1, 1, 5)).not.toThrow();
-  });
-
-  it('setEpisodeNote does not crash when show.seasons is null', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons: unknown }).seasons = null;
-    setShows([show]);
-    expect(() => setEpisodeNote(42, 1, 1, 'hello')).not.toThrow();
-  });
-
-  it('setEpisodeRating does not crash when seasonArr is not an array', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { seasons: unknown }).seasons = { 1: 42 };
-    setShows([show]);
-    expect(() => setEpisodeRating(42, 1, 1, 3)).not.toThrow();
-  });
-});
-
-describe('BUG-A6-08: removeShowTag handles non-string tag', () => {
-  it('does not crash when tag is null', () => {
-    setShows([makeShow({ id: 42, tags: ['Summer', 'Rewatch'] })]);
-    expect(() => removeShowTag(42, null as never)).not.toThrow();
-    const show = getState().shows.find((s) => s.id === 42)!;
-    expect(show.tags!.length).toBe(2); // unchanged
-  });
-
-  it('does not crash when tag is undefined', () => {
-    setShows([makeShow({ id: 42, tags: ['Summer'] })]);
-    expect(() => removeShowTag(42, undefined as never)).not.toThrow();
-  });
-
-  it('does not crash when tag is a number', () => {
-    setShows([makeShow({ id: 42, tags: ['Summer'] })]);
-    expect(() => removeShowTag(42, 42 as never)).not.toThrow();
-  });
-
-  it('still removes valid string tags', () => {
-    setShows([makeShow({ id: 42, tags: ['Summer', 'Rewatch'] })]);
-    removeShowTag(42, 'Summer');
-    const show = getState().shows.find((s) => s.id === 42)!;
-    expect(show.tags).toEqual(['Rewatch']);
-  });
-
-  it('does not crash when show.tags is not an array', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { tags?: unknown }).tags = 'not-an-array';
-    setShows([show]);
-    expect(() => removeShowTag(42, 'Summer')).not.toThrow();
-  });
-});
-
-describe('BUG-A6-09: addShowTag / getAllUserTags handle non-array show.tags', () => {
-  it('addShowTag does not crash when show.tags is a string', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { tags?: unknown }).tags = 'not-an-array';
-    setShows([show]);
-    expect(() => addShowTag(42, 'Summer')).not.toThrow();
-    const updated = getState().shows.find((s) => s.id === 42)!;
-    expect(Array.isArray(updated.tags)).toBe(true);
-    expect(updated.tags).toContain('Summer');
-  });
-
-  it('addShowTag does not crash when show.tags is null', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { tags?: unknown }).tags = null;
-    setShows([show]);
-    expect(() => addShowTag(42, 'Tag1')).not.toThrow();
-  });
-
-  it('getAllUserTags does not crash when show.tags is a string', () => {
-    const show = makeShow({ id: 42 }) as Show;
-    (show as { tags?: unknown }).tags = 'not-an-array';
-    setShows([show]);
-    expect(() => getAllUserTags()).not.toThrow();
-    expect(getAllUserTags()).toEqual([]);
-  });
-
-  it('getAllUserTags does not crash when show.tags contains non-string elements', () => {
-    const show = makeShow({ id: 42, tags: ['Valid', 42 as never, null as never] });
-    setShows([show]);
-    expect(() => getAllUserTags()).not.toThrow();
-    const tags = getAllUserTags();
-    expect(tags).toContain('Valid');
-    expect(tags.length).toBe(1);
   });
 });
 

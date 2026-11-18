@@ -37,31 +37,12 @@ export function getState(): AppState {
   return state;
 }
 
+/** Applica un patch allo stato. L'array `shows` viene copiato (il chiamante può riusare il suo). */
 export function setState(patch: Partial<AppState>): void {
-  if (!patch || typeof patch !== 'object') return;
-  // Valida `shows` se presente nel patch. Object.assign
-  // copia qualsiasi valore, incluso null/undefined — se il caller passa
-  // `{ shows: null }` (es. da un parse JSON malformato o un bug upstream),
-  // state.shows diventa null e ogni downstream .map/.filter crasha.
-  if ('shows' in patch && !Array.isArray(patch.shows)) {
-    // Scarta il campo `shows` invalido; applica il resto del patch.
-    const { shows: _drop, ...rest } = patch;
-    void _drop;
-    Object.assign(state, rest);
-    return;
-  }
-  // Shallow-copy difensivo dell'array shows — il caller
-  // potrebbe mantenere una reference e mutarla (.push/.splice/.sort) dopo
-  // setState, corrompendo lo store.
-  const safePatch = Array.isArray(patch.shows) ? { ...patch, shows: patch.shows.slice() } : patch;
-  Object.assign(state, safePatch);
+  Object.assign(state, patch.shows ? { ...patch, shows: patch.shows.slice() } : patch);
 }
 
 export function subscribe(fn: Listener): () => void {
-  // Valida che fn sia una funzione. Set.add accetta
-  // qualsiasi valore; un non-function verrebbe chiamato a ogni emit lanciando
-  // TypeError (catturato dal try/catch in flush, ma logga rumore e spreca cicli).
-  if (typeof fn !== 'function') return () => {};
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
@@ -85,13 +66,7 @@ export function emitChange(): void {
       }
     }
   };
-  // Guard: se RAF non disponibile, fallback a setTimeout.
-  const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
-  if (typeof w.requestAnimationFrame === 'function') {
-    w.requestAnimationFrame(flush);
-  } else {
-    setTimeout(flush, 0);
-  }
+  requestAnimationFrame(flush);
 }
 
 // ===== Mutators =====
@@ -133,38 +108,19 @@ export function resetCalendarWeek(): void {
 }
 
 export function setShows(shows: Show[]): void {
-  // Valida l'input. Se il caller passa null/undefined/
-  // non-array (es. da JSON.parse malformato o bug upstream), state.shows
-  // diventava null e ogni downstream .map/.filter crashava.
-  // Shallow-copy difensivo — il caller potrebbe mantenere
-  // una reference e mutarla (.push/.splice/.sort) dopo setShows.
-  state.shows = Array.isArray(shows) ? shows.slice() : [];
+  state.shows = shows.slice();
   emitChange();
 }
 
 export function replaceShow(show: Show): void {
-  // Valida show. Se show è null/undefined o ha id
-  // non positivo/NaN, findIndex restituirebbe -1 (o peggio, matcherebbe
-  // un show con id===undefined corrompendolo) e il push appenderebbe garbage.
-  if (!show || typeof show !== 'object') return;
-  if (typeof show.id !== 'number' || !Number.isFinite(show.id) || show.id <= 0) return;
-  // Guard state.shows (defense-in-depth).
-  if (!Array.isArray(state.shows)) state.shows = [];
-  const idx = state.shows.findIndex((s) => s && s.id === show.id);
+  const idx = state.shows.findIndex((s) => s.id === show.id);
   if (idx >= 0) state.shows[idx] = show;
   else state.shows.push(show);
   emitChange();
 }
 
 export function removeShowFromState(showId: number): void {
-  // Guard state.shows (defense-in-depth — se una corruzione
-  // precedente lo ha settato a null, filter crasherebbe).
-  if (!Array.isArray(state.shows)) {
-    state.shows = [];
-    emitChange();
-    return;
-  }
-  state.shows = state.shows.filter((s) => s && s.id !== showId);
+  state.shows = state.shows.filter((s) => s.id !== showId);
   emitChange();
 }
 

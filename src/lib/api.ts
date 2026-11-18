@@ -130,7 +130,7 @@ export async function getUpdatedShowIds(since: 'day' | 'week', signal?: AbortSig
     .filter((id) => Number.isSafeInteger(id) && id > 0);
 }
 
-export type ApiAction = 'search' | 'load' | 'refresh';
+export type ApiAction = 'search' | 'load' | 'refresh' | 'discover';
 
 const ERROR_MESSAGES: Record<
   ApiAction,
@@ -149,6 +149,13 @@ const ERROR_MESSAGES: Record<
     rateLimit: 'Troppe richieste. Attendi qualche secondo.',
     notFound: 'Serie non trovata',
     fallback: 'Errore caricamento serie',
+  },
+  discover: {
+    timeout: 'Timeout caricamento.',
+    network: 'Connessione internet non disponibile.',
+    rateLimit: 'Troppe richieste. Attendi qualche secondo.',
+    parse: 'Risposta API non valida. Riprova.',
+    fallback: 'Errore caricamento. Riprova.',
   },
   refresh: {
     timeout: 'Timeout aggiornamento. Riprova.',

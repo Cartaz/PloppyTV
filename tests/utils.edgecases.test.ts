@@ -4,7 +4,6 @@ import {
   findNextEpisode,
   formatDate,
   getPosterUrl,
-  getWatchedCount,
   isSameLocalDay,
   localISODate,
   parseISODateLocal,
@@ -150,33 +149,6 @@ describe('date boundaries', () => {
 });
 
 describe('show progress helpers', () => {
-  it('getWatchedCount counts only strict boolean true across array seasons', () => {
-    const show = {
-      seasons: {
-        1: [
-          { num: 1, watched: true },
-          { num: 2, watched: 'true' },
-          { num: 3, watched: 1 },
-          { num: 4, watched: false },
-        ],
-        2: 'invalid',
-      },
-    } as any;
-    expect(getWatchedCount(show)).toBe(1);
-  });
-
-  it('getWatchedCount fails closed when season enumeration throws', () => {
-    const seasons = new Proxy(
-      {},
-      {
-        ownKeys() {
-          throw new Error('boom');
-        },
-      },
-    );
-    expect(getWatchedCount({ seasons } as any)).toBe(0);
-  });
-
   it('findNextEpisode orders canonical seasons and episode numbers', () => {
     const show = {
       seasons: {
@@ -199,40 +171,5 @@ describe('show progress helpers', () => {
       },
     } as any;
     expect(findNextEpisode(show)).toBeNull();
-  });
-
-  it('findNextEpisode skips malformed episodes and treats only boolean true as watched', () => {
-    const show = {
-      seasons: {
-        1: [
-          null,
-          { num: undefined, watched: false },
-          { num: NaN, watched: false },
-          { num: Infinity, watched: false },
-          { num: 1.5, watched: false },
-          { num: 0, watched: false },
-          { num: 2, watched: 'false', airdate: '', name: undefined },
-        ],
-      },
-    } as any;
-    expect(findNextEpisode(show)).toEqual({ season: 1, num: 2, airdate: null, name: null });
-  });
-
-  it('findNextEpisode skips non-array seasons and fails closed on enumeration errors', () => {
-    expect(
-      findNextEpisode({
-        seasons: { 1: 'bad', 2: [{ num: 1, watched: false, airdate: null, name: null }] },
-      } as any),
-    ).toMatchObject({ season: 2, num: 1 });
-
-    const seasons = new Proxy(
-      {},
-      {
-        ownKeys() {
-          throw new Error('boom');
-        },
-      },
-    );
-    expect(findNextEpisode({ seasons } as any)).toBeNull();
   });
 });

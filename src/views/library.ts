@@ -55,14 +55,12 @@ export function _resetLibraryFiltersForTesting(): void {
 /**
  * Calcola il rating medio di una serie (media di tutti gli episodi rated).
  */
-function showAvgRating(show: { seasons?: Record<number, Array<{ rating?: number }>> }): number {
-  if (!show.seasons) return 0;
+function showAvgRating(show: { seasons: Record<number, Array<{ rating?: number }>> }): number {
   let sum = 0;
   let count = 0;
   for (const eps of Object.values(show.seasons)) {
-    if (!Array.isArray(eps)) continue;
     for (const ep of eps) {
-      if (ep && typeof ep.rating === 'number' && ep.rating >= 1) {
+      if (ep.rating && ep.rating >= 1) {
         sum += ep.rating;
         count++;
       }
@@ -77,7 +75,7 @@ function showAvgRating(show: { seasons?: Record<number, Array<{ rating?: number 
 function collectGenres(shows: Array<{ genres: string[] }>): string[] {
   const set = new Set<string>();
   for (const s of shows) {
-    if (Array.isArray(s.genres)) for (const g of s.genres) set.add(g);
+    for (const g of s.genres) set.add(g);
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

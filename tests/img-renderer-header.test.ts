@@ -548,10 +548,8 @@ describe('BUG-A17-08: renderer skips bindShowDetailEvents when renderShowDetail 
     initRenderer();
 
     render();
-    await new Promise((r) => setTimeout(r, 50));
-
-    // Success path: bind IS called.
-    expect(bindSpy).toHaveBeenCalledTimes(1);
+    // Success path: bind IS called (attende RAF + import dinamico, senza timeout fisso).
+    await vi.waitFor(() => expect(bindSpy).toHaveBeenCalledTimes(1));
   });
 });
 

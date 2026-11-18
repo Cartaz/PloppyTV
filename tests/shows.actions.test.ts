@@ -688,10 +688,6 @@ describe('showNeedsEpisodeNames', () => {
     };
   }
 
-  it('returns false for seasons undefined', () => {
-    expect(showNeedsEpisodeNames({ id: 1 } as Show)).toBe(false);
-  });
-
   it('returns true if any episode has name=null', () => {
     expect(showNeedsEpisodeNames(makeShowWithEps([{ name: 'Pilot' }, { name: null }]))).toBe(true);
   });
@@ -707,14 +703,6 @@ describe('showNeedsEpisodeNames', () => {
 
   it('returns false when all episodes have non-empty names', () => {
     expect(showNeedsEpisodeNames(makeShowWithEps([{ name: 'Pilot' }, { name: 'Ep2' }]))).toBe(false);
-  });
-
-  it('skips non-array season values', () => {
-    const show = {
-      id: 1,
-      seasons: { 1: 'not-an-array' },
-    } as unknown as Show;
-    expect(showNeedsEpisodeNames(show)).toBe(false);
   });
 
   it('returns true if ANY episode in ANY season has missing name', () => {

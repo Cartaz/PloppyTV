@@ -245,67 +245,27 @@ export function escapeAttr(str: unknown): string {
 }
 
 // ===== Show helpers =====
-export function getWatchedCount(show: { seasons?: Record<number, Episode[]> } | null): number {
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return 0;
+export function getWatchedCount(show: HasSeasons): number {
   let count = 0;
-  try {
-    for (const eps of Object.values(show.seasons)) {
-      if (Array.isArray(eps)) {
-        for (const ep of eps) {
-          if (ep && ep.watched === true) count++;
-        }
-      }
-    }
-  } catch {
-    return 0;
-  }
+  for (const eps of Object.values(show.seasons)) for (const ep of eps) if (ep.watched) count++;
   return count;
 }
 
 interface HasSeasons {
-  seasons?: Record<number, Episode[]>;
+  seasons: Record<number, Episode[]>;
 }
 
-/**
- * Trova il primo episodio non watched, iterando le stagioni in ordine numerico
- * e gli episodi di ogni stagione in ordine di `num`.
- * Senza il sort per `num`, un array non ordinato restituirebbe l'episodio
- * sbagliato come "prossimo".
- */
-export function findNextEpisode<T extends HasSeasons>(
-  show: T | null,
+/** Primo episodio non visto, in ordine di stagione e numero. */
+export function findNextEpisode(
+  show: HasSeasons,
 ): { season: number; num: number; airdate: string | null; name: string | null } | null {
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return null;
-  try {
-    const seasons = Object.keys(show.seasons)
-      // Una stagione ha una sola rappresentazione: "1", non "01".
-      .filter((k) => {
-        const n = Number(k);
-        return Number.isInteger(n) && n > 0 && k === String(n);
-      })
-      .sort((a, b) => Number(a) - Number(b));
-    for (const s of seasons) {
-      const eps = show.seasons![Number(s)];
-      if (!Array.isArray(eps)) continue;
-      // Ordina per num per restituire davvero il primo episodio non visto.
-      // Coerige num non-finiti/invalidi a Infinity così i valori
-      // validi vengono ordinati correttamente tra loro.
-      const sorted = [...eps].sort((a, b) => {
-        const an = a && typeof a.num === 'number' && Number.isFinite(a.num) ? a.num : Infinity;
-        const bn = b && typeof b.num === 'number' && Number.isFinite(b.num) ? b.num : Infinity;
-        return an - bn;
-      });
-      for (const ep of sorted) {
-        // Salta ep con num non intero positivo.
-        if (!ep || typeof ep.num !== 'number' || !Number.isInteger(ep.num) || ep.num <= 0) continue;
-        // Strict !== true check.
-        if (ep.watched !== true) {
-          return { season: Number(s), num: ep.num, airdate: ep.airdate || null, name: ep.name ?? null };
-        }
-      }
-    }
-  } catch {
-    return null;
+  const seasons = Object.keys(show.seasons)
+    .map(Number)
+    .sort((a, b) => a - b);
+  for (const season of seasons) {
+    const sorted = [...show.seasons[season]].sort((a, b) => a.num - b.num);
+    const ep = sorted.find((e) => !e.watched);
+    if (ep) return { season, num: ep.num, airdate: ep.airdate || null, name: ep.name ?? null };
   }
   return null;
 }
@@ -324,14 +284,12 @@ export interface DatedEpisode {
  * (a parità di data: stagione, poi numero). Base di calendario e notifiche:
  * contano le uscite reali, non solo il primo episodio non visto.
  */
-export function unwatchedEpisodesByAirdate(show: HasSeasons | null): DatedEpisode[] {
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) return [];
+export function unwatchedEpisodesByAirdate(show: HasSeasons): DatedEpisode[] {
   const result: DatedEpisode[] = [];
   for (const [key, eps] of Object.entries(show.seasons)) {
     const season = Number(key);
-    if (!Number.isInteger(season) || season <= 0 || !Array.isArray(eps)) continue;
     for (const ep of eps) {
-      if (!ep || ep.watched === true || !Number.isInteger(ep.num) || ep.num <= 0) continue;
+      if (ep.watched) continue;
       const date = ep.airdate ? parseISODateLocal(ep.airdate) : null;
       if (!date || !ep.airdate) continue;
       result.push({ season, num: ep.num, airdate: ep.airdate, name: ep.name ?? null, date });

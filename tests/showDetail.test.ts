@@ -228,24 +228,6 @@ describe('renderShowDetail — seasons filter+sort', () => {
     expect(document.querySelector('.empty-state')).toBeTruthy();
     expect(document.querySelectorAll('.episode-item').length).toBe(0);
   });
-
-  it('show.seasons as Array → reassigned to {} → empty-state', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: unknown }).seasons = [];
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    expect(Array.isArray(show.seasons)).toBe(false);
-    expect(show.seasons).toEqual({});
-    expect(document.querySelector('.empty-state')).toBeTruthy();
-  });
-
-  it('show.seasons null → reassigned to {} → empty-state', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: unknown }).seasons = null;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    expect(show.seasons).toEqual({});
-  });
 });
 
 // ============================================================================

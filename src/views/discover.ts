@@ -10,15 +10,15 @@ import {
   type DiscoverGroups,
 } from '../lib/discover';
 import { addShowToList } from '../lib/shows';
+import { apiErrorMessage } from '../lib/api';
 import { GENRE_CAROUSELS } from '../lib/constants';
 import { escapeHtml, escapeAttr, getPosterUrl, parseISODateLocal, stripHtml, safeId } from '../lib/utils';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 
-let _popularCache: DiscoverGroups | null = null;
-let _recentCache: DiscoverGroups | null = null;
-let _popularLoading = false;
-let _recentLoading = false;
+type DiscoverTab = 'popular' | 'recent';
+const _cache: Record<DiscoverTab, DiscoverGroups | null> = { popular: null, recent: null };
+const _loading: Record<DiscoverTab, boolean> = { popular: false, recent: false };
 
 let _discoverClickHandler: ((e: MouseEvent) => void) | null = null;
 let _discoverKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -111,14 +111,10 @@ function renderDiscoverContent(groups: DiscoverGroups | null): string {
   return html;
 }
 
-function renderDiscoverError(err: { name?: string }): string {
-  let msg = 'Errore caricamento. Riprova.';
-  if (err.name === 'NetworkError') msg = 'Connessione internet non disponibile.';
-  else if (err.name === 'TimeoutError') msg = 'Timeout caricamento.';
-  else if (err.name === 'ParseError') msg = 'Risposta API non valida. Riprova.';
+function renderDiscoverError(err: unknown): string {
   return (
     '<div class="empty-state"><div class="empty-state-title">' +
-    escapeHtml(msg) +
+    escapeHtml(apiErrorMessage(err, 'discover')) +
     '</div>' +
     '<div class="empty-state-text"><button class="btn btn-primary" data-action="retryDiscover">Riprova</button></div></div>'
   );
@@ -130,51 +126,29 @@ function renderDiscoverError(err: { name?: string }): string {
  * se l'utente ha switchato tab durante il fetch, scartiamo il risultato
  * per non sovrascrivere la vista del nuovo tab.
  */
-async function loadTab(tab: 'popular' | 'recent'): Promise<void> {
+async function loadTab(tab: DiscoverTab): Promise<void> {
   const el = document.getElementById('discoverContent');
   if (!el) return;
-  if (tab === 'popular') {
-    if (_popularCache) {
-      el.innerHTML = renderDiscoverContent(_popularCache);
-      bindCarousels(el);
-      return;
-    }
-    if (_popularLoading) return;
-    _popularLoading = true;
-    el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
-    try {
-      _popularCache = await loadDiscover('popular');
-      // Scarta se l'utente ha cambiato tab durante il fetch
-      if (getState()._discoverTab !== 'popular') return;
-      el.innerHTML = renderDiscoverContent(_popularCache);
-      bindCarousels(el);
-    } catch (e) {
-      if (getState()._discoverTab !== 'popular') return;
-      el.innerHTML = renderDiscoverError(e as { name?: string });
-    } finally {
-      _popularLoading = false;
-    }
-  } else {
-    if (_recentCache) {
-      el.innerHTML = renderDiscoverContent(_recentCache);
-      bindCarousels(el);
-      return;
-    }
-    if (_recentLoading) return;
-    _recentLoading = true;
-    el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
-    try {
-      _recentCache = await loadDiscover('recent');
-      // Scarta se l'utente ha cambiato tab durante il fetch
-      if (getState()._discoverTab !== 'recent') return;
-      el.innerHTML = renderDiscoverContent(_recentCache);
-      bindCarousels(el);
-    } catch (e) {
-      if (getState()._discoverTab !== 'recent') return;
-      el.innerHTML = renderDiscoverError(e as { name?: string });
-    } finally {
-      _recentLoading = false;
-    }
+  const cached = _cache[tab];
+  if (cached) {
+    el.innerHTML = renderDiscoverContent(cached);
+    bindCarousels(el);
+    return;
+  }
+  if (_loading[tab]) return;
+  _loading[tab] = true;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Caricamento serie...</div>';
+  try {
+    const groups = await loadDiscover(tab);
+    _cache[tab] = groups;
+    if (getState()._discoverTab !== tab) return;
+    el.innerHTML = renderDiscoverContent(groups);
+    bindCarousels(el);
+  } catch (e) {
+    if (getState()._discoverTab !== tab) return;
+    el.innerHTML = renderDiscoverError(e);
+  } finally {
+    _loading[tab] = false;
   }
 }
 
@@ -245,17 +219,11 @@ export function bindDiscoverEvents(main: HTMLElement): void {
     }
 
     if (action === 'refreshDiscover') {
-      const state = getState();
-      if (state._discoverTab === 'popular') {
-        invalidateDiscoverCache('popular');
-        resetDiscoverLoad('popular');
-        _popularCache = null;
-      } else {
-        invalidateDiscoverCache('recent');
-        resetDiscoverLoad('recent');
-        _recentCache = null;
-      }
-      loadTab(state._discoverTab);
+      const tab = getState()._discoverTab;
+      invalidateDiscoverCache(tab);
+      resetDiscoverLoad(tab);
+      _cache[tab] = null;
+      loadTab(tab);
       return;
     }
 
@@ -310,7 +278,7 @@ export function bindDiscoverEvents(main: HTMLElement): void {
 }
 
 function previewDiscover(showId: number): void {
-  const found = findShowInDiscoverGroups(showId, [_popularCache, _recentCache]);
+  const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
     showToast('Serie non trovata', 'error');
     return;
@@ -383,7 +351,7 @@ function previewDiscover(showId: number): void {
 }
 
 async function addDiscoverShow(showId: number, list: 'towatch' | 'watching'): Promise<void> {
-  const found = findShowInDiscoverGroups(showId, [_popularCache, _recentCache]);
+  const found = findShowInDiscoverGroups(showId, [_cache.popular, _cache.recent]);
   if (!found) {
     showToast('Serie non trovata nella cache, usa la ricerca', 'error');
     return;

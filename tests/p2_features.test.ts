@@ -107,36 +107,6 @@ describe('P2 — Schema v2: rating, note, tags', () => {
 });
 
 describe('P2.5 — getRandomGoldEpisode guards', () => {
-  it('handles show with seasons=null without throwing', async () => {
-    const { getRandomGoldEpisode } = await import('../src/lib/shows');
-    const { setShows } = await import('../src/lib/store');
-    const show: any = {
-      id: 1,
-      name: 'Test',
-      seasons: null,
-      list: 'watching',
-      totalEpisodes: 0,
-      totalSeasons: 0,
-    };
-    setShows([show]);
-    expect(() => getRandomGoldEpisode()).not.toThrow();
-    expect(getRandomGoldEpisode()).toBeNull();
-  });
-
-  it('handles show with seasons=undefined without throwing', async () => {
-    const { getRandomGoldEpisode } = await import('../src/lib/shows');
-    const { setShows } = await import('../src/lib/store');
-    const show: any = {
-      id: 1,
-      name: 'Test',
-      list: 'watching',
-      totalEpisodes: 0,
-      totalSeasons: 0,
-    };
-    setShows([show]);
-    expect(() => getRandomGoldEpisode()).not.toThrow();
-  });
-
   it('returns null when no 5★ episodes exist', async () => {
     const { getRandomGoldEpisode } = await import('../src/lib/shows');
     const { setShows } = await import('../src/lib/store');

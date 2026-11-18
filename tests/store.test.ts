@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { emitChange, getState, openShow, setState, subscribe, switchView } from '../src/lib/store';
+import { describe, expect, it } from 'vitest';
+import { getState, openShow, setState, switchView } from '../src/lib/store';
 import { updateShowListStatus } from '../src/lib/normalize';
 import { makeShowWithSeasons, markWatchedFirst } from './helpers';
 
@@ -59,23 +59,6 @@ describe('updateShowListStatus contracts', () => {
 });
 
 describe('store environment and navigation contracts', () => {
-  it('delivers changes through setTimeout when requestAnimationFrame is unavailable', async () => {
-    const w = window as unknown as { requestAnimationFrame?: typeof requestAnimationFrame };
-    const original = w.requestAnimationFrame;
-    delete w.requestAnimationFrame;
-    const listener = vi.fn();
-    const unsubscribe = subscribe(listener);
-
-    try {
-      emitChange();
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(listener).toHaveBeenCalledTimes(1);
-    } finally {
-      unsubscribe();
-      if (original) w.requestAnimationFrame = original;
-    }
-  });
-
   it('opens a show without requiring window.scrollTo', () => {
     const w = window as unknown as { scrollTo?: (x: number, y: number) => void };
     const original = w.scrollTo;

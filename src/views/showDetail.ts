@@ -69,11 +69,8 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 }
 
 // ===== P2 helper: tag management HTML =====
-// Array.isArray guard — `show.tags ?? []` lascia passare
-// stringhe/oggetti non-array (dati corrotti); `for (const t of "string")`
-// iterava i caratteri, rendendo ogni carattere come un tag separato.
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
-  const tags = Array.isArray(show.tags) ? show.tags : [];
+  const tags = show.tags ?? [];
   let html = '<div class="detail-tags-section">';
   html += '<div class="detail-tags-label">Tag:</div>';
   html += '<div class="detail-tags-list">';
@@ -95,13 +92,8 @@ function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
 }
 
 // ===== P2 helper: media rating stagione =====
-// `typeof e.rating === 'number'` lasciava passare NaN e
-// Infinity (`typeof NaN === 'number'` è true). sum diventava NaN →
-// "⌀ NaN★" renderizzato. Ora filtra solo numeri finiti e positivi.
 function seasonAvgRating(eps: Array<{ rating?: number }>): string {
-  const rated = eps.filter(
-    (e) => e && typeof e.rating === 'number' && Number.isFinite(e.rating) && (e.rating as number) > 0,
-  );
+  const rated = eps.filter((e) => (e.rating ?? 0) > 0);
   if (rated.length === 0) return '';
   const sum = rated.reduce((s, e) => s + (e.rating ?? 0), 0);
   const avg = sum / rated.length;
@@ -118,7 +110,6 @@ export function renderShowDetail(main: HTMLElement): void {
     closeShow();
     return;
   }
-  if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) show.seasons = {};
 
   // Filter season keys con regex /^\d+$/ (stretta, no "1.5").
   const seasons = Object.keys(show.seasons)
@@ -197,11 +188,7 @@ export function renderShowDetail(main: HTMLElement): void {
     ' episodi</span>' +
     '</div>' +
     '<div class="detail-genres">' +
-    // Array.isArray guard — `show.genres.map` avrebbe
-    // throwato TypeError se genres era non-array (corrupted state).
-    (Array.isArray(show.genres) ? show.genres : [])
-      .map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>')
-      .join('') +
+    show.genres.map((g) => '<span class="genre-tag">' + escapeHtml(g) + '</span>').join('') +
     '</div>' +
     '<div class="detail-progress-block' +
     (isCompleted ? ' completed' : '') +
@@ -297,31 +284,16 @@ export function renderShowDetail(main: HTMLElement): void {
       state.currentSeason +
       '" data-watched="0">Segna tutti come non visti</button>' +
       '</div>';
-    const eps = show.seasons[state.currentSeason];
-    // Array.isArray guard — `|| []` lasciava passare
-    // stringhe/oggetti non-array; `for (const ep of "string")` iterava i
-    // caratteri rendendo un episode-item rotto per ogni carattere.
-    const epsArr = Array.isArray(eps) ? eps : [];
+    const epsArr = show.seasons[state.currentSeason] ?? [];
     // P2.1: media rating stagione nella sezione actions
     const avgLabel = seasonAvgRating(epsArr);
     if (avgLabel) {
       html += '<div class="season-rating-avg">Rating medio stagione' + avgLabel + '</div>';
     }
     html += '<div class="episode-list">';
-    // Sort episodes by num prima del render.
-    // `for (const ep of eps)` iterava in ordine di storage; se gli episodi
-    // erano memorizzati out-of-order (refresh TVMaze, import backup), venivano
-    // mostrati nell'ordine sbagliato. Inconsistente con findNextEpisode
-    // (utils.ts) che fa sort. Coerisce num non-finiti a Infinity così i
-    // valori validi vengono ordinati correttamente tra loro.
-    const sortedEps = [...epsArr].sort((a, b) => {
-      const an = a && typeof a.num === 'number' && Number.isFinite(a.num) ? a.num : Infinity;
-      const bn = b && typeof b.num === 'number' && Number.isFinite(b.num) ? b.num : Infinity;
-      return an - bn;
-    });
+    // Ordine per numero: dopo refresh o import gli episodi possono essere salvati fuori ordine.
+    const sortedEps = [...epsArr].sort((a, b) => a.num - b.num);
     for (const ep of sortedEps) {
-      // Salta ep null/undefined nell'array (corrupted data).
-      if (!ep) continue;
       const epTitle = ep.name
         ? escapeHtml(ep.name)
         : '<span style="color:var(--text-muted);font-style:italic;">Episodio ' + ep.num + '</span>';
@@ -461,13 +433,8 @@ export function bindShowDetailEvents(main: HTMLElement): void {
 function openNoteEditor(showId: number, season: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
-  // Guard show.seasons (corrupted state) e Array.isArray
-  // per seasons[season]. Prima, `!show.seasons[season]` throwava TypeError se
-  // show.seasons era undefined; e se seasons[season] era non-array (string),
-  // `.find()` throwava.
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || !Array.isArray(show.seasons[season])) return;
-  const ep = show.seasons[season].find((e) => e && e.num === epNum);
-  if (!ep) return;
+  const ep = show?.seasons[season]?.find((e) => e.num === epNum);
+  if (!show || !ep) return;
   const epName = ep.name || 'Episodio ' + epNum;
   const currentNote = ep.note ?? '';
 
@@ -533,12 +500,7 @@ function openAddTagModal(showId: number): void {
   // Suggerisci tag già usati in altre serie (autocomplete visivo)
   const allTags = new Set<string>();
   for (const s of state.shows) {
-    // Array.isArray guard + typeof guard sui singoli tag.
-    // `s.tags && ...` lasciava passare stringhe/oggetti non-array; `for...of`
-    // su una stringa iterava i caratteri, aggiungendoli come suggerimenti.
-    if (Array.isArray(s.tags) && s.id !== showId) {
-      for (const t of s.tags) if (typeof t === 'string') allTags.add(t);
-    }
+    if (s.id !== showId) for (const t of s.tags ?? []) allTags.add(t);
   }
   const suggestions = Array.from(allTags)
     .sort((a, b) => a.localeCompare(b))

@@ -25,12 +25,6 @@ function renderStatsSkeleton(main: HTMLElement): void {
 }
 
 function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
-  if (!stats || typeof stats !== 'object') {
-    main.innerHTML =
-      '<h1 class="page-title">Statistiche</h1>' +
-      '<div class="empty-state"><div class="empty-state-title">Nessun dato</div><div class="empty-state-text">Aggiungi serie TV per visualizzare le statistiche.</div></div>';
-    return;
-  }
   if (stats.totalShows === 0) {
     main.innerHTML =
       '<h1 class="page-title">Statistiche</h1>' +
@@ -82,11 +76,10 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
 
   // Generi
   html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">Generi più visti</h2>';
-  // Guard Array.isArray (worker/corrupted data).
-  const topGenres = Array.isArray(stats.topGenres) ? stats.topGenres : [];
+  const topGenres = stats.topGenres;
   // maxCount fallback a 1 se 0/NaN per evitare division-by-zero e pct >100.
   const maxCount = topGenres.length > 0 ? safeCount(topGenres[0].episodes) || 1 : 1;
-  if (topGenres.length === 0 || topGenres.every((g) => safeCount(g && g.episodes) === 0)) {
+  if (topGenres.length === 0 || topGenres.every((g) => safeCount(g.episodes) === 0)) {
     html += '<p style="color:var(--text-muted);">Nessun dato. Segna alcuni episodi come visti.</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:12px;">';
@@ -118,14 +111,12 @@ function renderStatsContent(main: HTMLElement, stats: StatsResult): void {
 
   // Top serie
   html += '<div class="section"><h2 class="section-title" style="margin-bottom:16px;">Top serie per completamento</h2>';
-  // Guard Array.isArray (worker/corrupted data).
-  const topShows = Array.isArray(stats.topShows) ? stats.topShows : [];
+  const topShows = stats.topShows;
   if (topShows.length === 0) {
     html += '<p style="color:var(--text-muted);">Nessun dato.</p>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
     for (const item of topShows) {
-      if (!item || typeof item !== 'object') continue; // Skip entry non-object
       // Valida item.image come stringa prima di passarlo a imgTag
       // (defense-in-depth contro image non-string truthy come 42/{} che
       // produrrebbe <img src="42"> invalido).

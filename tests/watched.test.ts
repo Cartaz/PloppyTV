@@ -1,16 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { Episode, Show } from '../src/types';
+import type { Episode } from '../src/types';
 import { getWatchedCount, findNextEpisode } from '../src/lib/utils';
 import { makeEpisode, makeShow, makeShowWithSeasons, markWatchedFirst } from './helpers';
 
 describe('getWatchedCount', () => {
-  it('ritorna 0 per show nullo o senza seasons', () => {
-    expect(getWatchedCount(null)).toBe(0);
-    expect(getWatchedCount({} as Show)).toBe(0);
-    expect(getWatchedCount({ seasons: null } as unknown as Show)).toBe(0);
-    expect(getWatchedCount({ seasons: [] } as unknown as Show)).toBe(0);
-  });
-
   it('conta solo gli episodi watched=true', () => {
     const show = makeShowWithSeasons({ 1: 3, 2: 2 });
     expect(getWatchedCount(show)).toBe(0);
@@ -30,12 +23,6 @@ describe('getWatchedCount', () => {
 });
 
 describe('findNextEpisode', () => {
-  it('ritorna null per show nullo o senza seasons', () => {
-    expect(findNextEpisode(null)).toBeNull();
-    expect(findNextEpisode({} as Show)).toBeNull();
-    expect(findNextEpisode({ seasons: null } as unknown as Show)).toBeNull();
-  });
-
   it('ritorna il primo episodio non watched della stagione 1 se nulla è visto', () => {
     const show = makeShowWithSeasons({ 1: 3 });
     const next = findNextEpisode(show);

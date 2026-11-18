@@ -14,6 +14,14 @@ import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_P
 
 const _addShowInFlight = new Set<number>();
 
+function findShow(showId: number): Show | undefined {
+  return getState().shows.find((s) => s.id === showId);
+}
+
+function findEpisode(show: Show, seasonNum: number, epNum: number): Episode | undefined {
+  return show.seasons[seasonNum]?.find((e) => e.num === epNum);
+}
+
 export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Promise<Show | null> {
   if (!tvmazeShow || typeof tvmazeShow !== 'object' || tvmazeShow.id == null) {
     showToast('Dati serie non validi', 'error');
@@ -143,15 +151,9 @@ export function moveShowToList(showId: number, list: ListName): void {
 
 /** Toggle watched su un episodio, con rollback se il salvataggio fallisce. */
 export function toggleEpisode(showId: number, seasonNum: number, epNum: number): void {
-  const state = getState();
-  const show = state.shows.find((s) => s.id === showId);
-  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
-  // Prima, `!show.seasons[seasonNum]` lanciava TypeError se show.seasons era undefined.
-  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
-  const seasonArr = show.seasons[seasonNum];
-  if (!Array.isArray(seasonArr)) return;
-  const ep = seasonArr.find((e) => e && e.num === epNum);
-  if (!ep) return;
+  const show = findShow(showId);
+  const ep = show && findEpisode(show, seasonNum, epNum);
+  if (!show || !ep) return;
   const prevWatched = ep.watched;
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
@@ -169,12 +171,9 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
 }
 
 export function markSeasonWatched(showId: number, seasonNum: number, watched: boolean): void {
-  const state = getState();
-  const show = state.shows.find((s) => s.id === showId);
-  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
-  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
-  const seasonArr = show.seasons[seasonNum];
-  if (!Array.isArray(seasonArr)) return;
+  const show = findShow(showId);
+  const seasonArr = show?.seasons[seasonNum];
+  if (!show || !seasonArr) return;
   const prevEps = seasonArr.map((e) => ({ ...e }));
   const prevList = show.list;
   const prevManual = show.manualList ?? false;
@@ -205,22 +204,14 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
   }
   _refreshInFlight.add(id);
 
-  const state = getState();
-  const show = state.shows.find((s) => s.id === id);
-  // Guard show.seasons — su dati corrotti potrebbe essere null/array.
-  // Prima, `JSON.parse(JSON.stringify(show.seasons))` su undefined lanciava SyntaxError.
-  if (!show || !show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) {
+  const show = findShow(id);
+  if (!show) {
     _refreshInFlight.delete(id);
     return false;
   }
 
   try {
     const episodes = await getShowEpisodes(id);
-    // Defensive — se la risposta API non è un array, abort (non crashare).
-    if (!Array.isArray(episodes)) {
-      if (!opts?.silent) showToast('Risposta API non valida', 'error');
-      return false;
-    }
     // Se l'API ritorna 0 episodi ma lo show ne aveva, NON wipeare
     // i dati utente (potrebbe essere un glitch temporaneo dell'API o un 200 OK vuoto).
     if (episodes.length === 0 && Object.keys(show.seasons).length > 0) {
@@ -230,7 +221,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     // Un import, una rimozione o la sincronizzazione multi-tab può aver
     // sostituito la serie durante la richiesta. La risposta appartiene solo
     // all'istanza per cui è partita; non deve modificare la nuova istanza.
-    if (getState().shows.find((s) => s.id === id) !== show) return false;
+    if (findShow(id) !== show) return false;
 
     // La normalizzazione dei metadati API ha un solo proprietario, condiviso
     // con l'aggiunta iniziale. Anche un array non vuoto può non contenere
@@ -243,16 +234,15 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     const newSeasons = refreshed.seasons;
     const existingById = new Map<number, Episode>();
     for (const season of Object.values(show.seasons)) {
-      if (!Array.isArray(season)) continue;
       for (const ep of season) {
-        if (ep && safeId(ep.id)) existingById.set(ep.id, ep);
+        if (ep.id > 0) existingById.set(ep.id, ep);
       }
     }
     for (const [season, seasonEpisodes] of Object.entries(newSeasons)) {
       for (const ep of seasonEpisodes) {
         let existing = ep.id > 0 ? existingById.get(ep.id) : undefined;
         if (!existing) {
-          const positional = show.seasons[Number(season)]?.find((old) => old && old.num === ep.num);
+          const positional = show.seasons[Number(season)]?.find((old) => old.num === ep.num);
           // La posizione è un fallback per dati legacy senza ID. Due ID
           // validi e diversi identificano episodi diversi, anche dopo renumber.
           if (positional && (!ep.id || !safeId(positional.id))) existing = positional;
@@ -306,11 +296,9 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
 
 // Verifica se una serie ha nomi episodi mancanti (per auto-refresh in background)
 export function showNeedsEpisodeNames(show: Show): boolean {
-  if (!show.seasons) return false;
   for (const eps of Object.values(show.seasons)) {
-    if (!Array.isArray(eps)) continue;
     for (const ep of eps) {
-      if (ep && (ep.name === undefined || ep.name === null || ep.name === '')) return true;
+      if (!ep.name) return true;
     }
   }
   return false;
@@ -323,13 +311,8 @@ export function showNeedsEpisodeNames(show: Show): boolean {
  * Salva immediatamente su localStorage con rollback in caso di fallimento.
  */
 export function setEpisodeRating(showId: number, seasonNum: number, epNum: number, rating: number): void {
-  const state = getState();
-  const show = state.shows.find((s) => s.id === showId);
-  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
-  if (!show || !show.seasons || typeof show.seasons !== 'object') return;
-  const seasonArr = show.seasons[seasonNum];
-  if (!Array.isArray(seasonArr)) return;
-  const ep = seasonArr.find((e) => e && e.num === epNum);
+  const show = findShow(showId);
+  const ep = show && findEpisode(show, seasonNum, epNum);
   if (!ep) return;
 
   // Valida rating: 0 = rimuovi, 1..MAX = valido.
@@ -361,13 +344,8 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
  * Salva immediatamente su localStorage con rollback in caso di fallimento.
  */
 export function setEpisodeNote(showId: number, seasonNum: number, epNum: number, note: string): boolean {
-  const state = getState();
-  const show = state.shows.find((s) => s.id === showId);
-  // Guard show.seasons (corrupted state) e Array.isArray per seasonArr.
-  if (!show || !show.seasons || typeof show.seasons !== 'object') return false;
-  const seasonArr = show.seasons[seasonNum];
-  if (!Array.isArray(seasonArr)) return false;
-  const ep = seasonArr.find((e) => e && e.num === epNum);
+  const show = findShow(showId);
+  const ep = show && findEpisode(show, seasonNum, epNum);
   if (!ep) return false;
 
   const trimmed = typeof note === 'string' ? note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim() : '';
@@ -397,11 +375,10 @@ export function addShowTag(showId: number, tag: string): boolean {
   const trimmed = typeof tag === 'string' ? tag.trim().slice(0, MAX_TAG_LENGTH) : '';
   if (trimmed.length === 0) return false;
 
-  // Defensive — show.tags potrebbe non essere un array su dati corrotti.
-  const tags = Array.isArray(show.tags) ? show.tags : [];
+  const tags = show.tags ?? [];
   // Dedup case-insensitive: se "Estate" esiste, "estate" non viene aggiunto.
   const lower = trimmed.toLowerCase();
-  if (tags.some((t) => typeof t === 'string' && t.toLowerCase() === lower)) {
+  if (tags.some((t) => t.toLowerCase() === lower)) {
     showToast('Tag già presente', 'warning');
     return false;
   }
@@ -430,11 +407,10 @@ export function removeShowTag(showId: number, tag: string): void {
   const show = state.shows.find((s) => s.id === showId);
   // Tag non-string causerebbe TypeError su toLowerCase().
   // Show.tags non-array causerebbe TypeError su filter()/length.
-  if (!show || !Array.isArray(show.tags) || show.tags.length === 0) return;
-  if (typeof tag !== 'string') return;
+  if (!show?.tags?.length) return;
   const lower = tag.toLowerCase();
   const prevTags = show.tags;
-  show.tags = show.tags.filter((t) => typeof t === 'string' && t.toLowerCase() !== lower);
+  show.tags = show.tags.filter((t) => t.toLowerCase() !== lower);
 
   if (show.tags.length === prevTags.length) return; // nessun cambiamento
 
@@ -461,15 +437,11 @@ export function getRandomGoldEpisode(): {
   const state = getState();
   const gold: Array<{ show: Show; season: number; ep: Show['seasons'][number][number] }> = [];
   for (const show of state.shows) {
-    // Guard: seasons potrebbe essere null/undefined su dati malformati.
-    if (!show.seasons || typeof show.seasons !== 'object' || Array.isArray(show.seasons)) continue;
     for (const seasonKey of Object.keys(show.seasons)) {
       const seasonNum = Number(seasonKey);
       if (!Number.isInteger(seasonNum) || seasonNum <= 0) continue;
-      const eps = show.seasons[seasonNum];
-      if (!Array.isArray(eps)) continue;
-      for (const ep of eps) {
-        if (ep && ep.rating === MAX_EPISODE_RATING && ep.watched) {
+      for (const ep of show.seasons[seasonNum]) {
+        if (ep.rating === MAX_EPISODE_RATING && ep.watched) {
           gold.push({ show, season: seasonNum, ep });
         }
       }
@@ -495,8 +467,7 @@ export function getAllUserTags(): string[] {
   const state = getState();
   const set = new Set<string>();
   for (const show of state.shows) {
-    // Defensive — show.tags potrebbe non essere un array su dati corrotti.
-    if (Array.isArray(show.tags)) for (const t of show.tags) if (typeof t === 'string') set.add(t);
+    for (const t of show.tags ?? []) set.add(t);
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

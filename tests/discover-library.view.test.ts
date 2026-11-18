@@ -493,59 +493,6 @@ describe('Agent-A12 probe: library view', () => {
   });
 
   // ===================================================================
-  // BUG-A12-05: non-string tag element crashes applyFilters
-  // ===================================================================
-  describe('BUG-A12-05: non-string tag element does not crash (FIXED)', () => {
-    it('tags array with number element does not throw on render', () => {
-      const show = makeLibShow({ tags: ['valid', 123 as unknown, null as unknown, { obj: true } as unknown] });
-      storeMod.setState({ shows: [show as unknown as never] });
-      const main = document.getElementById('mainContent')!;
-      expect(() => libraryMod.renderLibrary(main)).not.toThrow();
-      // Show should still be rendered (no filters set)
-      expect(main.querySelector('.show-card')).toBeTruthy();
-    });
-
-    it('filtering by tag "valid" works when tags array has non-string elements', () => {
-      const show = makeLibShow({ tags: ['valid', 123 as unknown] });
-      storeMod.setState({ shows: [show as unknown as never] });
-      const main = document.getElementById('mainContent')!;
-      libraryMod.renderLibrary(main);
-
-      // Set tag filter = "valid"
-      const tagSel = main.querySelector('#libTagFilter') as HTMLSelectElement;
-      expect(tagSel).toBeTruthy();
-      tagSel.value = 'valid';
-      tagSel.dispatchEvent(new Event('change'));
-
-      // Show should still be in results (tag "valid" matches)
-      expect(main.querySelector('.show-card')).toBeTruthy();
-    });
-
-    it('filtering by tag with no match returns 0 results (no crash)', () => {
-      const show = makeLibShow({ tags: ['valid', 123 as unknown] });
-      storeMod.setState({ shows: [show as unknown as never] });
-      const main = document.getElementById('mainContent')!;
-      libraryMod.renderLibrary(main);
-
-      const tagSel = main.querySelector('#libTagFilter') as HTMLSelectElement;
-      tagSel.value = 'valid';
-      tagSel.dispatchEvent(new Event('change'));
-
-      // Now change to a non-existent tag (set via stale filter simulation)
-      // Actually, the dropdown only shows existing tags. Let me test with a show
-      // that has only non-string tags.
-      const show2 = makeLibShow({ id: 2, name: 'Show 2', tags: [456 as unknown] });
-      storeMod.setState({ shows: [show2 as unknown as never] });
-      libraryMod.renderLibrary(main);
-
-      // No tags in dropdown (getAllUserTags filters non-strings).
-      // But _filters.tag is still "valid" from before → 0 results.
-      expect(main.querySelector('.empty-state')).toBeTruthy();
-      expect(main.querySelector('.show-card')).toBeNull();
-    });
-  });
-
-  // ===================================================================
   // BUG-A12-06: non-string show.name crashes applyFilters
   // ===================================================================
   describe('BUG-A12-06: non-string show.name does not crash (FIXED)', () => {

@@ -12,10 +12,6 @@ function safeNumLabel(v: unknown): string {
   return '?';
 }
 
-function asCalEpisodes(v: unknown): CalendarEpisode[] {
-  return Array.isArray(v) ? (v as CalendarEpisode[]) : [];
-}
-
 let _calendarClickHandler: ((e: MouseEvent) => void) | null = null;
 let _calendarKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 let _calendarMain: HTMLElement | null = null;
@@ -47,8 +43,8 @@ function renderCalendarContent(
   }
 
   // Defensive coercion (worker/corrupted data).
-  const week = asCalEpisodes(weekIn);
-  const afterWeek = asCalEpisodes(afterWeekIn);
+  const week = weekIn;
+  const afterWeek = afterWeekIn;
 
   const state = getState();
   const today = new Date();
@@ -59,7 +55,6 @@ function renderCalendarContent(
   // Raggruppa per giorno della settimana corrente (gli episodi con data malformata vengono saltati).
   const byDay: CalendarEpisode[][] = [[], [], [], [], [], [], []];
   for (const ep of week) {
-    if (!ep || typeof ep !== 'object') continue; // Skip entry non-object
     const epDate = parseISODateLocal(ep.date);
     if (!epDate) continue; // skip episodi con data malformata
     const dayIdx = (epDate.getDay() + 6) % 7; // 0=Lun
@@ -137,7 +132,6 @@ function renderCalendarContent(
     html +=
       '<div class="section" style="margin-top:32px;"><h2 class="section-title">In arrivo</h2><div class="episode-list">';
     for (const ep of shown) {
-      if (!ep || typeof ep !== 'object') continue; // Skip entry non-object
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
         : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);
@@ -170,7 +164,6 @@ function renderCalendarContent(
   } else {
     html += '<div class="episode-list">';
     for (const ep of week) {
-      if (!ep || typeof ep !== 'object') continue; // Skip entry non-object
       const epTitle = ep.name
         ? escapeHtml(ep.showName) + ' · ' + escapeHtml(ep.name)
         : escapeHtml(ep.showName) + ' · Stagione ' + safeNumLabel(ep.season) + ', Episodio ' + safeNumLabel(ep.num);

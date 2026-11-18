@@ -1313,16 +1313,6 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     expect(showToast).toHaveBeenCalledWith('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
   });
 
-  it('computeStats with mixed valid + null entries → filters nulls (safeShows)', () => {
-    const valid = makeShowWithSeasons({ 1: 5 }, { id: 1, runtime: 60, list: 'watching' });
-    markWatchedFirst(valid, 1, 3);
-    const shows = [null, valid, undefined] as unknown as Show[];
-    const stats = computeStats(shows);
-    expect(stats.totalShows).toBe(1);
-    expect(stats.totalWatched).toBe(3);
-    expect(stats.totalEpisodes).toBe(5);
-  });
-
   it('computeStats with show having Infinity runtime → uses fallback 45 min', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1, runtime: Infinity as unknown as number, list: 'watching' });
     markWatchedFirst(show, 1, 2);

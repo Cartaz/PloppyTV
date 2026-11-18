@@ -78,7 +78,7 @@ vi.mock('../src/lib/shows.ts', async (importOriginal) => {
 import { renderShowDetail, bindShowDetailEvents } from '../src/views/showDetail';
 import { setState } from '../src/lib/store';
 import { toggleEpisode, setEpisodeRating, setEpisodeNote, addShowTag, removeShowTag } from '../src/lib/shows';
-import { showModal, closeModal } from '../src/components/modal';
+import { closeModal } from '../src/components/modal';
 
 // --- Helpers ---
 
@@ -142,22 +142,6 @@ describe('BUG-A11-01: seasonAvgRating rejects NaN/Infinity/negative ratings', ()
     expect(avg).toBeNull();
   });
 
-  it('Infinity rating in episode → no "Infinity" in season-rating-avg output', () => {
-    const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
-    show.seasons[1][0].name = 'Pilot';
-    show.seasons[1][1].name = 'Ep 2';
-    (show.seasons[1][0] as { rating?: number }).rating = Infinity;
-    (show.seasons[1][1] as { rating?: number }).rating = 4;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const avg = document.querySelector('.season-rating-avg');
-    expect(avg).toBeTruthy();
-    expect(avg?.textContent).not.toContain('Infinity');
-    // Only the finite rating (4) counts: avg = 4.0, count = 1.
-    expect(avg?.textContent).toContain('4.0');
-    expect(avg?.textContent).toContain('(1)');
-  });
-
   it('negative rating excluded from average', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
@@ -218,20 +202,6 @@ describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
     expect((items[2] as HTMLElement).dataset.ep).toBe('3');
   });
 
-  it('episodes with non-finite num (NaN/Infinity) sorted to end', () => {
-    const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
-    show.seasons = {
-      1: [makeEpisode({ num: 2, id: 12 }), makeEpisode({ num: NaN, id: 99 }), makeEpisode({ num: 1, id: 11 })],
-    };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const items = Array.from(document.querySelectorAll('.episode-item'));
-    expect(items.length).toBe(3);
-    expect((items[0] as HTMLElement).dataset.ep).toBe('1');
-    expect((items[1] as HTMLElement).dataset.ep).toBe('2');
-    expect((items[2] as HTMLElement).dataset.ep).toBe('NaN');
-  });
-
   it('in-order episodes remain in order (no regression)', () => {
     const show = makeShowWithSeasons({ 1: 3 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
@@ -243,119 +213,6 @@ describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
     expect((items[0] as HTMLElement).dataset.ep).toBe('1');
     expect((items[1] as HTMLElement).dataset.ep).toBe('2');
     expect((items[2] as HTMLElement).dataset.ep).toBe('3');
-  });
-});
-
-// ============================================================================
-// BUG-A11-03: tagsSectionHtml guards non-array show.tags
-// ============================================================================
-describe('BUG-A11-03: tagsSectionHtml guards non-array show.tags', () => {
-  it('show.tags as string → no character-iteration (no .user-tag per char)', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { tags: unknown }).tags = 'Summer';
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const tags = Array.from(document.querySelectorAll('.user-tag'));
-    expect(tags.length).toBe(0);
-  });
-
-  it('show.tags as null → no tags rendered (no crash)', () => {
-    const show = makeShow({ id: 1, tags: undefined });
-    (show as unknown as { tags: unknown }).tags = null;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    expect(document.querySelectorAll('.user-tag').length).toBe(0);
-  });
-
-  it('show.tags as object → no crash, no tags rendered', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { tags: unknown }).tags = { 0: 'a', 1: 'b' };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.user-tag').length).toBe(0);
-  });
-
-  it('show.tags as valid array → tags rendered normally', () => {
-    const show = makeShow({ id: 1, tags: ['Summer', 'Rewatch'] });
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    expect(document.querySelectorAll('.user-tag').length).toBe(2);
-  });
-});
-
-// ============================================================================
-// BUG-A11-04: episode list guards non-array seasons[currentSeason]
-// ============================================================================
-describe('BUG-A11-04: episode list guards non-array seasons[currentSeason]', () => {
-  it('seasons[1] as string → no character-iteration (no .episode-item per char)', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: Record<string, unknown> }).seasons = { 1: 'abc' };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.episode-item').length).toBe(0);
-  });
-
-  it('seasons[1] as object → no crash, no episodes rendered', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: Record<string, unknown> }).seasons = { 1: { num: 1 } };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.episode-item').length).toBe(0);
-  });
-
-  it('seasons[1] as null → empty episode list, no crash', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: Record<string, unknown> }).seasons = { 1: null };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.episode-item').length).toBe(0);
-  });
-});
-
-// ============================================================================
-// BUG-A11-06: episode list skips null/undefined items in array
-// ============================================================================
-describe('BUG-A11-06: episode list skips null/undefined items', () => {
-  it('array with null/undefined episodes → skipped, no TypeError', () => {
-    const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
-
-    show.seasons = {
-      1: [null as any, makeEpisode({ num: 2, id: 12 }), undefined as any, makeEpisode({ num: 1, id: 11 })],
-    };
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    const items = Array.from(document.querySelectorAll('.episode-item'));
-    expect(items.length).toBe(2);
-    expect((items[0] as HTMLElement).dataset.ep).toBe('1');
-    expect((items[1] as HTMLElement).dataset.ep).toBe('2');
-  });
-});
-
-// ============================================================================
-// BUG-A11-07: genres guards non-array
-// ============================================================================
-describe('BUG-A11-07: detail-genres guards non-array show.genres', () => {
-  it('show.genres as string → no crash, no genre-tag elements', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { genres: unknown }).genres = 'Drama';
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.genre-tag').length).toBe(0);
-  });
-
-  it('show.genres as null → no crash', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { genres: unknown }).genres = null;
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    expect(() => renderShowDetail(getMain())).not.toThrow();
-    expect(document.querySelectorAll('.genre-tag').length).toBe(0);
-  });
-
-  it('show.genres as valid array → genre-tag elements rendered', () => {
-    const show = makeShow({ id: 1, genres: ['Drama', 'Comedy'] });
-    setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
-    renderShowDetail(getMain());
-    expect(document.querySelectorAll('.genre-tag').length).toBe(2);
   });
 });
 
@@ -396,94 +253,6 @@ describe('BUG-A11-05: show.image non-string guarded (no .replace TypeError)', ()
     renderShowDetail(getMain());
     const img = document.querySelector('.detail-poster') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
-  });
-});
-
-// ============================================================================
-// BUG-A11-08: openNoteEditor guards show.seasons undefined + non-array season
-// ============================================================================
-describe('BUG-A11-08: openNoteEditor guards corrupted seasons', () => {
-  function setupAndClickNote(show: Show): void {
-    setState({ currentShowId: show.id, currentSeason: 1, shows: [show] });
-    const main = getMain();
-    renderShowDetail(main);
-    bindShowDetailEvents(main);
-    const btn = document.querySelector('[data-action="editNote"]') as HTMLElement | null;
-    if (btn) btn.click();
-  }
-
-  it('show.seasons undefined → editNote click no-op (no TypeError)', () => {
-    const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
-    (show as unknown as { seasons: unknown }).seasons = undefined;
-    expect(() => setupAndClickNote(show)).not.toThrow();
-    expect(setEpisodeNote).not.toHaveBeenCalled();
-    expect(showModal).not.toHaveBeenCalled();
-  });
-
-  it('show.seasons[1] as string → editNote click no-op (no .find TypeError)', () => {
-    const show = makeShow({ id: 1 });
-    (show as unknown as { seasons: Record<string, unknown> }).seasons = { 1: 'abc' };
-    expect(() => setupAndClickNote(show)).not.toThrow();
-    expect(setEpisodeNote).not.toHaveBeenCalled();
-    expect(showModal).not.toHaveBeenCalled();
-  });
-
-  it('show.seasons null → editNote click no-op', () => {
-    const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
-    (show as unknown as { seasons: unknown }).seasons = null;
-    expect(() => setupAndClickNote(show)).not.toThrow();
-    expect(setEpisodeNote).not.toHaveBeenCalled();
-    expect(showModal).not.toHaveBeenCalled();
-  });
-});
-
-// ============================================================================
-// BUG-A11-09: openAddTagModal suggestions guard non-array s.tags
-// ============================================================================
-describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
-  it('other show has tags as string → no character-iteration in suggestions', () => {
-    const showA = makeShow({ id: 1, tags: [] });
-    const showB = makeShow({ id: 2, tags: [] });
-    (showB as unknown as { tags: unknown }).tags = 'Summer';
-    setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
-    const main = getMain();
-    renderShowDetail(main);
-    bindShowDetailEvents(main);
-    const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
-    btn.click();
-    const suggestions = Array.from(document.querySelectorAll('.tag-suggestion'));
-    expect(suggestions.length).toBe(0);
-  });
-
-  it('other show has tags as valid array → suggestions rendered', () => {
-    const showA = makeShow({ id: 1, tags: [] });
-    const showB = makeShow({ id: 2, tags: ['Summer', 'Rewatch'] });
-    setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
-    const main = getMain();
-    renderShowDetail(main);
-    bindShowDetailEvents(main);
-    const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
-    btn.click();
-    const suggestions = Array.from(document.querySelectorAll('.tag-suggestion'));
-    expect(suggestions.length).toBe(2);
-  });
-
-  it('other show has tags with non-string elements → only strings added', () => {
-    const showA = makeShow({ id: 1, tags: [] });
-    const showB = makeShow({ id: 2, tags: [] });
-
-    (showB as unknown as { tags: any[] }).tags = ['Valid', 42, null, { x: 1 }, 'Also'];
-    setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
-    const main = getMain();
-    renderShowDetail(main);
-    bindShowDetailEvents(main);
-    const btn = document.querySelector('[data-action="addTag"]') as HTMLElement;
-    btn.click();
-    const suggestions = Array.from(document.querySelectorAll('.tag-suggestion'));
-    expect(suggestions.length).toBe(2);
-    const labels = suggestions.map((s) => s.textContent);
-    expect(labels).toContain('Valid');
-    expect(labels).toContain('Also');
   });
 });
 

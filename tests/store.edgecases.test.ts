@@ -4,7 +4,6 @@
 // to FAIL on the pre-fix code and PASS on the post-fix code.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Show } from '../src/types';
 import {
   getState,
   setState,
@@ -32,44 +31,6 @@ function resetState(): void {
 }
 
 // ---------------------------------------------------------------------------
-// BUG-A2-01 [HIGH] setShows(null/undefined/non-array) corrompe state.shows
-// ---------------------------------------------------------------------------
-describe('BUG-A2-01: setShows validates non-array input', () => {
-  beforeEach(resetState);
-
-  it('setShows(null) non corrompe state.shows (rimane array vuoto)', () => {
-    setShows([makeShow({ id: 1 })]);
-    expect(getState().shows.length).toBe(1);
-    // @ts-expect-error — intentionally invalid runtime input
-    setShows(null);
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows).toEqual([]);
-  });
-
-  it('setShows(undefined) non corrompe state.shows', () => {
-    setShows([makeShow({ id: 1 })]);
-    // @ts-expect-error intentional invalid-type test input
-    setShows(undefined);
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows).toEqual([]);
-  });
-
-  it('setShows(string) non corrompe state.shows', () => {
-    // @ts-expect-error intentional invalid-type test input
-    setShows('not-an-array');
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows).toEqual([]);
-  });
-
-  it('setShows({foo:bar}) non corrompe state.shows', () => {
-    // @ts-expect-error intentional invalid-type test input
-    setShows({ foo: 'bar' });
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows).toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // BUG-A2-02 [HIGH] setShows/setState shallow-copy difensivo
 // ---------------------------------------------------------------------------
 describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
@@ -89,119 +50,6 @@ describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
     setState({ shows: arr });
     expect(getState().shows).not.toBe(arr);
     arr.push(makeShow({ id: 2 }));
-    expect(getState().shows.length).toBe(1);
-  });
-
-  it('removeShowFromState non crasha se state.shows è stato corrotto a null', () => {
-    // Simula corruzione diretta
-    (getState() as { shows: unknown }).shows = null;
-    expect(() => removeShowFromState(1)).not.toThrow();
-    expect(Array.isArray(getState().shows)).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BUG-A2-03 [HIGH] replaceShow valida show (null/undefined/id invalido)
-// ---------------------------------------------------------------------------
-describe('BUG-A2-03: replaceShow validates invalid show / id', () => {
-  beforeEach(resetState);
-
-  it('replaceShow(null) è no-op (non pusha garbage)', () => {
-    // @ts-expect-error intentional invalid-type test input
-    replaceShow(null);
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow(undefined) è no-op', () => {
-    // @ts-expect-error intentional invalid-type test input
-    replaceShow(undefined);
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow({}) (no id) è no-op', () => {
-    // @ts-expect-error intentional invalid-type test input
-    replaceShow({});
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow con id=0 è no-op (id non positivo)', () => {
-    replaceShow({ ...makeShow(), id: 0 });
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow con id negativo è no-op', () => {
-    replaceShow({ ...makeShow(), id: -5 });
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow con id=NaN è no-op', () => {
-    replaceShow({ ...makeShow(), id: NaN });
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow con id=Infinity è no-op', () => {
-    replaceShow({ ...makeShow(), id: Infinity });
-    expect(getState().shows.length).toBe(0);
-  });
-
-  it('replaceShow con id valido funziona ancora (regression check)', () => {
-    replaceShow(makeShow({ id: 100 }));
-    expect(getState().shows.length).toBe(1);
-    expect(getState().shows[0].id).toBe(100);
-    // replace existing
-    replaceShow({ ...makeShow({ id: 100 }), name: 'Updated' });
-    expect(getState().shows.length).toBe(1);
-    expect(getState().shows[0].name).toBe('Updated');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BUG-A2-06 [HIGH] setState valida shows se presente nel patch
-// ---------------------------------------------------------------------------
-describe('BUG-A2-06: setState validates `shows` field if present', () => {
-  beforeEach(resetState);
-
-  it('setState({ shows: null }) non corrompe state.shows (preserva existing)', () => {
-    setShows([makeShow({ id: 1 })]);
-    expect(getState().shows.length).toBe(1);
-    // @ts-expect-error intentional invalid-type test input
-    setState({ shows: null });
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows.length).toBe(1); // preserved, not wiped
-  });
-
-  it('setState({ shows: undefined }) non corrompe state.shows', () => {
-    setShows([makeShow({ id: 1 })]);
-    // Note: { shows: undefined } is TS-legal (optional prop), but runtime-invalid.
-    setState({ shows: undefined as unknown as Show[] });
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows.length).toBe(1);
-  });
-
-  it('setState({ shows: null, currentView: "x" }) applica currentView ma scarta shows', () => {
-    setShows([makeShow({ id: 1 })]);
-    // @ts-expect-error intentional invalid-type test input
-    setState({ shows: null, currentView: 'library' });
-    expect(getState().shows.length).toBe(1); // preserved
-    expect(getState().currentView).toBe('library'); // applied
-  });
-
-  it('setState({ shows: "not-array" }) non corrompe', () => {
-    setShows([makeShow({ id: 1 })]);
-    // @ts-expect-error intentional invalid-type test input
-    setState({ shows: 'not-array' });
-    expect(Array.isArray(getState().shows)).toBe(true);
-    expect(getState().shows.length).toBe(1);
-  });
-
-  it('setState(non-object) è no-op', () => {
-    setShows([makeShow({ id: 1 })]);
-    // @ts-expect-error intentional invalid-type test input
-    setState(null);
-    // @ts-expect-error intentional invalid-type test input
-    setState(undefined);
-    // @ts-expect-error intentional invalid-type test input
-    setState('string');
     expect(getState().shows.length).toBe(1);
   });
 });
@@ -345,36 +193,6 @@ describe('BUG-A2-08: subscribe validates fn is a function', () => {
 // ---------------------------------------------------------------------------
 describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
   beforeEach(resetState);
-
-  it('replaceShow + removeShowFromState flow con id mistivalidi/invalidi', () => {
-    // Setup con show validi
-    setShows([makeShow({ id: 10 }), makeShow({ id: 20 }), makeShow({ id: 30 })]);
-    expect(getState().shows.length).toBe(3);
-
-    // replace di un esistente
-    replaceShow({ ...makeShow({ id: 20 }), name: 'Updated 20' });
-    expect(getState().shows.length).toBe(3);
-    expect(getState().shows.find((s) => s.id === 20)?.name).toBe('Updated 20');
-
-    // replace di un non-esistente (id valido) → push
-    replaceShow(makeShow({ id: 40 }));
-    expect(getState().shows.length).toBe(4);
-
-    // replace invalido → no-op
-    // @ts-expect-error intentional invalid-type test input
-    replaceShow(null);
-    replaceShow({ ...makeShow(), id: 0 });
-    expect(getState().shows.length).toBe(4);
-
-    // remove inesistente → no-op (ma emette)
-    removeShowFromState(999);
-    expect(getState().shows.length).toBe(4);
-
-    // remove esistente
-    removeShowFromState(20);
-    expect(getState().shows.length).toBe(3);
-    expect(getState().shows.find((s) => s.id === 20)).toBeUndefined();
-  });
 
   it('updateShowListStatus: edge cases misti non producono stati invalidi', () => {
     // totalEp=0, watched=0, manualList=false, list=watching → towatch
