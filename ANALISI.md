@@ -115,7 +115,7 @@ Totale indicativo: **~9–13 giorni** di lavoro per tutto; le fasi 1–3 (≈ 3 
 
 ## 4. Esito dell'esecuzione (18 novembre 2026)
 
-Tutte e 7 le fasi sono state eseguite sul branch `cleanup/analisi-2026-11`, un commit per fase (la fase 6 in tre commit). Il branch non è ancora pubblicato su GitHub.
+Tutte e 7 le fasi sono state eseguite sul branch `cleanup/analisi-2026-11`, un commit per fase (la fase 6 in tre commit). Il branch è pubblicato con una PR verso `main`.
 
 | | Prima | Dopo |
 | --- | --- | --- |
@@ -135,5 +135,5 @@ Esito per problema: A1, A2, A3, M1–M8 e B1–B10 risolti. Di B11 (hook di test
 - **Hook di test nel codice di produzione** (B11): `_resetXForTesting` e i flag globali su `window` sono rimasti, perché servono ancora a più file di test.
 - **Titoli dei test**: molti `describe` ereditati dai vecchi file probe contengono ancora ID come `BUG-A6-07`. È cosmetico, l'ho lasciato.
 - **Nomi delle chiavi i18n** generate automaticamente: sono slug italiani (es. `io.esportaBackup`). Funzionano, ma rinominarle sarebbe più leggibile.
-- **Versione**: `package.json` è ancora 1.2.1. Lo schema dati 3 è una modifica ai dati salvati: al rilascio conviene passare almeno a 1.3.0.
+- **Versione**: portata a 1.3.0 (schema dati 3). Il tag `v1.3.0` va creato al rilascio, dopo il merge.
 - **Verifica nel browser**: tutto è verificato con typecheck, lint, build e i test jsdom (compresi interfaccia inglese, routing e flusso completo). L'app non è stata provata a mano in un browser vero.

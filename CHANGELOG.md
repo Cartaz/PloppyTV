@@ -4,6 +4,12 @@ Tutte le versioni notevoli di PloppyTV sono documentate in questo file. Il forma
 
 ## [Unreleased]
 
+Nessuna modifica.
+
+## [1.3.0] — Pulizia e correzioni (novembre 2026)
+
+**Tag:** `v1.3.0`
+
 Pulizia guidata dall'analisi in `ANALISI.md`. **Schema dati 3** (vedi *Dati*): fai un backup con Esporta prima di aggiornare.
 
 ### Corretto
