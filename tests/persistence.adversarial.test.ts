@@ -2,7 +2,6 @@
 // shows / store / utils. End-to-end adversarial scenarios that exercise
 // multiple modules together — finding bugs that per-module tests miss.
 //
-//
 // Strategy:
 //  - Mock toast/modal/header (DOM-dependent; not under test).
 //  - Real imports: store, storage, normalize, utils, constants, api, shows.
@@ -526,8 +525,8 @@ describe('Section 3: Import enormi — size limits and large arrays', () => {
     expect(result!.seasons[1][0].note!.length).toBe(500);
   });
 
-  it('BUG-A19-04: loadData should dedup shows by id (storage.ts, A6)', () => {
-    // BUG-A19-04 [Medium] — storage.ts (A4): loadData does NOT dedup by show id.
+  it('loadData should dedup shows by id (storage.ts, A6)', () => {
+    // storage.ts (A4): loadData does NOT dedup by show id.
     // If localStorage contains duplicate shows (same id), both are loaded.
     // This causes downstream issues:
     //   - toggleEpisode/findIndex matches FIRST show only → second is orphaned.
@@ -712,8 +711,8 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
     expect(readShows(mem)[0]).toHaveProperty('id', 99);
   });
 
-  it('BUG-A19-05a: storage event should warn on past version (storage.ts, A4)', () => {
-    // BUG-A19-05 [Low] — storage.ts (A4): the storage event handler only checks
+  it('storage event should warn on past version (storage.ts, A4)', () => {
+    // storage.ts (A4): the storage event handler only checks
     // `parsed.version > SCHEMA_VERSION` (future versions are ignored). It does
     // NOT warn on `parsed.version < SCHEMA_VERSION` (past versions), unlike
     // loadData which logs a warning. This is an inconsistency — past-version
@@ -747,8 +746,8 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
     warnSpy.mockRestore();
   });
 
-  it('BUG-A19-05b: storage event should reject non-number version (storage.ts, A4)', () => {
-    // BUG-A19-05 [Low-Medium] — storage.ts (A4): the storage event handler
+  it('storage event should reject non-number version (storage.ts, A4)', () => {
+    // 05 [Low-Medium] — storage.ts (A4): the storage event handler
     // accepts non-number versions (string, NaN, etc.) because its check is
     // `typeof parsed.version === 'number' && parsed.version > SCHEMA_VERSION`.
     // For a string version, typeof !== 'number' → condition is false → NOT
@@ -1112,9 +1111,9 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     expect(show.list).toBe('towatch');
   });
 
-  it('reconcileAllLists with same show appearing twice → both processed (BUG-A19-04 consequence)', () => {
+  it('reconcileAllLists with same show appearing twice → both processed', () => {
     // Duplicate shows in the array are both processed by reconcileAllLists.
-    // This is a consequence of BUG-A19-04 (loadData doesn't dedup).
+    // This is a consequence of (loadData doesn't dedup).
     const s1 = makeShowWithSeasons({ 1: 2 }, { id: 1, list: 'towatch', manualList: false });
     const s2 = makeShowWithSeasons({ 1: 2 }, { id: 1, list: 'towatch', manualList: false });
     markWatchedFirst(s1, 1, 2);
@@ -1133,8 +1132,8 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     expect(getState().shows[0].list).toBe('watching');
   });
 
-  it('refreshShowEpisodes should reject invalid airdate "2024-13-40" (BUG-A19-01)', async () => {
-    // BUG-A19-01 [Medium] — shows.ts (A6): refreshShowEpisodes uses loose regex
+  it('refreshShowEpisodes should reject invalid airdate "2024-13-40"', async () => {
+    // shows.ts (A6): refreshShowEpisodes uses loose regex
     // `/^\d{4}-\d{2}-\d{2}$/` for airdate validation, which accepts invalid
     // dates like "2024-13-40" (month 13, day 40). This is inconsistent with
     // buildShowFromTvmaze and normalizeShow which use parseISODateLocal
@@ -1164,15 +1163,15 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     expect(updated.seasons[1][0].airdate).toBeNull();
   });
 
-  it('buildShowFromTvmaze rejects "2024-13-40" airdate (correct behavior, contrast with BUG-A19-01)', () => {
+  it('buildShowFromTvmaze rejects "2024-13-40" airdate', () => {
     const eps = [{ id: 1, season: 1, number: 1, airdate: '2024-13-40' }];
     const show = buildShowFromTvmaze({ id: 1, name: 'X', runtime: 60 }, eps, 'towatch');
     // buildShowFromTvmaze uses parseISODateLocal → rejects invalid date
     expect(show.seasons[1][0].airdate).toBeNull();
   });
 
-  it('refreshShowEpisodes should stripHtml ep.name (BUG-A19-02)', async () => {
-    // BUG-A19-02 [Medium] — shows.ts (A6): refreshShowEpisodes stores ep.name
+  it('refreshShowEpisodes should stripHtml ep.name', async () => {
+    // shows.ts (A6): refreshShowEpisodes stores ep.name
     // raw (only .slice(0, 300), no stripHtml). This is inconsistent with
     // buildShowFromTvmaze/normalizeShow which use safeEpisodeName (stripHtml +
     // fallback null if empty). XSS defense-in-depth: if a future renderer
@@ -1214,15 +1213,15 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     expect(updated.seasons[1][0].name).toBe('Real');
   });
 
-  it('buildShowFromTvmaze strips HTML from ep.name (correct behavior, contrast with BUG-A19-02)', () => {
+  it('buildShowFromTvmaze strips HTML from ep.name', () => {
     const eps = [{ id: 1, season: 1, number: 1, name: '<script>alert(1)</script>Real', airdate: '2024-01-01' }];
     const show = buildShowFromTvmaze({ id: 1, name: 'X', runtime: 60 }, eps, 'towatch');
     // buildShowFromTvmaze uses safeEpisodeName → strips HTML
     expect(show.seasons[1][0].name).toBe('Real');
   });
 
-  it('BUG-A19-03: refreshShowEpisodes should reject Infinity runtime (code-level finding)', async () => {
-    // BUG-A19-03 [Low] — shows.ts (A6): refreshShowEpisodes uses `ep.runtime > 0`
+  it('refreshShowEpisodes should reject Infinity runtime (code-level finding)', async () => {
+    // shows.ts (A6): refreshShowEpisodes uses `ep.runtime > 0`
     // which accepts Infinity (Infinity > 0 === true). This is inconsistent with
     // buildShowFromTvmaze/normalizeShow which use safeEpisodeRuntime
     // (Number.isFinite → rejects Infinity).
@@ -1243,7 +1242,7 @@ describe('Section 8: Combinazioni cross-cutting', () => {
     // Number.isFinite), but we can't trigger it via JSON mock.
   });
 
-  it('buildShowFromTvmaze rejects Infinity runtime (correct behavior, contrast with BUG-A19-03)', () => {
+  it('buildShowFromTvmaze rejects Infinity runtime', () => {
     const eps = [{ id: 1, season: 1, number: 1, runtime: Infinity }];
     const show = buildShowFromTvmaze({ id: 1, name: 'X', runtime: 60 }, eps, 'towatch');
     // buildShowFromTvmaze uses safeEpisodeRuntime → Infinity → null

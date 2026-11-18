@@ -87,7 +87,7 @@ afterEach(() => {
 
 // ---------- tests ----------
 
-describe('Agent-07 probe: discover.ts', () => {
+describe('discover.ts', () => {
   it('loadDiscover deduplicates concurrent requests for the same tab', async () => {
     mockedGetShowsPage.mockImplementation(async (page: number) => [makeShow(page * 1000 + 1)]);
 
@@ -115,7 +115,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(mockedGetShowsPage.mock.calls.length).toBe(callsAfterFirstLoad + DISCOVER_POPULAR_PAGES.length);
   });
 
-  it('FASE2 respects DISCOVER_TARGET_PER_GENRE cap (BUG-07-01 fixed)', async () => {
+  it('FASE2 respects DISCOVER_TARGET_PER_GENRE cap', async () => {
     // 40 Sci-Fi shows, no other genres. FASE1 caps Sci-Fi at 20.
     // FASE2 deficit = 150 - 20 = 130; the remaining 20 Sci-Fi candidates
     // must NOT be pushed to groups['Science-Fiction'] (cap reached).
@@ -142,15 +142,15 @@ describe('Agent-07 probe: discover.ts', () => {
       totalTarget: DISCOVER_TOTAL_TARGET,
     });
 
-    // BUG-07-01 fixed: Sci-Fi must not exceed the per-genre cap.
+    // 01 fixed: Sci-Fi must not exceed the per-genre cap.
     expect(sciFiCount).toBeLessThanOrEqual(DISCOVER_TARGET_PER_GENRE);
     expect(sciFiCount).toBe(DISCOVER_TARGET_PER_GENRE); // FASE1 fills to cap, FASE2 doesn't add
-    // Spillover redirected to _other (BUG-07-02 cap also enforced).
+    // Spillover redirected to _other ( cap also enforced).
     expect(otherCount).toBeLessThanOrEqual(DISCOVER_TARGET_OTHER);
     expect(otherCount).toBe(20); // remaining 20 Sci-Fi shows
   });
 
-  it('FASE2 respects DISCOVER_TARGET_OTHER cap (BUG-07-02 fixed)', async () => {
+  it('FASE2 respects DISCOVER_TARGET_OTHER cap', async () => {
     // 50 shows with genre 'Western' (not in GENRE_CAROUSELS) → all go to _other.
     // FASE1 caps _other at 30. FASE2 must NOT push the remaining 20.
     const otherShows: TvmazeShow[] = [];
@@ -172,7 +172,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(otherCount).toBe(DISCOVER_TARGET_OTHER); // FASE1 fills to cap, FASE2 doesn't add
   });
 
-  it('weight=0 is included; missing/negative weight excluded (BUG-07-03 fixed)', async () => {
+  it('weight=0 is included; missing/negative weight excluded', async () => {
     const zeroWeight = makeShow(1, { weight: 0 });
     const missingWeight = makeShow(2, { weight: undefined });
     const negativeWeight = makeShow(3, { weight: -5 });
@@ -222,7 +222,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(parsed.groups).toBeDefined();
   });
 
-  it('readCache: future cachedAt rejected → fresh fetch (BUG-07-04 fixed)', async () => {
+  it('readCache: future cachedAt rejected → fresh fetch', async () => {
     const futureTime = Date.now() + 365 * 24 * 60 * 60 * 1000; // 1 year in the future
     const cachedGroups = {
       _other: [],
@@ -249,7 +249,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(ids).toContain(1); // fresh fetch produced id 1
   });
 
-  it('readCache: malformed groups rejected → fresh fetch (BUG-07-05 fixed)', async () => {
+  it('readCache: malformed groups rejected → fresh fetch', async () => {
     // cached.groups is a string, not an object. readCache now validates shape.
     localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), groups: 'not-an-object' }));
 
@@ -316,7 +316,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(ids).not.toContain(2);
   });
 
-  it('recentOnly Mar 31 setMonth clamps to Sep 30 (BUG-07-06 fixed)', async () => {
+  it('recentOnly Mar 31 setMonth clamps to Sep 30', async () => {
     // On March 31, "6 months ago" should be Sep 30 (Sep has 30 days).
     // Old code: new Date(2024,2,31).setMonth(2-6) → Sep 31 → rolls to Oct 1.
     // Fixed code: anchor to day 1, then clamp day to last day of target month → Sep 30.
@@ -366,7 +366,7 @@ describe('Agent-07 probe: discover.ts', () => {
     expect(localStorage.getItem(DISCOVER_RECENT_CACHE_KEY)).toBeNull();
   });
 
-  it('fetchAllCandidates: all page indices are assigned (BUG-07-07 shared-array fill removed)', async () => {
+  it('fetchAllCandidates: all page indices are assigned', async () => {
     // The old `new Array(n).fill([])` shared one [] across indices — a footgun.
     // The fix uses Array.from with per-index fresh []. The for-loop assigns
     // results[r.idx] = r.shows for EVERY batch item, so all pages appear.

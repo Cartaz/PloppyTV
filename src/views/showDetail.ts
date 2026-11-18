@@ -17,7 +17,7 @@ import {
 import { showModal, closeModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { MAX_EPISODE_RATING, MAX_EPISODE_NOTE_LENGTH, MAX_TAG_LENGTH } from '../lib/constants';
-import { t } from '../lib/i18n';
+import { t, showStatusLabel } from '../lib/i18n';
 
 let _showDetailClickHandler: ((e: MouseEvent) => void) | null = null;
 let _showDetailKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -27,7 +27,7 @@ let _showDetailMain: HTMLElement | null = null;
 function starRatingHtml(showId: number, season: number, epNum: number, rating: number | undefined): string {
   let html =
     '<span class="ep-rating" role="group" aria-label="' +
-    t('detail.ratingEpisodio') +
+    t('detail.ratingGroup') +
     '" ' +
     'data-action="rateEpisode" data-show-id="' +
     showId +
@@ -75,7 +75,7 @@ function noteBtnHtml(showId: number, season: number, epNum: number, hasNote: boo
 function tagsSectionHtml(show: { id: number; tags?: string[] }): string {
   const tags = show.tags ?? [];
   let html = '<div class="detail-tags-section">';
-  html += '<div class="detail-tags-label">' + t('detail.tag') + '</div>';
+  html += '<div class="detail-tags-label">' + t('detail.tagsLabel') + '</div>';
   html += '<div class="detail-tags-list">';
   for (const t of tags) {
     html +=
@@ -135,9 +135,7 @@ export function renderShowDetail(main: HTMLElement): void {
   const rawProgress = show.totalEpisodes > 0 ? (watched / show.totalEpisodes) * 100 : 0;
   const progress = Math.max(0, Math.min(100, rawProgress));
   const isCompleted = show.list === 'completed' || (show.totalEpisodes > 0 && watched >= show.totalEpisodes);
-  const statusLower = String(show.status || '').toLowerCase();
-  const statusClass =
-    statusLower.includes('running') || statusLower.includes(t('detail.corso')) ? 'status-running' : 'status-ended';
+  const statusClass = show.status === 'Running' ? 'status-running' : 'status-ended';
 
   let html =
     '<button class="btn btn-secondary" data-action="closeShow" style="margin-bottom:20px;">' +
@@ -146,27 +144,9 @@ export function renderShowDetail(main: HTMLElement): void {
     '</button>';
 
   html += '<div class="detail-header">';
-  // Poster principale: prova original (alta qualità), fallback su medium, poi placeholder.
-  // Regex /\/medium_(portrait|landscape)\// matcha solo path-segment TVMaze.
-  // Typeof guard su show.image — se corrotto a non-string
-  // (numero/oggetto), `.replace` avrebbe throwato TypeError. normalize valida,
-  // ma defense-in-depth contro dati importati malevoli/corrotti.
-  const bigImg =
-    typeof show.image === 'string' ? show.image.replace(/\/medium_(portrait|landscape)\//, '/original_$1/') : null;
-  if (bigImg && show.image && bigImg !== show.image) {
-    // Catena: original -> medium -> placeholder
-    html +=
-      '<img class="detail-poster" src="' +
-      escapeAttr(bigImg) +
-      '" alt="' +
-      escapeAttr(show.name) +
-      '" loading="eager" decoding="async" data-fallback="' +
-      escapeAttr(t('detail.imageUnavailable')) +
-      '" data-fallback-cls="detail-poster-placeholder" data-fallback-src="' +
-      escapeAttr(show.image) +
-      '">';
-  } else if (show.image) {
-    // Solo medium disponibile
+  // Poster: l'URL medium del CDN TVMaze (quello salvato). La variante
+  // "original_untouched" pesa >1 MB; "original_portrait" non esiste (404).
+  if (show.image) {
     html +=
       '<img class="detail-poster" src="' +
       escapeAttr(show.image) +
@@ -187,7 +167,7 @@ export function renderShowDetail(main: HTMLElement): void {
     '<span><span class="status-badge ' +
     statusClass +
     '">' +
-    escapeHtml(show.status) +
+    escapeHtml(showStatusLabel(show.status)) +
     '</span></span>' +
     (show.premiered ? '<span>' + formatDate(show.premiered) + '</span>' : '') +
     '<span>' +
@@ -251,13 +231,13 @@ export function renderShowDetail(main: HTMLElement): void {
       '<button class="btn btn-secondary" data-action="moveShow" data-show-id="' +
       show.id +
       '" data-list="completed">' +
-      t('search.completata') +
+      t('search.addCompleted') +
       '</button>';
   html +=
     '<button class="btn btn-secondary" data-action="refreshShow" data-show-id="' +
     show.id +
     '" title="' +
-    t('detail.aggiornaEpisodiMetadatiTvmaze') +
+    t('detail.refreshTitle') +
     '">' +
     t('detail.refreshData') +
     '</button>';
@@ -541,7 +521,7 @@ function openAddTagModal(showId: number): void {
   if (suggestions.length > 0) {
     suggestionsHtml =
       '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);margin-bottom:6px;">' +
-      t('detail.suggerimenti') +
+      t('detail.suggestions') +
       '</div>' +
       '<div class="tag-suggestions">' +
       suggestions

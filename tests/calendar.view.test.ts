@@ -85,7 +85,7 @@ afterEach(() => {
 // Part 1: Basic rendering (happy path)
 // ============================================================
 
-describe('Agent-16 calendar: basic rendering', () => {
+describe('basic rendering', () => {
   it('renders 7 day cells with Italian day names Mon→Sun', async () => {
     const main = makeMain();
     await renderCalendar(main);
@@ -173,7 +173,7 @@ describe('Agent-16 calendar: basic rendering', () => {
 // Part 2: Episode rendering & XSS
 // ============================================================
 
-describe('Agent-16 calendar: episode placement & XSS', () => {
+describe('episode placement & XSS', () => {
   it('places episode in correct day cell based on date weekday (Tue 2024-03-12 → index 1)', async () => {
     const main = makeMain();
     mockCal({ week: [makeCalEp({ date: '2024-03-12', showName: 'TueShow' })] });
@@ -284,7 +284,7 @@ describe('Agent-16 calendar: episode placement & XSS', () => {
     expect(main.innerHTML).toContain('FutureShow');
   });
 
-  it('afterWeek slice(0,20): 25 episodes → 20 rendered + "altri" indicator (FIXED BUG-16-05)', async () => {
+  it('afterWeek slice(0,20): 25 episodes → 20 rendered + "altri" indicator', async () => {
     const main = makeMain();
     const eps: CalendarEpisode[] = [];
     for (let i = 0; i < 25; i++) {
@@ -294,7 +294,7 @@ describe('Agent-16 calendar: episode placement & XSS', () => {
     await renderCalendar(main);
     const items = main.querySelectorAll('.episode-item');
     expect(items).toHaveLength(20);
-    // FIX BUG-16-05: "altri" indicator rendered with remaining count.
+    // "altri" indicator rendered with remaining count.
     expect(main.innerHTML).toMatch(/\+\s*5\s+altri episodi/i);
   });
 
@@ -316,8 +316,8 @@ describe('Agent-16 calendar: episode placement & XSS', () => {
 // Part 3: Defense-in-depth (non-null assertions)
 // ============================================================
 
-describe('Agent-16 calendar: defense-in-depth — null check on parseISODateLocal (BUG-16-04 FIXED)', () => {
-  it('malformed weekStart → graceful "Errore date" (FIXED, no TypeError)', async () => {
+describe('defense-in-depth — null check on parseISODateLocal', () => {
+  it('malformed weekStart → graceful "Errore date" (no TypeError)', async () => {
     const main = makeMain();
     mockCal({ weekStart: 'not-a-date' });
     await renderCalendar(main);
@@ -346,7 +346,7 @@ describe('Agent-16 calendar: defense-in-depth — null check on parseISODateLoca
   });
 
   it('episode with malformed date → skipped in GRID (no crash, other episodes render)', async () => {
-    // FIX BUG-16-04 (cont): episodes with malformed date are SKIPPED in the grid
+    // 04 (cont): episodes with malformed date are SKIPPED in the grid
     // (no null.getDay() crash) instead of bubbling up to "Errore caricamento".
     // They may still appear in the bottom "Da vedere questa settimana" list
     // (where formatDate gracefully returns 'N/D' for bad dates).
@@ -389,7 +389,7 @@ describe('Agent-16 calendar: defense-in-depth — null check on parseISODateLoca
 // Part 4: changeWeek / resetWeek + listener accumulation BUG
 // ============================================================
 
-describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
+describe('changeWeek & resetWeek (happy path)', () => {
   it('clicking prev button decrements calendarWeekOffset by 1', async () => {
     const main = makeMain();
     await renderCalendar(main);
@@ -434,7 +434,7 @@ describe('Agent-16 calendar: changeWeek & resetWeek (happy path)', () => {
   });
 });
 
-describe('Agent-16 calendar: no listener accumulation across re-binds', () => {
+describe('no listener accumulation across re-binds', () => {
   it('bindCalendarEvents removes the old listener → 1 active', async () => {
     // bindCalendarEvents rimuove il listener precedente prima di aggiungerne uno nuovo.
     // un nuovo handler. Quindi N cicli → 1 listener attivo → 1 chiamata a
@@ -464,7 +464,7 @@ describe('Agent-16 calendar: no listener accumulation across re-binds', () => {
     expect(getState().calendarWeekOffset).toBe(-1); // FIX (was -2)
   });
 
-  it('BUG-16-01 (FIXED cont): after N render cycles, single click applies 1×delta', async () => {
+  it('after N render cycles, single click applies 1×delta', async () => {
     const main = makeMain();
     for (let i = 0; i < 5; i++) {
       await renderCalendar(main);
@@ -476,7 +476,7 @@ describe('Agent-16 calendar: no listener accumulation across re-binds', () => {
     expect(getState().calendarWeekOffset).toBe(-1);
   });
 
-  it('BUG-16-01 (FIXED cont): next-button NO drift — each click adds 1', async () => {
+  it('next-button NO drift — each click adds 1', async () => {
     // Simulate the real user flow: click → emitChange → re-render → click → ...
     // FIX: each click adds exactly 1 (no triangular drift).
     const main = makeMain();
@@ -509,9 +509,9 @@ describe('Agent-16 calendar: no listener accumulation across re-binds', () => {
   });
 });
 
-describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () => {
-  it('clicking button with missing data-delta → no-op (FIXED, state unchanged at 0)', async () => {
-    // FIX BUG-16-02: changeCalendarWeek(Number(undefined)) → NaN. Ora il bind handler
+describe('NaN delta & state pollution', () => {
+  it('clicking button with missing data-delta → no-op (state unchanged at 0)', async () => {
+    // changeCalendarWeek(Number(undefined)) → NaN. Ora il bind handler
     // ha un guard `if (!Number.isFinite(delta)) return;` → no-op, state resta 0.
     const main = makeMain();
     await renderCalendar(main);
@@ -556,7 +556,7 @@ describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () 
 // Part 5: Async rendering & skeleton
 // ============================================================
 
-describe('Agent-16 calendar: async render flow', () => {
+describe('async render flow', () => {
   it('skeleton shown before computeCalendarAsync resolves', async () => {
     const main = makeMain();
     let resolveFn!: (v: {
@@ -581,8 +581,8 @@ describe('Agent-16 calendar: async render flow', () => {
     expect(main.innerHTML).toContain('Calendario');
   });
 
-  it('FIX BUG-16-06: rapid re-renders — last-STARTED wins (token guard)', async () => {
-    // FIX BUG-16-06: renderCalendar ora ha un token interno. Se due chiamate
+  it('rapid re-renders — last-STARTED wins (token guard)', async () => {
+    // renderCalendar ora ha un token interno. Se due chiamate
     // concorrenti risolvono in ordine diverso da quello di partenza, l'ultima
     // STARTED vince (non l'ultima RESOLVED).
     const main = makeMain();
@@ -622,7 +622,7 @@ describe('Agent-16 calendar: async render flow', () => {
     expect(main.innerHTML).not.toContain('First');
   });
 
-  it('FIX BUG-16-06: if first resolves AFTER second, first is discarded (token wins)', async () => {
+  it('if first resolves AFTER second, first is discarded (token wins)', async () => {
     const main = makeMain();
     let r1!: () => void;
     let r2!: () => void;
@@ -665,7 +665,7 @@ describe('Agent-16 calendar: async render flow', () => {
 // Part 6: DST / timezone edge cases
 // ============================================================
 
-describe('Agent-16 calendar: DST & date arithmetic', () => {
+describe('DST & date arithmetic', () => {
   it('weekStart=2024-03-25 (Mon, DST week in Europe/Rome): episode on Sun 2024-03-31 lands in index 6', async () => {
     // 2024-03-31 is the EU spring-forward Sunday. parseISODateLocal returns local midnight.
     // getDay()=0 for Sunday → (0+6)%7=6 → byDay[6] (Domenica).
@@ -701,7 +701,7 @@ describe('Agent-16 calendar: DST & date arithmetic', () => {
 // Part 7: Limitations / contract notes (not bugs)
 // ============================================================
 
-describe('Agent-16 calendar: contract notes (limitations, not bugs)', () => {
+describe('contract notes (limitations, not bugs)', () => {
   it('episode click target is openShow (does not jump to specific episode — UX limitation)', async () => {
     const main = makeMain();
     mockCal({ week: [makeCalEp({ showId: 42, season: 3, num: 7, date: '2024-03-12' })] });

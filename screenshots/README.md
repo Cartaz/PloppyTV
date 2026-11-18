@@ -1,45 +1,36 @@
-# Screenshot reali di PloppyTV
+# Screenshot di PloppyTV
 
-Questa cartella conterrà gli screenshot ufficiali della PWA usati nel README e nelle release notes.
+Screenshot reali della PWA usati nel README e nelle release notes.
 
 ## Screenshot attuali
 
-| File | Stato | Note |
+| File | Vista | Viewport |
 | --- | --- | --- |
-| `dashboard-placeholder.svg` | **Placeholder** | Mockup SVG generato per il README. Sostituire con screenshot reale. |
+| `dashboard.webp` | Dashboard | 1280×800 |
+| `show-detail.webp` | Dettaglio serie (voti, tag, stagioni) | 1280×800 |
+| `discover.webp` | Scopri, caroselli per genere | 1280×800 |
+| `stats.webp` | Statistiche | 1280×800 |
 
-## Come generare gli screenshot reali
+Generati il 18 novembre 2026 dalla build di produzione della v1.3.1, con una libreria demo di 6 serie aggiunte dalla ricerca TVMaze. Poster, titoli e trame sono forniti da [TVMaze](https://www.tvmaze.com).
 
-La roadmap P1 prevede 3-4 screenshot della PWA in azione: **Dashboard**, **Scopri**, **Calendario**, **Statistiche**. Procedura consigliata:
+## Come rigenerarli
 
-1. **Avvia la build di produzione** (non il dev server, per avere il tema corretto):
+1. Avvia la build di produzione (non il dev server):
    ```bash
    npm run build
    npm run preview   # http://localhost:4173
    ```
-2. **Apri Chrome/Edge** su `http://localhost:4173` a viewport 1280×720 (Desktop) o 390×844 (mobile).
-3. **Importa un dataset di esempio** (3-5 serie con stati misti) per avere screenshot realistici anziché una libreria vuota.
-4. **Naviga ogni vista** e cattura con:
-   - Chrome DevTools → Cmd/Ctrl+Shift+P → "Capture full size screenshot", oppure
-   - Strumento nativo OS (Cmd+Shift+4 su macOS, Win+Shift+S su Windows, `gnome-screenshot` su Linux).
-5. **Salva come PNG** (non JPG, per evitare artefatti su testi) con nome `<vista>-1280x720.png` o `<vista>-mobile.png`.
-6. **Ottimizza** con `optipng` o [squoosh.app](https://squoosh.app): target < 200 KB per immagine.
-
-## Screenshot raccomandati per il README
-
-| Nome file | Vista | Viewport | Scopo |
-| --- | --- | --- | --- |
-| `dashboard-desktop.png` | Dashboard | 1280×720 | Hero screenshot in cima al README |
-| `discover-desktop.png` | Scopri | 1280×720 | Mostra i caroselli per genere |
-| `calendar-desktop.png` | Calendario | 1280×720 | Mostra la settimana con airdate reali |
-| `stats-desktop.png` | Statistiche | 1280×720 | Mostra card + top generi |
-| `dashboard-mobile.png` | Dashboard | 390×844 | Demo del layout responsive |
-
-Una volta generati, aggiorna `README.md` sostituendo il riferimento al placeholder SVG con gli screenshot PNG reali.
+2. Apri il sito in una finestra **anonima** (così non tocchi i tuoi dati) a viewport 1280×800, con la lingua dell'app in italiano.
+3. Aggiungi 5-6 serie dalla ricerca con stati misti (in corso, da vedere, completata), segna qualche episodio come visto, aggiungi voti e un paio di tag.
+4. Cattura ogni vista (Chrome DevTools → Cmd/Ctrl+Shift+P → "Capture screenshot").
+5. Converti in WebP mantenendo il nome della vista, per esempio:
+   ```bash
+   magick dashboard.png -strip -quality 82 dashboard.webp
+   ```
+   Obiettivo: meno di 100 KB per immagine.
 
 ## Convenzioni
 
-- **Niente dati personali**: usa serie TV fittizie o popolari (Breaking Bad, The Last of Us, ecc.) senza email/nome utente visibili.
-- **Lingua italiana**: lascia l'UI in italiano (è il default dell'app).
-- **Tema scuro**: il tema default di PloppyTV è scuro. Se in futuro aggiungiamo il tema chiaro, genera una coppia di screenshot per entrambi.
-- **Niente timestamps del browser**: nascondi la barra degli indirizzi se possibile, o ritaglia via.
+- **Niente dati personali**: solo serie popolari, nessun nome utente o email visibile.
+- **Lingua italiana** e tema scuro (il default dell'app).
+- **Niente barra del browser** né elementi esterni all'app.

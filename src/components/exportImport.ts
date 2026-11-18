@@ -47,13 +47,13 @@ function decodeArrayBuffer(buf: ArrayBuffer): string {
 export function initExportImport(): void {
   document.getElementById('exportBtn')?.addEventListener('click', () => {
     if (!SUPPORTS_EXPORT) {
-      showToast(t('io.esportazioneSupportataQuestoBrowser'), 'error');
+      showToast(t('io.exportUnsupported'), 'error');
       return;
     }
     if (getState().shows.length === 0) {
-      showModal(t('io.esportaBackup'), '<p>' + t('io.haiNessunaSerieVuoi') + '</p>', [
+      showModal(t('io.exportTitle'), '<p>' + t('io.exportEmptyConfirm') + '</p>', [
         { label: t('actions.cancel') },
-        { label: t('io.esportaComunque'), style: 'btn-primary', onClick: doExport },
+        { label: t('io.exportAnyway'), style: 'btn-primary', onClick: doExport },
       ]);
       return;
     }
@@ -78,7 +78,7 @@ export function initExportImport(): void {
     }
     const reader = new FileReader();
     reader.onerror = () => {
-      showToast(t('io.erroreLetturaFile'), 'error');
+      showToast(t('io.readError'), 'error');
       input.value = '';
     };
     // readAsArrayBuffer + BOM detection per supportare UTF-16.
@@ -114,27 +114,27 @@ export function initExportImport(): void {
         const canonical = canonicalizeDataDocument(data);
         if (!canonical.ok) {
           if (canonical.code === 'unsupported-version') {
-            showToast(t('io.backupCreatoVersionePiu'), 'error');
+            showToast(t('io.newerVersion'), 'error');
           } else if (canonical.code === 'invalid-version') {
-            showToast(t('io.formatoValidoVersioneSchema'), 'error');
+            showToast(t('io.invalidVersion'), 'error');
           } else if (canonical.code === 'invalid-shows') {
-            showToast(t('io.formatoValidoShowsDeve'), 'error');
+            showToast(t('io.invalidShows'), 'error');
           } else {
-            showToast(t('io.formatoValidoFileDeve'), 'error');
+            showToast(t('io.invalidDocument'), 'error');
           }
           input.value = '';
           return;
         }
 
         if (canonical.document.sourceVersion === null) {
-          showToast(t('io.backupSenzaVersioneSchema'), 'warning');
+          showToast(t('io.legacyBackup'), 'warning');
         }
 
         const dedupedShows = canonical.document.shows;
         const skipped = canonical.document.skippedShows;
         const duplicates = canonical.document.duplicateShows;
         if (dedupedShows.length === 0) {
-          showToast(t('io.nessunaSerieValidaNel'), 'error');
+          showToast(t('io.noValidShows'), 'error');
           input.value = '';
           return;
         }
@@ -144,7 +144,7 @@ export function initExportImport(): void {
         const skipMsg = skipParts.length > 0 ? ' (' + skipParts.join(', ') + ')' : '';
 
         const mergeAction: ModalAction = {
-          label: t('io.unisciSmart'),
+          label: t('io.merge'),
           onClick: () => {
             // Snapshot per rollback in caso di save fallito
             const prevShows = getState().shows.map((s) => ({ ...s }));
@@ -163,7 +163,7 @@ export function initExportImport(): void {
             if (!saveData()) {
               // Rollback: ripristina lo snapshot precedente
               setShows(prevShows);
-              showToast(t('io.importAnnullatoStorageInsufficiente'), 'error');
+              showToast(t('io.importCancelled'), 'error');
               return;
             }
             updateBadges();
@@ -173,7 +173,7 @@ export function initExportImport(): void {
         };
 
         const replaceAction: ModalAction = {
-          label: t('io.sostituisciTutto'),
+          label: t('io.replaceAll'),
           style: 'btn-danger',
           // keepOpen = true impedisce che il closeModal()
           // automatico dopo onClick chiuda il modale genitore prima che la
@@ -181,18 +181,18 @@ export function initExportImport(): void {
           keepOpen: true,
           onClick: () => {
             showModal(
-              t('io.confermaSostituzione'),
+              t('io.replaceConfirmTitle'),
               '<p><strong>' +
-                t('io.attenzione') +
+                t('io.warning') +
                 '</strong> ' +
                 t('io.replaceWarning', { current: getState().shows.length, incoming: dedupedShows.length }) +
                 '</p><p>' +
-                t('io.questaAzionePuoEssere') +
+                t('io.irreversible') +
                 '</p>',
               [
                 { label: t('actions.cancel') },
                 {
-                  label: t('io.siSostituisciTutto'),
+                  label: t('io.replaceAllConfirm'),
                   style: 'btn-danger',
                   onClick: () => {
                     // Snapshot per rollback
@@ -201,12 +201,12 @@ export function initExportImport(): void {
                     if (!saveData()) {
                       // Rollback al precedente stato
                       setShows(prev);
-                      showToast(t('io.importAnnullatoStorageInsufficiente'), 'error');
+                      showToast(t('io.importCancelled'), 'error');
                       return;
                     }
                     updateBadges();
                     emitChange();
-                    showToast(t('io.backupImportatoSostituzione'), 'success');
+                    showToast(t('io.importedReplace'), 'success');
                     // Chiudi entrambi i modali (genitore + figlia)
                     closeAllModals();
                   },
@@ -217,19 +217,19 @@ export function initExportImport(): void {
         };
 
         showModal(
-          t('io.importaBackup'),
+          t('io.importTitle'),
           '<p>' +
             t('io.found', { count: dedupedShows.length }) +
             skipMsg +
             '.</p>' +
             '<p>' +
-            t('io.vuoiSostituireDatiAttuali') +
+            t('io.replaceOrMerge') +
             '</p>',
           [{ label: t('actions.cancel') }, mergeAction, replaceAction],
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown';
-        showToast(t('io.erroreElaborazioneBackup') + msg, 'error');
+        showToast(t('io.processError') + msg, 'error');
         input.value = '';
       }
     };
@@ -250,7 +250,7 @@ function doExport(): void {
     data = JSON.stringify(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
-    showToast(t('io.erroreSerializzazione') + msg, 'error');
+    showToast(t('io.serializeError') + msg, 'error');
     return;
   }
   try {
@@ -263,9 +263,9 @@ function doExport(): void {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast(t('io.backupEsportato'), 'success');
+    showToast(t('io.exported'), 'success');
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
-    showToast(t('io.erroreEsportazione') + msg, 'error');
+    showToast(t('io.exportError') + msg, 'error');
   }
 }

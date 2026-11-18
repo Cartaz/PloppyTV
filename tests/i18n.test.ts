@@ -4,9 +4,7 @@ import itLocale from '../src/locales/it.json';
 
 async function freshI18n() {
   vi.resetModules();
-  const i18n = await import('../src/lib/i18n');
-  i18n._resetI18nForTesting();
-  return i18n;
+  return import('../src/lib/i18n');
 }
 
 function setBrowserLanguage(language: string): void {
@@ -20,13 +18,13 @@ beforeEach(() => {
 
 describe('i18n contracts', () => {
   it('uses a saved locale case-insensitively before browser language', async () => {
-    const i18n = await freshI18n();
+    let i18n = await freshI18n();
     setBrowserLanguage('it-IT');
     localStorage.setItem('ploppytv_prefs_v1', JSON.stringify({ lang: 'EN' }));
     i18n.initI18n();
     expect(i18n.getLocale()).toBe('en');
 
-    i18n._resetI18nForTesting();
+    i18n = await freshI18n();
     localStorage.setItem('ploppytv_prefs_v1', JSON.stringify({ lang: 'It' }));
     setBrowserLanguage('en-US');
     i18n.initI18n();
@@ -34,17 +32,17 @@ describe('i18n contracts', () => {
   });
 
   it('falls back to browser language when saved preferences are unusable', async () => {
-    const i18n = await freshI18n();
+    let i18n = await freshI18n();
     setBrowserLanguage('en-US');
 
     for (const raw of ['{bad json', JSON.stringify({ lang: 'fr' }), JSON.stringify({ lang: '' })]) {
-      i18n._resetI18nForTesting();
+      i18n = await freshI18n();
       localStorage.setItem('ploppytv_prefs_v1', raw);
       i18n.initI18n();
       expect(i18n.getLocale()).toBe('en');
     }
 
-    i18n._resetI18nForTesting();
+    i18n = await freshI18n();
     localStorage.clear();
     setBrowserLanguage('de-DE');
     i18n.initI18n();
@@ -65,11 +63,11 @@ describe('i18n contracts', () => {
   });
 
   it('recovers corrupted or non-object preferences when saving a locale', async () => {
-    const i18n = await freshI18n();
+    let i18n = await freshI18n();
 
     for (const raw of ['<<<corrupted>>>', 'null', '[]']) {
       localStorage.setItem('ploppytv_prefs_v1', raw);
-      i18n._resetI18nForTesting();
+      i18n = await freshI18n();
       i18n.initI18n();
       i18n.setLocale('en');
       expect(JSON.parse(localStorage.getItem('ploppytv_prefs_v1') ?? '{}')).toEqual({ lang: 'en' });

@@ -190,7 +190,7 @@ describe('search.ts probe', () => {
     expect(document.querySelector('.search-result-name')?.textContent).toBe('Foobar Show');
   });
 
-  it('BUG-10-01 FIXED: fallback shows all altResults.slice(0,10) (dead filter removed)', async () => {
+  it('fallback shows all altResults.slice(0,10) (dead filter removed)', async () => {
     // query 'foo bar', altQuery 'foo'. Previous filter (matching `name.includes('foo bar')`)
     // was dead code that always returned []; we now show altResults.slice(0,10) directly.
     mockSearchShows.mockResolvedValueOnce([]).mockResolvedValueOnce([makeResult(1, 'Foo'), makeResult(2, 'Barbaz')]);
@@ -302,9 +302,9 @@ describe('search.ts probe', () => {
     expect(resultsEl().innerHTML).toContain('A');
   });
 
-  // === BUG-VERIFICATION TESTS ===
+  // === TESTS ===
 
-  it('BUG-10-02 FIXED: Escape clears lastSearchResults/DOM + aborts in-flight — stale Enter is a no-op', async () => {
+  it('Escape clears lastSearchResults/DOM + aborts in-flight — stale Enter is a no-op', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'Stale Show')]);
     mockAddShowToList.mockResolvedValue(null);
     fireInput('foo');
@@ -329,7 +329,7 @@ describe('search.ts probe', () => {
     expect(mockAddShowToList).not.toHaveBeenCalled();
   });
 
-  it('BUG-10-03 FIXED: click outside clears DOM/lastSearchResults — stale Enter is a no-op', async () => {
+  it('click outside clears DOM/lastSearchResults — stale Enter is a no-op', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'Hidden Show')]);
     mockAddShowToList.mockResolvedValue(null);
     fireInput('foo');
@@ -353,7 +353,7 @@ describe('search.ts probe', () => {
     expect(mockAddShowToList).not.toHaveBeenCalled();
   });
 
-  it('BUG-10-05 FIXED: selectSearchResult retains input when addShowToList fails (already in list)', async () => {
+  it('selectSearchResult retains input when addShowToList fails (already in list)', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'Dup Show')]);
     mockAddShowToList.mockResolvedValue(null); // simulate "already in list" failure
     fireInput('foo');
@@ -371,7 +371,7 @@ describe('search.ts probe', () => {
     expect(mockAddShowToList).toHaveBeenCalledTimes(1);
   });
 
-  it('BUG-10-05 (success path): selectSearchResult clears input after addShowToList succeeds', async () => {
+  it('selectSearchResult clears input after addShowToList succeeds', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'New Show')]);
     // Simulate success: addShowToList returns a Show object (truthy)
     mockAddShowToList.mockResolvedValue({ id: 1, name: 'New Show' } as any);
@@ -478,9 +478,9 @@ describe('search.ts probe', () => {
     expect(mockSearchShows.mock.calls[0][0]).toBe(q);
   });
 
-  it('BUG-10-07 FIXED: fallback altQuery NetworkError propagates → shows connection error message', async () => {
+  it('fallback altQuery NetworkError propagates → shows connection error message', async () => {
     // First searchShows returns [] → triggers fallback.
-    // AltQuery searchShows rejects with NetworkError → inner catch re-throws →
+    // altQuery searchShows rejects with NetworkError → inner catch re-throws →
     // outer catch shows "Connessione internet non disponibile."
     const netErr = new Error('Network error');
     (netErr as any).name = 'NetworkError';
@@ -495,7 +495,7 @@ describe('search.ts probe', () => {
     expect(resultsEl().innerHTML).not.toContain('Nessuna serie trovata');
   });
 
-  it('BUG-10-07 (TimeoutError): fallback altQuery TimeoutError propagates → shows timeout message', async () => {
+  it('fallback altQuery TimeoutError propagates → shows timeout message', async () => {
     const timeoutErr = new Error('Timeout');
     (timeoutErr as any).name = 'TimeoutError';
     mockSearchShows.mockResolvedValueOnce([]).mockRejectedValueOnce(timeoutErr);
@@ -508,7 +508,7 @@ describe('search.ts probe', () => {
     expect(resultsEl().innerHTML).not.toContain('Nessuna serie trovata');
   });
 
-  it('first-fetch NetworkError shows connection error message (contrast with BUG-10-07)', async () => {
+  it('first-fetch NetworkError shows connection error message', async () => {
     const netErr = new Error('Network error');
     (netErr as any).name = 'NetworkError';
     mockSearchShows.mockRejectedValueOnce(netErr);
@@ -520,9 +520,9 @@ describe('search.ts probe', () => {
     expect(resultsEl().innerHTML).toContain('Connessione');
   });
 
-  // === BUG-20-08: WAI-ARIA listbox semantics ===
+  // ===: WAI-ARIA listbox semantics ===
 
-  it('BUG-20-08: initSearch sets ARIA combobox/listbox attributes on input + results', () => {
+  it('initSearch sets ARIA combobox/listbox attributes on input + results', () => {
     expect(inputEl().getAttribute('role')).toBe('combobox');
     expect(inputEl().getAttribute('aria-expanded')).toBe('false');
     expect(inputEl().getAttribute('aria-autocomplete')).toBe('list');
@@ -531,7 +531,7 @@ describe('search.ts probe', () => {
     expect(resultsEl().getAttribute('aria-label')).toBe('Risultati di ricerca');
   });
 
-  it('BUG-20-08: aria-expanded toggles true when results are shown, false when cleared', async () => {
+  it('aria-expanded toggles true when results are shown, false when cleared', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'A')]);
     expect(inputEl().getAttribute('aria-expanded')).toBe('false');
 
@@ -548,7 +548,7 @@ describe('search.ts probe', () => {
     expect(inputEl().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('BUG-20-08: each result item has role=option and aria-selected=false initially', async () => {
+  it('each result item has role=option and aria-selected=false initially', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'A'), makeResult(2, 'B')]);
     fireInput('foo');
     await vi.advanceTimersByTimeAsync(350);
@@ -562,7 +562,7 @@ describe('search.ts probe', () => {
     });
   });
 
-  it('BUG-20-08: ArrowDown toggles aria-selected on the active option', async () => {
+  it('ArrowDown toggles aria-selected on the active option', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'A'), makeResult(2, 'B')]);
     fireInput('foo');
     await vi.advanceTimersByTimeAsync(350);
@@ -585,7 +585,7 @@ describe('search.ts probe', () => {
     expect(items[1].getAttribute('aria-selected')).toBe('false');
   });
 
-  it('BUG-20-08: aria-expanded=false when query drops below 2 chars', async () => {
+  it('aria-expanded=false when query drops below 2 chars', async () => {
     mockSearchShows.mockResolvedValue([makeResult(1, 'A')]);
     fireInput('foo');
     await vi.advanceTimersByTimeAsync(350);
@@ -596,9 +596,9 @@ describe('search.ts probe', () => {
     expect(inputEl().getAttribute('aria-expanded')).toBe('false');
   });
 
-  // === BUG-20-03: safeImageUrl blocks javascript:/data: URLs ===
+  // ===: safeImageUrl blocks javascript:/data: URLs ===
 
-  it('BUG-20-03: javascript: URL in show.image.medium is blocked (no <img src="javascript:">)', async () => {
+  it('javascript: URL in show.image.medium is blocked (no <img src="javascript:">)', async () => {
     const malicious = makeResult(1, 'Evil') as any;
     malicious.show.image = { medium: 'javascript:alert(1)', original: null };
     mockSearchShows.mockResolvedValueOnce([malicious]);
@@ -615,7 +615,7 @@ describe('search.ts probe', () => {
     expect(resultsEl().innerHTML).not.toContain('javascript:');
   });
 
-  it('BUG-20-03: data: URL in show.image.medium is blocked', async () => {
+  it('data: URL in show.image.medium is blocked', async () => {
     const malicious = makeResult(1, 'Evil') as any;
     malicious.show.image = { medium: 'data:text/html,<script>alert(1)</script>', original: null };
     mockSearchShows.mockResolvedValueOnce([malicious]);
@@ -631,7 +631,7 @@ describe('search.ts probe', () => {
     expect(imgs[0].tagName).toBe('DIV');
   });
 
-  it('BUG-20-03: valid TVMaze HTTPS poster URL is preserved', async () => {
+  it('valid TVMaze HTTPS poster URL is preserved', async () => {
     const ok = makeResult(1, 'Good') as any;
     ok.show.image = { medium: 'https://static.tvmaze.com/uploads/poster.jpg', original: null };
     mockSearchShows.mockResolvedValueOnce([ok]);

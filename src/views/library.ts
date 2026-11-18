@@ -48,7 +48,8 @@ let _filters: FilterState = {
  * relying solely on `vi.resetModules()` (which may not re-evaluate the
  * module if a hoisted `vi.mock` factory caches the original).
  */
-export function _resetLibraryFiltersForTesting(): void {
+/** Riporta tutti i filtri della libreria ai valori iniziali. */
+export function clearLibraryFilters(): void {
   _filters = { text: '', genre: '', status: '', minRating: 0, network: '', year: '', tag: '' };
 }
 
@@ -371,7 +372,7 @@ function bindLibraryEvents(main: HTMLElement): void {
   }
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      _filters = { text: '', genre: '', status: '', minRating: 0, network: '', year: '', tag: '' };
+      clearLibraryFilters();
       renderLibrary(main);
     });
   }

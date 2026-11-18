@@ -312,17 +312,17 @@ describe('removeShow', () => {
 });
 
 describe('moveShowToList', () => {
-  it('BUG-06-01 FIXED: sets manualList=false for towatch (allows natural promotion)', () => {
+  it('sets manualList=false for towatch (allows natural promotion)', () => {
     setShows([makeShow({ id: 42, list: 'watching', manualList: false })]);
     moveShowToList(42, 'towatch');
     const show = getState().shows.find((s) => s.id === 42)!;
     expect(show.list).toBe('towatch');
-    // FIXED (BUG-06-01): manualList=false for towatch, so a subsequent
+    // FIXED: manualList=false for towatch, so a subsequent
     // toggleEpisode can naturally promote the show back to 'watching'.
     expect(show.manualList).toBe(false);
   });
 
-  it('BUG-06-01 FIXED: sets manualList=true for watching and completed', () => {
+  it('sets manualList=true for watching and completed', () => {
     for (const target of ['watching', 'completed'] as const) {
       resetState();
       vi.clearAllMocks();
@@ -365,10 +365,10 @@ describe('moveShowToList', () => {
   });
 
   // === THE BUG (FIXED) ===
-  it('BUG-06-03 FIXED: moving to towatch + later toggle DOES promote towatch→watching', () => {
+  it('moving to towatch + later toggle DOES promote towatch→watching', () => {
     const show = makeShow({ id: 42, list: 'watching', manualList: false });
     setShows([show]);
-    moveShowToList(42, 'towatch'); // BUG-06-01 fix: manualList=false for towatch
+    moveShowToList(42, 'towatch'); // towatch non è una scelta manuale: manualList=false
     expect(show.manualList).toBe(false);
     expect(show.list).toBe('towatch');
     // User starts watching the show, marks episode 1
@@ -506,7 +506,7 @@ describe('refreshShowEpisodes', () => {
     expect(show.seasons[1].find((e) => e.num === 2)!.watched).toBe(false);
   });
 
-  it('BUG-06-04 FIXED: preserves watched state when TVMaze renumbers (matched by id)', async () => {
+  it('preserves watched state when TVMaze renumbers (matched by id)', async () => {
     const show = makeShow({
       id: 42,
       list: 'watching',
@@ -525,7 +525,7 @@ describe('refreshShowEpisodes', () => {
       { id: 102, season: 1, number: 11, name: 'Ep2', airdate: '2024-01-08', runtime: 60 },
     ]);
     await refreshShowEpisodes(42);
-    // FIXED (BUG-06-02): matched by stable TVMaze id → watched state preserved.
+    // FIXED: matched by stable TVMaze id → watched state preserved.
     expect(show.seasons[1].find((e) => e.num === 1)).toBeUndefined();
     expect(show.seasons[1].find((e) => e.num === 10)!.watched).toBe(true); // FIXED: preserved via id match
     expect(show.seasons[1].find((e) => e.num === 10)!.id).toBe(101);
@@ -696,8 +696,8 @@ describe('showNeedsEpisodeNames', () => {
     expect(showNeedsEpisodeNames(makeShowWithEps([{ name: 'Pilot' }, {}]))).toBe(true);
   });
 
-  it('BUG-06-05 FIXED: returns true for name="" (empty string) — consistent with null/undefined', () => {
-    // FIXED (BUG-06-03): empty string is now treated as "missing" — auto-refresh fires.
+  it('returns true for name="" (empty string) — consistent with null/undefined', () => {
+    // FIXED: empty string is now treated as "missing" — auto-refresh fires.
     expect(showNeedsEpisodeNames(makeShowWithEps([{ name: '' }]))).toBe(true);
   });
 

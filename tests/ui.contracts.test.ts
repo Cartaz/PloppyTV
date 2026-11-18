@@ -4,7 +4,7 @@ import { setState } from '../src/lib/store';
 import { loadData, saveData } from '../src/lib/storage';
 import { PREFS_KEY } from '../src/lib/constants';
 import { notificationsEnabled, disableNotifications } from '../src/lib/notifications';
-import { renderLibrary, _resetLibraryFiltersForTesting } from '../src/views/library';
+import { renderLibrary, clearLibraryFilters } from '../src/views/library';
 import { bindShowDetailEvents, renderShowDetail } from '../src/views/showDetail';
 import { closeAllModals, initModal, isModalOpen } from '../src/components/modal';
 
@@ -20,7 +20,7 @@ beforeEach(() => {
   localStorage.clear();
   setState({ shows: [], _storageDisabled: false, currentShowId: null, currentView: 'library' });
   loadData();
-  _resetLibraryFiltersForTesting();
+  clearLibraryFilters();
   document.getElementById('toast')!.innerHTML = '';
   vi.stubGlobal('Notification', { permission: 'granted' });
   setState({ shows: [makeShow({ seasons: { 1: [makeEpisode({ name: 'Pilot' })] }, totalEpisodes: 1 })] });

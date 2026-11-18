@@ -70,7 +70,7 @@ function renderSearchResultsHTML(results: TvmazeSearchResult[] | null, fallbackN
         '<button class="btn btn-secondary btn-sm" data-idx="' +
         idx +
         '" data-list="completed">' +
-        t('search.completata') +
+        t('search.addCompleted') +
         '</button>' +
         '</div></div></div>'
       );
@@ -187,7 +187,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
   if (!lastSearchResults[idx]) return;
   const show = lastSearchResults[idx].show;
   if (!show) {
-    showToast(t('search.datiSerieValidi'), 'error');
+    showToast(t('search.invalidShow'), 'error');
     return;
   }
   // CRITICAL (H11): abortisce la ricerca in-flight + incrementa seq.
@@ -223,7 +223,7 @@ async function selectSearchResult(idx: number, list: ListName): Promise<void> {
     }
   } catch (e) {
     console.error('[search] selectSearchResult error:', e);
-    showToast(t('search.erroreAggiuntaSerie'), 'error');
+    showToast(t('search.addError'), 'error');
   }
 }
 
@@ -236,10 +236,11 @@ function updateSearchSelection(items: NodeListOf<Element>): void {
   });
 }
 
-export function initSearch(): void {
+/** Collega la ricerca al DOM. Ritorna la funzione che rimuove il listener globale. */
+export function initSearch(): () => void {
   _searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
   _searchResults = document.getElementById('searchResults');
-  if (!_searchInput || !_searchResults) return;
+  if (!_searchInput || !_searchResults) return () => {};
 
   // ARIA combobox/listbox attributes.
   _searchInput.setAttribute('role', 'combobox');
@@ -247,7 +248,7 @@ export function initSearch(): void {
   _searchInput.setAttribute('aria-autocomplete', 'list');
   _searchInput.setAttribute('aria-controls', 'searchResults');
   _searchResults.setAttribute('role', 'listbox');
-  _searchResults.setAttribute('aria-label', t('search.risultatiRicerca'));
+  _searchResults.setAttribute('aria-label', t('search.resultsLabel'));
 
   _searchInput.addEventListener('input', () => {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -321,29 +322,10 @@ export function initSearch(): void {
     }
   });
 
-  // Il listener su `document` è globale e NON viene rimosso
-  // quando il DOM viene re-renderizzato (a differenza dei listener su
-  // _searchInput/_searchResults, che sono su elementi figli e vengono
-  // GC'd insieme all'elemento). Su re-init (SPA navigation, HMR, test con
-  // vi.resetModules), i vecchi listener accumulerebbero su `document`,
-  // ognuno referenziando il vecchio stato del modulo (detached DOM, stale
-  // controllers) — leak di memoria + CPU sprecata su ogni click.
-  // Soluzione: memorizziamo l'handler su `document` e rimuoviamo il
-  // vecchio prima di aggiungere il nuovo, garantendo un solo listener.
-  const DOC_CLICK_KEY = '__ploppytvSearchDocClickHandler';
-  const docAny = document as unknown as {
-    [key: string]: ((e: MouseEvent) => void) | undefined;
-  };
-  const prevDocClickHandler = docAny[DOC_CLICK_KEY];
-  if (prevDocClickHandler) {
-    document.removeEventListener('click', prevDocClickHandler);
-  }
+  // Click fuori dalla ricerca: chiude i risultati.
   const docClickHandler = (e: MouseEvent): void => {
-    if (!(e.target as HTMLElement).closest('.search-wrap')) {
-      // Clear completo anche su click outside.
-      clearSearchState();
-    }
+    if (!(e.target as HTMLElement).closest('.search-wrap')) clearSearchState();
   };
-  docAny[DOC_CLICK_KEY] = docClickHandler;
   document.addEventListener('click', docClickHandler);
+  return () => document.removeEventListener('click', docClickHandler);
 }

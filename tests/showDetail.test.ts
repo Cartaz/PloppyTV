@@ -78,75 +78,31 @@ describe('renderShowDetail — show not found', () => {
 // ============================================================================
 // bigImg URL replace bug
 // ============================================================================
-describe('renderShowDetail — bigImg URL replace', () => {
-  it('TVMaze medium_portrait URL → original_portrait URL (CORRECT case)', () => {
+describe('renderShowDetail — poster', () => {
+  it('uses the stored TVMaze medium URL directly (the "original_portrait" variant does not exist)', () => {
     const url = 'https://static.tvmaze.com/uploads/images/medium_portrait/100/250000.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
+    setState({ currentShowId: 1, shows: [makeShow({ id: 1, image: url })] });
     renderShowDetail(getMain());
     const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    expect(img).toBeTruthy();
-    expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
-    expect(img.dataset.fallbackSrc).toBe(url);
+    expect(img.getAttribute('src')).toBe(url);
+    expect(img.dataset.fallbackSrc).toBeUndefined();
     expect(img.dataset.fallback).toBe('Immagine non disponibile');
     expect(img.dataset.fallbackCls).toBe('detail-poster-placeholder');
   });
 
-  it('pathological URL with multiple "medium" — regex matches only /medium_(portrait|landscape)/ — URL unchanged (FIXED)', () => {
-    // FIX BUG-14-03: la regex /\/medium_(portrait|landscape)\// non matcha
-    // URL non-standard come questo (medium-shows, medium_poster) → bigImg === show.image
-    // → si cade nel branch "solo medium disponibile" (no data-fallback-src).
-    const url = 'https://cdn.example.com/medium-shows/medium_poster/x.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
+  it('renders the placeholder when the show has no poster', () => {
+    setState({ currentShowId: 1, shows: [makeShow({ id: 1, image: null })] });
     renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // FIX: URL invariato (nessuna corruzione). bigImg === show.image → solo-medium branch.
-    expect(img.getAttribute('src')).toBe(url);
-    // Nessun data-fallback-src (solo-medium branch non lo imposta).
-    expect(img.dataset.fallbackSrc).toBeUndefined();
-  });
-
-  it('show.image already original (no "medium") → bigImg===show.image → solo-medium branch', () => {
-    const url = 'https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // solo-medium branch: src is the same, NO data-fallback-src attribute
-    expect(img.getAttribute('src')).toBe(url);
-    expect(img.dataset.fallbackSrc).toBeUndefined();
-    expect(img.dataset.fallback).toBe('Immagine non disponibile');
-  });
-
-  it('show.image=null → placeholder div rendered', () => {
-    const show = makeShow({ id: 1, image: null });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const ph = document.querySelector('.detail-poster-placeholder');
-    expect(ph).toBeTruthy();
-    expect(ph?.textContent).toBe('Immagine non disponibile');
-  });
-
-  it('show.image with "medium" substring in filename only — regex no match → URL unchanged (FIXED)', () => {
-    // FIX BUG-14-03: la regex non matcha "medium" dentro un filename, solo
-    // path-segment TVMaze `/medium_portrait/` o `/medium_landscape/`.
-    const url = 'https://cdn.example.com/posters/show-medium-cover.jpg';
-    const show = makeShow({ id: 1, image: url });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    // FIX: URL invariato (filename non corrotto). bigImg === show.image → solo-medium branch.
-    expect(img.getAttribute('src')).toBe(url);
-    expect(img.dataset.fallbackSrc).toBeUndefined();
+    expect(document.querySelector('.detail-poster')).toBeNull();
+    expect(document.querySelector('.detail-poster-placeholder')?.textContent).toBe('Immagine non disponibile');
   });
 });
 
 // ============================================================================
 // progress not clamped
 // ============================================================================
-describe('renderShowDetail — progress not clamped (BUG-14-02 FIXED)', () => {
-  it('watched > totalEpisodes → width clamped to 100%, label clamped to 100% (FIXED)', () => {
+describe('renderShowDetail — progress not clamped', () => {
+  it('watched > totalEpisodes → width clamped to 100%, label clamped to 100%', () => {
     // 5 episodes in season, all watched, but totalEpisodes=3 (stale)
     const show = makeShowWithSeasons({ 1: 5 }, { id: 1, totalEpisodes: 3 });
     markWatchedFirst(show, 1, 5);
@@ -213,8 +169,8 @@ describe('renderShowDetail — seasons filter+sort', () => {
     expect(document.querySelector('.empty-state-title')?.textContent).toBe('Nessun episodio disponibile');
   });
 
-  it('pathological non-integer season key "1.5" — REJECTED by filter (FIXED BUG-14-04)', () => {
-    // FIX BUG-14-04: il filter ora usa /^\d+$/ (regex stretta) invece di
+  it('pathological non-integer season key "1.5" — REJECTED by filter', () => {
+    // Il filter ora usa /^\d+$/ (regex stretta) invece di
     // !isNaN(parseInt(k,10)) che accettava "1.5". Ora "1.5" è filtrato →
     // seasons.length === 0 → empty-state, nessun tab.
     const show = makeShow({ id: 1 }) as unknown as Show & { seasons: Record<string, unknown> };
@@ -242,12 +198,17 @@ describe('renderShowDetail — status badge', () => {
     expect(badge?.classList.contains('status-running')).toBe(true);
   });
 
-  it('status "In corso" (Italian) → status-running class', () => {
-    const show = makeShow({ id: 1, status: 'In corso' });
-    setState({ currentShowId: 1, shows: [show] });
-    renderShowDetail(getMain());
-    const badge = document.querySelector('.status-badge');
-    expect(badge?.classList.contains('status-running')).toBe(true);
+  it('translates the TVMaze status and keeps unknown values as they are', () => {
+    for (const [status, label] of [
+      ['Running', 'In corso'],
+      ['Ended', 'Conclusa'],
+      ['To Be Determined', 'Da definire'],
+      ['Pilot Ordered', 'Pilot Ordered'],
+    ]) {
+      setState({ currentShowId: 1, shows: [makeShow({ id: 1, status })] });
+      renderShowDetail(getMain());
+      expect(document.querySelector('.status-badge')?.textContent).toBe(label);
+    }
   });
 
   it('status "Ended" → status-ended class', () => {
@@ -542,7 +503,7 @@ describe('renderShowDetail — auto-refresh trigger', () => {
     expect(refreshShowEpisodes).not.toHaveBeenCalled();
   });
 
-  it('refreshShowEpisodes IS called when names are empty string (BUG-06-03 FIXED by Subagent 3)', () => {
+  it('refreshShowEpisodes IS called when names are empty string', () => {
     // Subagent 3 fixed showNeedsEpisodeNames to also treat empty string as missing
     // (ep.name == null || ep.name === ''). So now refreshShowEpisodes IS called.
     const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
@@ -661,7 +622,7 @@ describe('bindShowDetailEvents — event delegation', () => {
 // ============================================================================
 // bindShowDetailEvents — listener accumulation (HIGH severity bug, FIXED)
 // ============================================================================
-describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', () => {
+describe('bindShowDetailEvents — listener accumulation', () => {
   it('re-bind on same main leaves only ONE active listener', () => {
     // bindShowDetailEvents rimuove il listener precedente prima di aggiungerne uno nuovo.
     // prima che bindShowDetailEvents ne aggiunga uno nuovo. Quindi N cicli di
@@ -700,7 +661,7 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
     expect(toggleEpisode).toHaveBeenCalledTimes(3);
   });
 
-  it('listener accumulation FIXED — markSeason fires EXACTLY once after 2 binds', () => {
+  it('listener accumulation markSeason fires EXACTLY once after 2 binds', () => {
     const show = makeShowWithSeasons({ 1: 2 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';
     show.seasons[1][1].name = 'Ep 2';
@@ -744,7 +705,7 @@ describe('bindShowDetailEvents — listener accumulation (BUG-14-01, FIXED)', ()
 // ============================================================================
 // H17 a11y — keyboard accessible episode-item and season-tab
 // ============================================================================
-describe('H17 a11y — episode-item and season-tab keyboard accessible (FIXED)', () => {
+describe('H17 a11y — episode-item and season-tab keyboard accessible', () => {
   it('episode-item has role=button, tabindex=0, aria-label', () => {
     const show = makeShowWithSeasons({ 1: 1 }, { id: 1 });
     show.seasons[1][0].name = 'Pilot';

@@ -71,7 +71,7 @@ describe('apiGet — abort propagation', () => {
   });
   afterEach(() => restore());
 
-  it('FIXED: external abort AFTER awaits DOES abort in-flight fetch (C2 fix)', async () => {
+  it('external abort AFTER awaits DOES abort in-flight fetch', async () => {
     // This is the normal case in search.ts: apiGet is called, then later (after
     // the user types again) the external signal is aborted. With the C2 fix,
     // the onExternalAbort listener stays attached until `finally` runs (i.e.
@@ -341,7 +341,7 @@ describe('apiGet — abort race-condition (search-like scenario)', () => {
     vi.restoreAllMocks();
   });
 
-  it('FIXED: two concurrent searchShows calls — first fetch IS aborted when ac1.abort() fires (C2 fix)', async () => {
+  it('two concurrent searchShows calls — first fetch IS aborted when ac1.abort() fires', async () => {
     // Simulate the search.ts race-protect pattern:
     //   1) searchShows(q1, signal1) starts
     //   2) (later) signal1.abort()  // user typed again

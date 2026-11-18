@@ -87,9 +87,11 @@ beforeEach(() => {
   installNotification('default', 'granted');
 });
 
+// initNotifications ritorna il dispose (timer + listener): lo eseguiamo dopo ogni test.
+const disposers: Array<() => void> = [];
+
 afterEach(async () => {
-  const notifications = await import('../src/lib/notifications');
-  notifications._resetNotificationsForTesting();
+  disposers.splice(0).forEach((dispose) => dispose());
   vi.useRealTimers();
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'serviceWorker');
@@ -265,8 +267,9 @@ describe('notification contracts', () => {
     const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     const notifications = await import('../src/lib/notifications');
 
-    notifications.initNotifications();
-    notifications.initNotifications();
+    const dispose = notifications.initNotifications();
+    disposers.push(dispose);
+    expect(notifications.initNotifications()).toBe(dispose);
     notifications.initNotifications();
     expect(addSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications')).toHaveLength(1);
     expect(setTimeoutSpy).toHaveBeenCalledTimes(2);
@@ -275,7 +278,7 @@ describe('notification contracts', () => {
     expect(setTimeoutSpy).toHaveBeenCalledTimes(4);
     expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
-    notifications._resetNotificationsForTesting();
+    dispose();
     expect(removeSpy.mock.calls.filter(([type]) => String(type) === 'ploppytv:reschedule-notifications')).toHaveLength(
       1,
     );

@@ -19,8 +19,8 @@ function installDeferredRaf(): () => void {
 }
 
 async function useEnglishLocale() {
+  vi.resetModules();
   const i18n = await import('../src/lib/i18n');
-  i18n._resetI18nForTesting();
   i18n.setLocale('en');
   return i18n;
 }
@@ -42,7 +42,6 @@ describe('localized show-list rendering', () => {
     const showList = await import('../src/views/showList');
 
     store.setState({ shows: [], currentView: 'watching', currentShowId: null });
-    showList._resetShowListStateForTesting();
 
     const main = document.createElement('main');
     showList.renderShowList(main, 'watching', i18n.t('nav.watching'));
@@ -63,7 +62,6 @@ describe('localized show-list rendering', () => {
       currentView: 'watching',
       currentShowId: null,
     });
-    showList._resetShowListStateForTesting();
 
     const main = document.createElement('main');
     showList.renderShowList(main, 'watching', i18n.t('nav.watching'));

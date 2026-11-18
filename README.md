@@ -9,7 +9,11 @@
 
 > Tracker personale per serie TV, in formato PWA local-first. Niente backend, niente account, niente tracking. I tuoi dati restano sul tuo dispositivo; i metadati delle serie arrivano dall'API gratuita di TVMaze.
 
-![PloppyTV Dashboard](./screenshots/dashboard-placeholder.svg)
+![PloppyTV — Dashboard](./screenshots/dashboard.webp)
+
+| Dettaglio serie | Scopri | Statistiche |
+| --- | --- | --- |
+| ![Dettaglio serie con voti e tag](./screenshots/show-detail.webp) | ![Scopri: caroselli per genere](./screenshots/discover.webp) | ![Statistiche di visione](./screenshots/stats.webp) |
 
 PloppyTV è una PWA ispirata a TV Time, pensata per tenere traccia delle serie che stai guardando, degli episodi visti, del calendario delle uscite e delle statistiche di visione. Si installa su desktop e mobile, funziona offline e gestisce gli aggiornamenti tramite Service Worker.
 

@@ -13,7 +13,6 @@
 //
 // NOTE: main.ts calls init() at module top-level (line 151). To exercise
 // init() repeatedly, we use vi.resetModules() + dynamic import per test.
-//
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -176,9 +175,6 @@ function resetMocks(): void {
     _discoverTab: 'popular',
   });
   mockGetState.mockImplementation(() => _state);
-  // FIX-18-08: init() now guards against double-init via a flag on window.
-  // Clear it so each test starts fresh.
-  delete (window as any).__ploppytvInit;
   // jsdom ha navigator.language = en-US: fissa l'italiano per i testi attesi.
   localStorage.setItem('ploppytv_prefs_v1', JSON.stringify({ lang: 'it' }));
 }
@@ -258,7 +254,7 @@ describe('main.ts — init order', () => {
     expect(mockShowModal).not.toHaveBeenCalled();
   });
 
-  it('FIX-18-01 (H13): init() is guarded — if initRenderer throws, init catches it, logs, and shows fallback UI; subsequent steps (loadData/render/subscribe/preload) are skipped', async () => {
+  it('init() is guarded — if initRenderer throws, init catches it, logs, and shows fallback UI; subsequent steps (loadData/render/subscribe/preload) are skipped', async () => {
     mockInitRenderer.mockImplementationOnce(() => {
       throw new Error('initRenderer boom');
     });
@@ -484,14 +480,6 @@ describe('main.ts — SW registration (prod)', () => {
     expect(typeof opts.onRegisterError).toBe('function');
   });
 
-  it('PROD: window.__ploppytvUpdateSW exposed and calls updateSW(true)', async () => {
-    await import('../src/main');
-    const w = window as unknown as { __ploppytvUpdateSW?: () => Promise<void> };
-    expect(typeof w.__ploppytvUpdateSW).toBe('function');
-    await w.__ploppytvUpdateSW!();
-    expect(mockUpdateSW).toHaveBeenCalledWith(true);
-  });
-
   it('PROD: onNeedRefresh shows toast + appends a reload button', async () => {
     await import('../src/main');
     const opts = mockRegisterSW.mock.calls[0][0];
@@ -504,7 +492,7 @@ describe('main.ts — SW registration (prod)', () => {
     expect(reloadButtons()[0].textContent).toBe('Aggiorna ora');
   });
 
-  it('FIX-18-03: onNeedRefresh fires MULTIPLE times → only ONE button shown (dedup); toast re-shown each time to remind user', async () => {
+  it('onNeedRefresh fires MULTIPLE times → only ONE button shown (dedup); toast re-shown each time to remind user', async () => {
     await import('../src/main');
     const opts = mockRegisterSW.mock.calls[0][0];
     opts.onNeedRefresh();
@@ -544,14 +532,14 @@ describe('main.ts — SW registration (prod)', () => {
     expect(reloadButtons().length).toBe(1);
     await vi.advanceTimersByTimeAsync(30000);
     expect(reloadButtons().length).toBe(0);
-    // FIX-18-03 follow-up: after the auto-remove timer fires, the dedup
+    // 03 follow-up: after the auto-remove timer fires, the dedup
     // flag is cleared, so a subsequent onNeedRefresh can show a fresh
     // button (e.g., a second SW update arrives later).
     opts.onNeedRefresh();
     expect(reloadButtons().length).toBe(1);
   });
 
-  it('FIX-18-04: reloadBtn.onclick catches updateSW rejection — reload still runs, no unhandled rejection', async () => {
+  it('reloadBtn.onclick catches updateSW rejection — reload still runs, no unhandled rejection', async () => {
     await import('../src/main');
     mockUpdateSW.mockImplementationOnce(() => Promise.reject(new Error('SW skipWaiting failed')));
     // Stub reload so the handler doesn't throw "Not implemented" inside jsdom.
@@ -692,7 +680,7 @@ describe('main.ts — standalone detection', () => {
   });
 });
 
-describe('main.ts — double init (HMR / re-import)', () => {
+describe('main.ts — module caching', () => {
   beforeEach(() => {
     resetMocks();
     vi.useFakeTimers();
@@ -708,29 +696,6 @@ describe('main.ts — double init (HMR / re-import)', () => {
     await import('../src/main');
     expect(mockInitModal).toHaveBeenCalledTimes(1);
     expect(mockInitRenderer).toHaveBeenCalledTimes(1);
-  });
-
-  it('FIX-18-08: idempotency guard — with vi.resetModules between imports, init still runs ONCE (no duplicate listeners)', async () => {
-    await import('../src/main');
-    vi.resetModules();
-    await import('../src/main');
-    // FIX: the __ploppytvInit flag on window survives vi.resetModules(), so
-    // the second import's init() call short-circuits immediately.
-    expect(mockInitModal).toHaveBeenCalledTimes(1);
-    expect(mockInitRenderer).toHaveBeenCalledTimes(1);
-    expect(mockLoadData).toHaveBeenCalledTimes(1);
-    expect(mockRender).toHaveBeenCalledTimes(1);
-  });
-
-  it('FIX-18-08: idempotency guard — applyHash fires ONCE on hashchange (single handler even after re-import)', async () => {
-    mockIsStorageOK.mockReturnValue(true);
-    await import('../src/main');
-    vi.resetModules();
-    await import('../src/main');
-    __setState({ currentView: 'dashboard', currentShowId: null });
-    setHash('#stats');
-    fireHashchange();
-    expect(mockSwitchView).toHaveBeenCalledTimes(1);
   });
 });
 

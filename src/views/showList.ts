@@ -12,14 +12,6 @@ let _activeTag: string = '';
 // Traccia la lista precedente per resettare _activeTag al cambio.
 let _previousList: 'watching' | 'towatch' | 'completed' | '' = '';
 
-/**
- * Resetta lo stato interno della vista (solo per testing). NON usare in prod.
- */
-export function _resetShowListStateForTesting(): void {
-  _activeTag = '';
-  _previousList = '';
-}
-
 export function renderShowList(main: HTMLElement, list: 'watching' | 'towatch' | 'completed', title: string): void {
   // Reset _activeTag quando l'utente cambia lista. Prima il
   // filter persisteva across le liste, intrappolando l'utente se il tag

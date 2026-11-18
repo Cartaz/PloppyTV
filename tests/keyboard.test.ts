@@ -40,35 +40,41 @@ beforeEach(() => {
   document.body.innerHTML = '<main id="mainContent"></main>';
 });
 
+// initKeyboard ritorna il dispose del listener globale: lo eseguiamo dopo ogni test.
+const disposers: Array<() => void> = [];
+function track(dispose: () => void): () => void {
+  disposers.push(dispose);
+  return dispose;
+}
+
 afterEach(async () => {
-  const keyboard = await import('../src/lib/keyboard');
-  keyboard._resetKeyboardForTesting();
+  disposers.splice(0).forEach((dispose) => dispose());
   vi.useRealTimers();
   vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
 
 describe('keyboard contracts', () => {
-  it('has one global listener and can be reset and initialized again', async () => {
+  it('has one global listener and can be disposed and initialized again', async () => {
     const addSpy = vi.spyOn(document, 'addEventListener');
     const removeSpy = vi.spyOn(document, 'removeEventListener');
     const keyboard = await import('../src/lib/keyboard');
 
-    keyboard.initKeyboard();
-    keyboard.initKeyboard();
-    keyboard.initKeyboard();
+    const dispose = track(keyboard.initKeyboard());
+    expect(track(keyboard.initKeyboard())).toBe(dispose);
+    track(keyboard.initKeyboard());
     expect(addSpy.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(1);
 
-    keyboard._resetKeyboardForTesting();
+    dispose();
     expect(removeSpy.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(1);
 
-    keyboard.initKeyboard();
+    track(keyboard.initKeyboard());
     expect(addSpy.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(2);
   });
 
   it('routes every g-sequence to its semantic view', async () => {
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     const routes = [
       ['d', 'dashboard'],
@@ -87,7 +93,7 @@ describe('keyboard contracts', () => {
 
   it('ignores browser modifier shortcuts and cancels a pending g-sequence', async () => {
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     for (const modifiers of [{ ctrl: true }, { meta: true }, { alt: true }]) {
       dispatchKey('g', modifiers);
@@ -102,7 +108,7 @@ describe('keyboard contracts', () => {
 
   it('expires or rejects an incomplete g-sequence', async () => {
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     dispatchKey('g');
     dispatchKey('x');
@@ -117,7 +123,7 @@ describe('keyboard contracts', () => {
 
   it('does not hijack keys from editable controls', async () => {
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     for (const tag of ['input', 'textarea', 'select'] as const) {
       const element = document.createElement(tag);
@@ -141,7 +147,7 @@ describe('keyboard contracts', () => {
 
   it('opens the cheat sheet only when no modal is already open', async () => {
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     dispatchKey('?', { shift: true });
     expect(showModal).toHaveBeenCalledTimes(1);
@@ -159,7 +165,7 @@ describe('keyboard contracts', () => {
     input.id = 'searchInput';
     document.body.appendChild(input);
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     dispatchKey('/');
     expect(document.activeElement).toBe(input);
@@ -168,7 +174,7 @@ describe('keyboard contracts', () => {
   it('navigates episode focus with j/k and clamps at both boundaries', async () => {
     const main = document.getElementById('mainContent')!;
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
 
     expect(() => {
       dispatchKey('j');
@@ -201,7 +207,7 @@ describe('keyboard contracts', () => {
     episode.focus();
 
     const { initKeyboard } = await import('../src/lib/keyboard');
-    initKeyboard();
+    track(initKeyboard());
     dispatchKey('w');
 
     expect(clickSpy).toHaveBeenCalledTimes(1);

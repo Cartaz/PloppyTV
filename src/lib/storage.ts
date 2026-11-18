@@ -134,7 +134,7 @@ export function saveData(): boolean {
       setStorageDisabled(true);
       showToast(t('toast.storageUnavailable'), 'error');
     } else {
-      showToast(t('storage.erroreSalvataggio') + (err.message || 'unknown'), 'error');
+      showToast(t('storage.saveError') + (err.message || 'unknown'), 'error');
     }
     return false;
   }
@@ -190,7 +190,7 @@ export function loadData(): void {
     _storageOK = false;
     setShows([]);
     setStorageDisabled(true);
-    showToast(t('storage.archiviazioneDisponibile'), 'error');
+    showToast(t('storage.unavailable'), 'error');
     return;
   }
   if (raw === null) {
@@ -243,13 +243,13 @@ export function loadData(): void {
     const backupShows = _loadCanonicalBackup();
     if (backupShows) {
       setShows(backupShows);
-      showToast(t('storage.datiValidiRipristinatoBackup'), 'warning');
+      showToast(t('storage.invalidRestored'), 'warning');
       saveData();
       return;
     }
 
     setShows([]);
-    showToast(t('storage.datiValidiUsaImporta'), 'error');
+    showToast(t('storage.invalidUseImport'), 'error');
     return;
   }
 

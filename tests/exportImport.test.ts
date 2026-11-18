@@ -8,15 +8,6 @@
 // runs against actual state. Mock globalThis.FileReader to control decoded bytes.
 //
 // FIXES APPLIED (per agent-11-exportimport.md):
-//  - H12/BUG-11-01/BUG-11-04: merge is now field-level (preserve addedAt, image,
-//    name, etc.) and calls updateShowListStatus to reconcile list.
-//  - BUG-11-02: readAsArrayBuffer + BOM detection (UTF-8/UTF-16 LE/BE).
-//  - BUG-11-03: data.version validated (warning toast on missing/future).
-//  - BUG-11-05: replace flow still calls reconcileAllLists (now respects
-//    manualList — fixed in normalize.ts by agent 02). Cross-cutting test
-//    updated to assert the FIXED behavior.
-//  - BUG-11-06: Italian singular/plural.
-//  - BUG-11-08: minified JSON export.
 
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { Buffer } from 'buffer';
@@ -232,11 +223,11 @@ beforeEach(() => {
 });
 
 // =====================================================================
-// BUG-11-01 (FIXED): BOM detection now handles UTF-8 (with/without BOM),
+// BOM detection now handles UTF-8 (with/without BOM),
 // UTF-16 LE (BOM FF FE), and UTF-16 BE (BOM FE FF). Previously only UTF-8
 // BOM was stripped and readAsText(file,'utf-8') mangled UTF-16 files.
 // =====================================================================
-describe('BUG-11-01: BOM detection (UTF-8/UTF-16 LE/BE) — FIXED', () => {
+describe('BOM detection (UTF-8/UTF-16 LE/BE) —', () => {
   it('UTF-8 BOM (\\uFEFF) is stripped, JSON parses (empty shows → toast)', () => {
     const json = '{"shows":[]}';
     setFile(makeFile('\uFEFF' + json));
@@ -330,12 +321,12 @@ describe('Import schema compatibility', () => {
 });
 
 // =====================================================================
-// BUG-11-03 (FIXED): Merge is now field-level. When newWatched >
+// Merge is now field-level. When newWatched >
 // existingWatched, the backup's seasons/totalEpisodes/totalSeasons/list/
 // manualList are adopted, but the user's local addedAt/image/name/status/
 // premiered/genres/summary/network/runtime are PRESERVED.
 // =====================================================================
-describe('BUG-11-03: merge is field-level (preserves user metadata) — FIXED', () => {
+describe('merge is field-level (preserves user metadata) —', () => {
   it('PRESERVES existing.addedAt (backup.addedAt ignored)', () => {
     setShows([makeShow({ id: 1, addedAt: 1000, seasons: { 1: [ep(1, false, 1)] }, totalEpisodes: 1 })]);
     const backup = {
@@ -426,11 +417,11 @@ describe('BUG-11-03: merge is field-level (preserves user metadata) — FIXED', 
 });
 
 // =====================================================================
-// BUG-11-04 (FIXED): Merge now calls updateShowListStatus to reconcile
+// Merge now calls updateShowListStatus to reconcile
 // list with the new watched count. E.g. all-watched-but-towatch is
 // auto-promoted to 'completed'; some-watched-but-towatch becomes 'watching'.
 // =====================================================================
-describe('BUG-11-04: merge reconciles list status — FIXED', () => {
+describe('merge reconciles list status —', () => {
   it('all episodes watched after merge → list becomes "completed" (was "towatch")', () => {
     setShows([
       makeShow({ id: 1, list: 'towatch', seasons: { 1: [ep(1, false, 1), ep(2, false, 2)] }, totalEpisodes: 2 }),
@@ -520,7 +511,7 @@ describe('merge: basic flows', () => {
         .sort(),
     ).toEqual([1, 2]);
     expect(saveDataMock).toHaveBeenCalled();
-    // BUG-11-06 fix: singular feminine "Importata 1 nuova"
+    // 06 fix: singular feminine "Importata 1 nuova"
     expect(lastToast()?.msg).toContain('Importata 1 nuova');
   });
 
@@ -654,12 +645,12 @@ describe('replace flow', () => {
 });
 
 // =====================================================================
-// BUG-11-06 (cross-cutting, FIXED by agent 02 in normalize.ts):
+// 06 (cross-cutting, FIXED by agent 02 in normalize.ts):
 // replace flow's reconcileAllLists now RESPECTS manualList. A backup show
 // with manualList=true, list='completed', 0 watched keeps its 'completed'
 // list placement (previously downgraded to 'towatch').
 // =====================================================================
-describe('BUG-11-06: replace reconcileAllLists respects manualList — FIXED (agent 02)', () => {
+describe('replace reconcileAllLists respects manualList — (agent 02)', () => {
   it('backup show with manualList=true, list="completed", 0 watched → list preserved as "completed"', () => {
     setShows([makeShow({ id: 1 })]);
     const backup = {
@@ -700,7 +691,7 @@ describe('dedup logic', () => {
     };
     setFile(makeFile(JSON.stringify(backup)));
     expect(modalBody()).toContain('1 serie valide');
-    // BUG-11-06 fix: singular masculine "1 duplicato saltato"
+    // 06 fix: singular masculine "1 duplicato saltato"
     expect(modalBody()).toContain('1 duplicato saltato');
     clickButton('Unisci (smart)');
     expect(getState().shows).toHaveLength(1);
@@ -745,11 +736,11 @@ describe('dedup logic', () => {
 });
 
 // =====================================================================
-// BUG-11-07 (FIXED): Italian grammar — singular/plural now handled
+// Italian grammar — singular/plural now handled
 // correctly. "1 ignorata" (not "1 ignorate"), "1 duplicato saltato"
 // (not "1 duplicati saltati"), "Importata 1 nuova" (not "Importate 1 nuove").
 // =====================================================================
-describe('BUG-11-07: Italian grammar (singular vs plural) — FIXED', () => {
+describe('Italian grammar (singular vs plural) —', () => {
   it('1 invalid show → "1 ignorata per dati non validi" (singular feminine)', () => {
     setShows([]);
     const backup = {
@@ -880,11 +871,11 @@ describe('MAX_IMPORT_SIZE boundary', () => {
 });
 
 // =====================================================================
-// BUG-11-08: input.value is cleared at end of change handler, BEFORE
+// Input.value is cleared at end of change handler, BEFORE
 // the import modal interaction. If user cancels the modal, the file is
 // gone — they must re-select it. (Low priority — left as-is per task.)
 // =====================================================================
-describe('BUG-11-08: input.value cleared before modal interaction (left as-is)', () => {
+describe('input.value cleared before modal interaction (left as-is)', () => {
   it('input.value is "" after change event (before user clicks merge/replace)', () => {
     const backup = { version: 1, shows: [makeShow({ id: 1 })], exportedAt: '2024-01-01' };
     setFile(makeFile(JSON.stringify(backup)));
@@ -1000,10 +991,10 @@ describe('export flow', () => {
 });
 
 // =====================================================================
-// BUG-11-09 (FIXED): export uses minified JSON (no indentation) for
+// Export uses minified JSON (no indentation) for
 // smaller backup files. Previously used 2-space indent (~2x larger).
 // =====================================================================
-describe('BUG-11-09: export uses minified JSON — FIXED', () => {
+describe('export uses minified JSON —', () => {
   it('JSON.stringify(payload) → single-line minified output (no newlines, no 2-space indent)', () => {
     setShows([makeShow({ id: 1, name: 'X' })]);
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});

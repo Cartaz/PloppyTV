@@ -3,7 +3,7 @@
 // Strategy:
 //  - Mock '../src/worker/client' so we can inject arbitrary results (incl. malformed).
 //  - Use the REAL store (not mocked) so we can change currentView/currentShowId
-//    and verify the cross-view race protection (BUG-A13-01).
+//    and verify the cross-view race protection.
 //  - jsdom provides a real DOM; main.innerHTML rendering is exercised end-to-end.
 //  - vi.useFakeTimers + vi.setSystemTime so `new Date()` in renderCalendarContent
 //    is deterministic (used for isToday highlight).
@@ -121,10 +121,10 @@ afterEach(() => {
 });
 
 // ============================================================
-// BUG-A13-01: Stale render race across view switches
+// Stale render race across view switches
 // ============================================================
 
-describe('BUG-A13-01: stale render race across view switches', () => {
+describe('stale render race across view switches', () => {
   it('calendar: worker resolves AFTER user switched to stats → calendar does NOT overwrite stats', async () => {
     const main = makeMain();
     setState({ currentView: 'calendar' });
@@ -275,7 +275,7 @@ describe('BUG-A13-01: stale render race across view switches', () => {
     expect(main.innerHTML).toContain('Show Detail Content');
   });
 
-  it('calendar: same-view re-render still works (token check, BUG-16-06 regression)', async () => {
+  it('calendar: same-view re-render still works', async () => {
     // Verify that the currentView check doesn't break the existing token-based race fix
     const main = makeMain();
     setState({ currentView: 'calendar' });
@@ -315,7 +315,7 @@ describe('BUG-A13-01: stale render race across view switches', () => {
     expect(main.innerHTML).not.toContain('First');
   });
 
-  it('stats: same-view re-render still works (token check, BUG-17-02 regression)', async () => {
+  it('stats: same-view re-render still works', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
 
@@ -431,10 +431,10 @@ describe('BUG-A13-01: stale render race across view switches', () => {
 });
 
 // ============================================================
-// BUG-A13-02: XSS via data-show-id attribute (calendar)
+// XSS via data-show-id attribute (calendar)
 // ============================================================
 
-describe('BUG-A13-02: XSS via data-show-id attribute', () => {
+describe('XSS via data-show-id attribute', () => {
   it('calendar grid: showId as malicious string → attribute escaped (no XSS)', async () => {
     const main = makeMain();
     const evil = '42" onclick="alert(1)';
@@ -481,7 +481,7 @@ describe('BUG-A13-02: XSS via data-show-id attribute', () => {
     expect(ep.dataset.showId).toBe('42');
   });
 
-  it('stats topShows: showId as malicious string → attribute escaped (BUG-A13-02 in stats)', async () => {
+  it('stats topShows: showId as malicious string → attribute escaped', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
     const evil = '42" onclick="alert(1)';
@@ -509,10 +509,10 @@ describe('BUG-A13-02: XSS via data-show-id attribute', () => {
 });
 
 // ============================================================
-// BUG-A13-03: NaN/Infinity handling in stats
+// NaN/Infinity handling in stats
 // ============================================================
 
-describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
+describe('NaN/Infinity handling in stats', () => {
   it('totalProgress=NaN → falls back to 0% (not "NaN%")', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
@@ -756,10 +756,10 @@ describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
 });
 
 // ============================================================
-// BUG-A13-04: NaN/invalid season/num in calendar
+// NaN/invalid season/num in calendar
 // ============================================================
 
-describe('BUG-A13-04: NaN/invalid season/num in calendar', () => {
+describe('NaN/invalid season/num in calendar', () => {
   it('grid: season=NaN, num=NaN → "S?E?" (not "SNaNENaN")', async () => {
     const main = makeMain();
     mockCal({ week: [makeCalEp({ season: NaN as unknown as number, num: NaN as unknown as number })] });
@@ -857,14 +857,14 @@ describe('BUG-A13-04: NaN/invalid season/num in calendar', () => {
 });
 
 // ============================================================
-// BUG-A13-05: Non-array guards (worker/corrupted data)
+// Non-array guards (worker/corrupted data)
 // ============================================================
 
 // ============================================================
-// BUG-A13-06: Non-string image guard (stats)
+// Non-string image guard (stats)
 // ============================================================
 
-describe('BUG-A13-06: non-string image guard (stats)', () => {
+describe('non-string image guard (stats)', () => {
   it('item.image=42 (number truthy) → no <img> rendered (would be invalid src)', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });

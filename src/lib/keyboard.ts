@@ -26,9 +26,7 @@ import { t } from './i18n';
 let _initialized = false;
 let _gPending = false;
 let _gTimer: ReturnType<typeof setTimeout> | null = null;
-// Salviamo il riferimento al keydown handler per poterlo
-// rimuovere in _resetKeyboardForTesting. Prima era anonimo e accumulava in
-// test con module reload.
+// Riferimento al keydown handler, per poterlo rimuovere in disposeKeyboard.
 let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
 const G_TIMEOUT_MS = 800;
@@ -113,8 +111,9 @@ export function showCheatSheet(): void {
  * Inizializza il listener globale per le scorciatoie da tastiera.
  * Idempotente: può essere chiamato più volte senza duplicare listener.
  */
-export function initKeyboard(): void {
-  if (_initialized) return;
+/** Registra le scorciatoie (idempotente). Ritorna la funzione che le rimuove. */
+export function initKeyboard(): () => void {
+  if (_initialized) return disposeKeyboard;
   _initialized = true;
 
   _keyHandler = (e: KeyboardEvent) => {
@@ -217,20 +216,13 @@ export function initKeyboard(): void {
   };
 
   document.addEventListener('keydown', _keyHandler);
+  return disposeKeyboard;
 }
 
-/**
- * Resetta lo stato della keyboard (solo per testing). Rimuove il listener
- * document, cancella il timer g pending e resetta il flag _initialized.
- * NON usare in produzione.
- */
-export function _resetKeyboardForTesting(): void {
+/** Rimuove il listener globale e azzera le sequenze in corso. */
+function disposeKeyboard(): void {
   if (_keyHandler) {
-    try {
-      document.removeEventListener('keydown', _keyHandler);
-    } catch {
-      // ignore
-    }
+    document.removeEventListener('keydown', _keyHandler);
     _keyHandler = null;
   }
   if (_gTimer) {

@@ -133,7 +133,7 @@ async function flushMicro(): Promise<void> {
 // TESTS
 // ============================================================
 
-describe('Agent-15 probe: discover view', () => {
+describe('discover view', () => {
   let storeMod: any;
   let discoverMod: any;
 
@@ -175,10 +175,10 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-01: Listener accumulation (FIXED)
+  // Listener accumulation (FIXED)
   // ===================================================================
-  describe('BUG-15-01: bindDiscoverEvents listener accumulation (FIXED)', () => {
-    it('after N reset+bind cycles, only ONE click listener is ACTIVE (FIXED)', async () => {
+  describe('bindDiscoverEvents listener accumulation', () => {
+    it('after N reset+bind cycles, only ONE click listener is ACTIVE', async () => {
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
 
@@ -198,7 +198,7 @@ describe('Agent-15 probe: discover view', () => {
       expect(clickRemoves).toBe(2);
     });
 
-    it('single click fires handler EXACTLY once (FIXED — no N× amplification)', async () => {
+    it('single click fires handler EXACTLY once (no N× amplification)', async () => {
       const main = document.getElementById('mainContent')!;
       discoverMod.renderDiscover(main);
       discoverMod.bindDiscoverEvents(main);
@@ -221,10 +221,10 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-02: Stuck loading after re-render (FIXED — manual loadTab removed)
+  // Stuck loading after re-render (FIXED — manual loadTab removed)
   // ===================================================================
-  describe('BUG-15-02: stuck loading (FIXED — no manual loadTab)', () => {
-    it('clicking tab does NOT manually call loadTab; re-render handles it (FIXED)', async () => {
+  describe('stuck loading (no manual loadTab)', () => {
+    it('clicking tab does NOT manually call loadTab; re-render handles it', async () => {
       const main = document.getElementById('mainContent')!;
 
       // Step 1: Initial render with 'popular'. Populate _popularCache.
@@ -291,10 +291,10 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-03: No stale DOM ops (FIXED — manual ops removed from switchDiscoverTab)
+  // No stale DOM ops (FIXED — manual ops removed from switchDiscoverTab)
   // ===================================================================
-  describe('BUG-15-03: NO stale DOM ops on elements about to be replaced (FIXED)', () => {
-    it('clicking tab does NOT manually set innerHTML on OLD discoverContent (FIXED)', async () => {
+  describe('NO stale DOM ops on elements about to be replaced', () => {
+    it('clicking tab does NOT manually set innerHTML on OLD discoverContent', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
@@ -328,7 +328,7 @@ describe('Agent-15 probe: discover view', () => {
       expect(newContent).not.toBe(oldContent);
     });
 
-    it('clicking tab does NOT manually toggle active class on OLD tabs (FIXED)', async () => {
+    it('clicking tab does NOT manually toggle active class on OLD tabs', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
@@ -363,10 +363,10 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-04: Single render after add (FIXED — direct renderDiscover removed)
+  // Single render after add (FIXED — direct renderDiscover removed)
   // ===================================================================
-  describe('BUG-15-04: addDiscoverShow single render (FIXED — direct renderDiscover removed)', () => {
-    it('addDiscoverShow only relies on replaceShow RAF (no direct renderDiscover, FIXED)', async () => {
+  describe('addDiscoverShow single render (direct renderDiscover removed)', () => {
+    it('addDiscoverShow only relies on replaceShow RAF (no direct renderDiscover,)', async () => {
       const main = document.getElementById('mainContent')!;
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
@@ -428,9 +428,9 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-05: scrollCarousel hardcoded cardWidth=160+12
+  // scrollCarousel hardcoded cardWidth=160+12
   // ===================================================================
-  describe('BUG-15-05: scrollCarousel magic number', () => {
+  describe('scrollCarousel magic number', () => {
     it('scrollBy called with 172*3=516 pixels (hardcoded cardWidth=160+12)', async () => {
       // jsdom doesn't implement scrollBy; add a stub
       if (!Element.prototype.scrollBy) {
@@ -471,9 +471,9 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-06: 'openDiscover' dead branch (FIXED — removed)
+  // 'openDiscover' dead branch (FIXED — removed)
   // ===================================================================
-  describe('BUG-15-06: openDiscover dead branch (FIXED — branch removed)', () => {
+  describe('openDiscover dead branch (branch removed)', () => {
     it('rendered HTML never uses data-action="openDiscover" (dead branch removed)', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
@@ -489,9 +489,9 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-07: carousel-card a11y (FIXED — role/tabindex added)
+  // Carousel-card a11y (FIXED — role/tabindex added)
   // ===================================================================
-  describe('BUG-15-07: carousel-card a11y (FIXED)', () => {
+  describe('carousel-card a11y', () => {
     it('carousel-card has role=button, tabindex=0, aria-label (keyboard accessible)', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
@@ -523,9 +523,9 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-08: storageDisabled still renders tabs
+  // storageDisabled still renders tabs
   // ===================================================================
-  describe('BUG-15-08: storageDisabled tabs rendered', () => {
+  describe('storageDisabled tabs rendered', () => {
     it('storageDisabled=true: tabs rendered above "Funzione non disponibile"', async () => {
       storeMod.setState({ _storageDisabled: true });
       const main = document.getElementById('mainContent')!;
@@ -541,9 +541,9 @@ describe('Agent-15 probe: discover view', () => {
   });
 
   // ===================================================================
-  // BUG-15-09: previewDiscover modal actions
+  // previewDiscover modal actions
   // ===================================================================
-  describe('BUG-15-09: previewDiscover modal actions', () => {
+  describe('previewDiscover modal actions', () => {
     it('show not in cache → showToast error, no modal', async () => {
       mockFindShowInDiscoverGroups.mockReturnValue(null);
       const main = document.getElementById('mainContent')!;
@@ -740,8 +740,8 @@ describe('Agent-15 probe: discover view', () => {
   // ===================================================================
   // addDiscoverShow re-render (FIXED — relies on RAF only)
   // ===================================================================
-  describe('addDiscoverShow re-render (FIXED — RAF only)', () => {
-    it('after add, "Aggiunta" badge appears on card via RAF render (FIXED)', async () => {
+  describe('addDiscoverShow re-render (RAF only)', () => {
+    it('after add, "Aggiunta" badge appears on card via RAF render', async () => {
       const show = makeTvmazeShow(1);
       mockFindShowInDiscoverGroups.mockReturnValue(show);
       mockLoadDiscover.mockResolvedValue(makeGroups([show]));
@@ -799,8 +799,8 @@ describe('Agent-15 probe: discover view', () => {
   // ===================================================================
   // Carousel nav state (FIXED — resize listener added)
   // ===================================================================
-  describe('carousel nav state (FIXED — resize listener updates nav state)', () => {
-    it('resize listener is registered on bindDiscoverEvents (FIXED)', async () => {
+  describe('carousel nav state (resize listener updates nav state)', () => {
+    it('resize listener is registered on bindDiscoverEvents', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
@@ -812,7 +812,7 @@ describe('Agent-15 probe: discover view', () => {
       expect(resizeCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('resize event triggers updateCarouselNavState on all tracks (FIXED)', async () => {
+    it('resize event triggers updateCarouselNavState on all tracks', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
@@ -844,8 +844,8 @@ describe('Agent-15 probe: discover view', () => {
   // ===================================================================
   // Single loadTab on tab switch (FIXED — manual loadTab removed from handler)
   // ===================================================================
-  describe('single loadTab on tab switch (FIXED)', () => {
-    it('clicking popular tab: no MANUAL loadTab, only renderDiscover loadTab runs (FIXED)', async () => {
+  describe('single loadTab on tab switch', () => {
+    it('clicking popular tab: no MANUAL loadTab, only renderDiscover loadTab runs', async () => {
       const main = document.getElementById('mainContent')!;
       mockLoadDiscover.mockResolvedValue(makeGroups([makeTvmazeShow(1)]));
       discoverMod.renderDiscover(main);
