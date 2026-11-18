@@ -14,7 +14,7 @@ const episodes: TvmazeEpisode[] = [
 
 beforeEach(() => {
   localStorage.clear();
-  setState({ shows: [], _storageDisabled: false, _localDirty: false });
+  setState({ shows: [], _storageDisabled: false });
   loadData();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -33,7 +33,7 @@ function seedShow() {
     totalSeasons: 1,
   });
   setShows([show]);
-  expect(saveData({ immediate: true })).toBe(true);
+  expect(saveData()).toBe(true);
   return show;
 }
 
@@ -136,7 +136,7 @@ describe('refresh preserves user data across asynchronous boundaries', () => {
     const pending = pendingRefresh();
     const replacement = makeShow({ name: 'Imported', seasons: {} });
     setShows([replacement]);
-    expect(saveData({ immediate: true })).toBe(true);
+    expect(saveData()).toBe(true);
     const saved = localStorage.getItem(STORAGE_KEY);
     pending.finish();
     expect(await pending.promise).toBe(false);
@@ -197,7 +197,7 @@ describe('persistence rejects conflicting and unreadable documents', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version, shows: [show] }));
     loadData();
     expect(getState().shows[0].seasons[1][0].note).toBe('Legacy note');
-    expect(saveData({ immediate: true })).toBe(true);
+    expect(saveData()).toBe(true);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(SCHEMA_VERSION);
   });
 
@@ -206,7 +206,7 @@ describe('persistence rejects conflicting and unreadable documents', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new DOMException('Denied', 'SecurityError');
     });
-    expect(saveData({ immediate: true })).toBe(false);
+    expect(saveData()).toBe(false);
   });
 
   it.each(['', '{"version":2,"shows":"invalid"}'])(
@@ -227,7 +227,7 @@ describe('persistence rejects conflicting and unreadable documents', () => {
     loadData();
     const concurrent = JSON.stringify({ version: SCHEMA_VERSION, shows: [makeShow({ name: 'Other tab' })], savedAt });
     localStorage.setItem(STORAGE_KEY, concurrent);
-    expect(saveData({ immediate: true })).toBe(false);
+    expect(saveData()).toBe(false);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(concurrent);
   });
 
@@ -237,19 +237,9 @@ describe('persistence rejects conflicting and unreadable documents', () => {
     if (backup) localStorage.setItem(BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: [makeShow()] }));
     const originalBackup = localStorage.getItem(BACKUP_KEY);
     loadData();
-    expect(saveData({ immediate: true })).toBe(false);
+    expect(saveData()).toBe(false);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(future);
     expect(localStorage.getItem(BACKUP_KEY)).toBe(originalBackup);
-  });
-
-  it('cancels an older scheduled save when saving immediately', () => {
-    vi.useFakeTimers();
-    seedShow();
-    saveData();
-    expect(saveData({ immediate: true })).toBe(true);
-    const writes = vi.spyOn(Storage.prototype, 'setItem');
-    vi.advanceTimersByTime(300);
-    expect(writes).not.toHaveBeenCalled();
   });
 });
 

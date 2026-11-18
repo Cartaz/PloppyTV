@@ -24,7 +24,7 @@ import { makeShow, makeShowWithSeasons, makeEpisode } from './helpers';
 interface MockModalCall {
   title: string;
   bodyHtml: string;
-   
+
   actions: any[];
 }
 let _lastModalCall: MockModalCall | null = null;
@@ -77,13 +77,7 @@ vi.mock('../src/lib/shows.ts', async (importOriginal) => {
 
 import { renderShowDetail, bindShowDetailEvents, resetBoundGuard } from '../src/views/showDetail';
 import { setState } from '../src/lib/store';
-import {
-  toggleEpisode,
-  setEpisodeRating,
-  setEpisodeNote,
-  addShowTag,
-  removeShowTag,
-} from '../src/lib/shows';
+import { toggleEpisode, setEpisodeRating, setEpisodeNote, addShowTag, removeShowTag } from '../src/lib/shows';
 import { showModal, closeModal } from '../src/components/modal';
 
 // --- Helpers ---
@@ -104,7 +98,6 @@ function resetState(): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -125,9 +118,7 @@ function clickModalButton(label: string): void {
 
 beforeEach(() => {
   document.body.innerHTML =
-    '<main class="main" id="mainContent"></main>' +
-    '<div id="modalTestContainer"></div>' +
-    '<div id="toast"></div>';
+    '<main class="main" id="mainContent"></main>' + '<div id="modalTestContainer"></div>' + '<div id="toast"></div>';
   _lastModalCall = null;
   _modalOpen = false;
   resetState();
@@ -230,11 +221,7 @@ describe('BUG-A11-02: episodes sorted by num (not storage order)', () => {
   it('episodes with non-finite num (NaN/Infinity) sorted to end', () => {
     const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
     show.seasons = {
-      1: [
-        makeEpisode({ num: 2, id: 12 }),
-        makeEpisode({ num: NaN, id: 99 }),
-        makeEpisode({ num: 1, id: 11 }),
-      ],
+      1: [makeEpisode({ num: 2, id: 12 }), makeEpisode({ num: NaN, id: 99 }), makeEpisode({ num: 1, id: 11 })],
     };
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     renderShowDetail(getMain());
@@ -331,8 +318,10 @@ describe('BUG-A11-04: episode list guards non-array seasons[currentSeason]', () 
 describe('BUG-A11-06: episode list skips null/undefined items', () => {
   it('array with null/undefined episodes → skipped, no TypeError', () => {
     const show = makeShow({ id: 1, totalSeasons: 1, totalEpisodes: 3 });
-     
-    show.seasons = { 1: [null as any, makeEpisode({ num: 2, id: 12 }), undefined as any, makeEpisode({ num: 1, id: 11 })] };
+
+    show.seasons = {
+      1: [null as any, makeEpisode({ num: 2, id: 12 }), undefined as any, makeEpisode({ num: 1, id: 11 })],
+    };
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     expect(() => renderShowDetail(getMain())).not.toThrow();
     const items = Array.from(document.querySelectorAll('.episode-item'));
@@ -406,9 +395,7 @@ describe('BUG-A11-05: show.image non-string guarded (no .replace TypeError)', ()
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     renderShowDetail(getMain());
     const img = document.querySelector('.detail-poster') as HTMLImageElement;
-    expect(img.getAttribute('src')).toBe(
-      'https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg',
-    );
+    expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
   });
 });
 
@@ -487,7 +474,7 @@ describe('BUG-A11-09: openAddTagModal suggestions guard non-array tags', () => {
   it('other show has tags with non-string elements → only strings added', () => {
     const showA = makeShow({ id: 1, tags: [] });
     const showB = makeShow({ id: 2, tags: [] });
-     
+
     (showB as unknown as { tags: any[] }).tags = ['Valid', 42, null, { x: 1 }, 'Also'];
     setState({ currentShowId: 1, currentSeason: 1, shows: [showA, showB] });
     const main = getMain();
@@ -923,10 +910,6 @@ describe('no regressions in core rendering', () => {
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     renderShowDetail(getMain());
     const tabs = Array.from(document.querySelectorAll('.season-tab'));
-    expect(tabs.map((t) => t.textContent?.trim())).toEqual([
-      'Stagione 1',
-      'Stagione 2',
-      'Stagione 10',
-    ]);
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Stagione 1', 'Stagione 2', 'Stagione 10']);
   });
 });

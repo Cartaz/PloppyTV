@@ -64,12 +64,14 @@ function makeStats(over: Partial<StatsResult> = {}): StatsResult {
   };
 }
 
-function mockCal(opts: {
-  week?: CalendarEpisode[];
-  afterWeek?: CalendarEpisode[];
-  weekStart?: string;
-  weekEnd?: string;
-} = {}) {
+function mockCal(
+  opts: {
+    week?: CalendarEpisode[];
+    afterWeek?: CalendarEpisode[];
+    weekStart?: string;
+    weekEnd?: string;
+  } = {},
+) {
   vi.mocked(computeCalendarAsync).mockResolvedValue({
     week: opts.week ?? [],
     afterWeek: opts.afterWeek ?? [],
@@ -79,9 +81,7 @@ function mockCal(opts: {
 }
 
 function statValues(main: HTMLElement): string[] {
-  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-value')).map(
-    (el) => el.textContent ?? '',
-  );
+  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-value')).map((el) => el.textContent ?? '');
 }
 
 function progressBar(main: HTMLElement): HTMLElement {
@@ -93,9 +93,7 @@ function generiSection(main: HTMLElement): HTMLElement {
 }
 
 function generiBars(main: HTMLElement): HTMLElement[] {
-  return Array.from(
-    generiSection(main).querySelectorAll<HTMLDivElement>('div[style*="height:8px"] > div'),
-  );
+  return Array.from(generiSection(main).querySelectorAll<HTMLDivElement>('div[style*="height:8px"] > div'));
 }
 
 beforeEach(() => {
@@ -113,7 +111,6 @@ beforeEach(() => {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
   vi.mocked(computeCalendarAsync).mockReset();
   vi.mocked(computeStatsAsync).mockReset();
@@ -521,9 +518,7 @@ describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
   it('totalProgress=NaN → falls back to 0% (not "NaN%")', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
-    vi.mocked(computeStatsAsync).mockResolvedValueOnce(
-      makeStats({ totalShows: 1, totalProgress: NaN }),
-    );
+    vi.mocked(computeStatsAsync).mockResolvedValueOnce(makeStats({ totalShows: 1, totalProgress: NaN }));
     await renderStats(main);
     const card = main.querySelectorAll('.stat-card .stat-value')[6];
     expect(card.textContent).toBe('0%');
@@ -545,9 +540,7 @@ describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
   it('totalProgress=Infinity → clamped to 100% (not "Infinity%")', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
-    vi.mocked(computeStatsAsync).mockResolvedValueOnce(
-      makeStats({ totalShows: 1, totalProgress: Infinity }),
-    );
+    vi.mocked(computeStatsAsync).mockResolvedValueOnce(makeStats({ totalShows: 1, totalProgress: Infinity }));
     await renderStats(main);
     const card = main.querySelectorAll('.stat-card .stat-value')[6];
     expect(card.textContent).toBe('100%');
@@ -559,9 +552,7 @@ describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
   it('totalProgress=-Infinity → clamped to 0%', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
-    vi.mocked(computeStatsAsync).mockResolvedValueOnce(
-      makeStats({ totalShows: 1, totalProgress: -Infinity }),
-    );
+    vi.mocked(computeStatsAsync).mockResolvedValueOnce(makeStats({ totalShows: 1, totalProgress: -Infinity }));
     await renderStats(main);
     const card = main.querySelectorAll('.stat-card .stat-value')[6];
     expect(card.textContent).toBe('0%');
@@ -736,9 +727,7 @@ describe('BUG-A13-03: NaN/Infinity handling in stats', () => {
   it('fractional totalProgress still preserved (50.7 → "50.7%", regression)', async () => {
     const main = makeMain();
     setState({ currentView: 'stats' });
-    vi.mocked(computeStatsAsync).mockResolvedValueOnce(
-      makeStats({ totalShows: 1, totalProgress: 50.7 }),
-    );
+    vi.mocked(computeStatsAsync).mockResolvedValueOnce(makeStats({ totalShows: 1, totalProgress: 50.7 }));
     await renderStats(main);
     const card = main.querySelectorAll('.stat-card .stat-value')[6];
     expect(card.textContent).toBe('50.7%');

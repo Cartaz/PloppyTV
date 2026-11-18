@@ -135,7 +135,9 @@ describe('BUG-A10-01: goldBtn click re-bound on re-render', () => {
     renderDashboard(main);
     const card = main.querySelector('.show-card') as HTMLElement;
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -250,7 +252,9 @@ describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
     const card = main.querySelector('.show-card') as HTMLElement;
     expect(card).not.toBeNull();
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     card.focus();
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
@@ -265,7 +269,9 @@ describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
     renderShowList(main, 'towatch', 'ToWatch');
     const card = main.querySelector('.show-card') as HTMLElement;
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -280,7 +286,9 @@ describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
     renderShowList(main, 'watching', 'Watching');
     const card = main.querySelector('.show-card') as HTMLElement;
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -297,7 +305,9 @@ describe('BUG-A10-03: showList keyboard nav without dashboard first', () => {
     bindKeydown(main); // idempotente
     const card = main.querySelector('.card') as HTMLElement;
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -466,10 +476,7 @@ describe('XSS regression — escaping surface', () => {
   });
 
   it('dashboard escapes show.name in continue-card-name', () => {
-    const s = makeShowWithSeasons(
-      { 1: 5 },
-      { id: 1, name: '<script>alert("xss")</script>', list: 'watching' },
-    );
+    const s = makeShowWithSeasons({ 1: 5 }, { id: 1, name: '<script>alert("xss")</script>', list: 'watching' });
     setShows([s]);
     renderDashboard(main);
     const name = main.querySelector('.continue-card-name');
@@ -601,7 +608,9 @@ describe('Event delegation — interactions', () => {
     renderDashboard(main);
     const goldBtn = main.querySelector('#randomGoldBtn') as HTMLElement;
     let clicked = 0;
-    goldBtn.addEventListener('click', () => { clicked++; });
+    goldBtn.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: goldBtn });
     main.dispatchEvent(ev);

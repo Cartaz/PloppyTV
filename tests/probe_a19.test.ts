@@ -159,7 +159,6 @@ function resetState(shows: Show[] = []): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -203,7 +202,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
       return false; // stripped write succeeds
     };
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     // Stripped write stored the show without image
     const written = readShows(mem) as Array<{ id: number; image: unknown }>;
@@ -222,7 +221,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
 
     mem.quotaFailOn = () => true; // all writes fail
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(false);
     expect(showToast).toHaveBeenCalledWith('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
     // _lastSavedAt not advanced → next save can retry
@@ -237,12 +236,12 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
     // First save: all writes fail
     setShows([makeShow({ id: 1, name: 'Fail' })]);
     mem.quotaFailOn = () => true;
-    expect(saveData({ immediate: true })).toBe(false);
+    expect(saveData()).toBe(false);
 
     // User frees space (export + delete)
     mem.quotaFailOn = undefined;
     setShows([makeShow({ id: 2, name: 'Success' })]);
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     expect(readShows(mem)).toEqual([expect.objectContaining({ id: 2, name: 'Success' })]);
   });
@@ -281,7 +280,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
 
     mem.quotaFailOn = (key) => key === BACKUP_KEY;
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     expect(readShows(mem)).toEqual([expect.objectContaining({ id: 2 })]);
     // BACKUP_KEY was not written
@@ -295,7 +294,7 @@ describe('Section 1: Storage quota piena — recovery, backup, state consistency
     const manyMultibyte = 'à'.repeat(3_000_000);
     setShows([makeShow({ id: 1, name: manyMultibyte })]);
 
-    saveData({ immediate: true });
+    saveData();
     const quotaWarnCalls = vi
       .mocked(showToast)
       .mock.calls.filter((c) => typeof c[0] === 'string' && String(c[0]).includes('limite'));
@@ -424,7 +423,7 @@ describe('Section 2: Dati corrotti in localStorage', () => {
     expect(getState().shows).toHaveLength(1);
     // Subsequent save should succeed (CAS not broken by NaN)
     setShows([makeShow({ id: 2, name: 'New' })]);
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
   });
 
@@ -436,7 +435,7 @@ describe('Section 2: Dati corrotti in localStorage', () => {
     loadData();
     expect(getState().shows).toHaveLength(1);
     // saveData should work (CAS not broken)
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
   });
 
@@ -448,7 +447,7 @@ describe('Section 2: Dati corrotti in localStorage', () => {
     loadData();
     expect(getState().shows).toHaveLength(1);
     // CAS safe: _lastSavedAt=null, _readSavedAtFromStorage returns null → passes
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
   });
 
@@ -663,7 +662,7 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
     // _lastSavedAt NOT advanced → next save CAS-fails (preserves tab B's data)
     vi.mocked(isModalOpen).mockReturnValue(false);
     setShows([makeShow({ id: 5, name: 'C' })]);
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(false); // CAS mismatch
   });
 
@@ -692,7 +691,7 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
   it('first save to empty storage (_lastSavedAt=null) succeeds', () => {
     loadData(); // empty storage → _lastSavedAt=null
     setShows([makeShow({ id: 1, name: 'First' })]);
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     expect(readShows(mem)).toHaveLength(1);
   });
@@ -704,7 +703,7 @@ describe('Section 4: Multi-tab CAS — storage event edge cases', () => {
     putSavedData(mem, [{ id: 99, name: 'Tab B', seasons: {} }], 1000);
     // Tab A tries to save
     setShows([makeShow({ id: 1, name: 'Tab A' })]);
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(false); // CAS refuses
     expect(showToast).toHaveBeenCalledWith(
       'Modifiche in un altro tab — ricarica per vedere i dati aggiornati',

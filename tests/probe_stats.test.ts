@@ -53,15 +53,11 @@ function makeStats(over: Partial<StatsResult> = {}): StatsResult {
 }
 
 function statValues(main: HTMLElement): string[] {
-  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-value')).map(
-    (el) => el.textContent ?? '',
-  );
+  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-value')).map((el) => el.textContent ?? '');
 }
 
 function statLabels(main: HTMLElement): string[] {
-  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-label')).map(
-    (el) => el.textContent ?? '',
-  );
+  return Array.from(main.querySelectorAll<HTMLElement>('.stat-card .stat-label')).map((el) => el.textContent ?? '');
 }
 
 // Sections in renderStatsContent (when totalShows>0):
@@ -76,9 +72,7 @@ function topShowsSection(main: HTMLElement): HTMLElement {
 }
 function generiBars(main: HTMLElement): HTMLElement[] {
   // Each genre bar is the inner div of `<div style="height:8px;...">`.
-  return Array.from(
-    generiSection(main).querySelectorAll<HTMLDivElement>('div[style*="height:8px"] > div'),
-  );
+  return Array.from(generiSection(main).querySelectorAll<HTMLDivElement>('div[style*="height:8px"] > div'));
 }
 function progressBar(main: HTMLElement): HTMLElement {
   return main.querySelector('.section > div > div') as HTMLElement;
@@ -111,9 +105,7 @@ describe('[stats view] empty state (totalShows=0)', () => {
         totalWatched: 999,
         totalProgress: 50,
         topGenres: [{ genre: 'Drama', episodes: 10, shows: 2 }],
-        topShows: [
-          { showId: 1, showName: 'X', image: null, watched: 5, totalEpisodes: 10, pct: 50 },
-        ],
+        topShows: [{ showId: 1, showName: 'X', image: null, watched: 5, totalEpisodes: 10, pct: 50 }],
       }),
     );
     const main = makeMain();
@@ -386,9 +378,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 42, showName: 'Test', image: null, watched: 5, totalEpisodes: 10, pct: 50 },
-        ],
+        topShows: [{ showId: 42, showName: 'Test', image: null, watched: 5, totalEpisodes: 10, pct: 50 }],
       }),
     );
     const main = makeMain();
@@ -404,9 +394,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 7, totalEpisodes: 10, pct: 70 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 7, totalEpisodes: 10, pct: 70 }],
       }),
     );
     const main = makeMain();
@@ -419,9 +407,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 20, totalEpisodes: 10, pct: 200 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 20, totalEpisodes: 10, pct: 200 }],
       }),
     );
     const main = makeMain();
@@ -434,9 +420,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 0, totalEpisodes: 10, pct: -20 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 0, totalEpisodes: 10, pct: -20 }],
       }),
     );
     const main = makeMain();
@@ -449,9 +433,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 101, totalEpisodes: 200, pct: 50.5 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 101, totalEpisodes: 200, pct: 50.5 }],
       }),
     );
     const main = makeMain();
@@ -464,9 +446,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: '<b>X</b>', image: null, watched: 1, totalEpisodes: 1, pct: 100 },
-        ],
+        topShows: [{ showId: 1, showName: '<b>X</b>', image: null, watched: 1, totalEpisodes: 1, pct: 100 }],
       }),
     );
     const main = makeMain();
@@ -479,9 +459,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 1, totalEpisodes: 1, pct: 100 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 1, totalEpisodes: 1, pct: 100 }],
       }),
     );
     const main = makeMain();
@@ -530,9 +508,7 @@ describe('[stats view] topShows', () => {
     mockCompute.mockResolvedValue(
       makeStats({
         totalShows: 1,
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 5, totalEpisodes: 0, pct: 0 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 5, totalEpisodes: 0, pct: 0 }],
       }),
     );
     const main = makeMain();
@@ -630,9 +606,7 @@ describe('[stats view] stale-render race (BUG-17-02 invalidation token fix)', ()
         totalShows: 5,
         totalWatched: 10,
         topGenres: [{ genre: 'Drama', episodes: 10, shows: 3 }],
-        topShows: [
-          { showId: 1, showName: 'A', image: null, watched: 5, totalEpisodes: 10, pct: 50 },
-        ],
+        topShows: [{ showId: 1, showName: 'A', image: null, watched: 5, totalEpisodes: 10, pct: 50 }],
       }),
     );
     await secondPromise;

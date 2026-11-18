@@ -101,11 +101,7 @@ describe('P2 — Schema v2: rating, note, tags', () => {
 
   it('buildShowFromTvmaze includes empty tags array', async () => {
     const { buildShowFromTvmaze } = await import('../src/lib/normalize');
-    const show = buildShowFromTvmaze(
-      { id: 1, name: 'Test' },
-      [{ id: 100, season: 1, number: 1 }],
-      'towatch',
-    );
+    const show = buildShowFromTvmaze({ id: 1, name: 'Test' }, [{ id: 100, season: 1, number: 1 }], 'towatch');
     expect(show.tags).toEqual([]);
   });
 });

@@ -367,9 +367,7 @@ describe('BUG-A17-06: renderer uses safeId for data-show-id', () => {
       openShowSpy,
       clickButton: (showId: string) => {
         main.innerHTML = `<div data-action="openShow" data-show-id="${showId}">click</div>`;
-        main.querySelector('[data-action="openShow"]')!.dispatchEvent(
-          new MouseEvent('click', { bubbles: true }),
-        );
+        main.querySelector('[data-action="openShow"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       },
     };
   }
@@ -463,9 +461,7 @@ describe('BUG-A17-07: safeImport error UI uses data-action not inline onclick', 
     });
 
     try {
-      main.querySelector('[data-action="reloadPage"]')!.dispatchEvent(
-        new MouseEvent('click', { bubbles: true }),
-      );
+      main.querySelector('[data-action="reloadPage"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       expect(reloadSpy).toHaveBeenCalled();
     } finally {
       // Restore.
@@ -720,9 +716,7 @@ describe('BUG-A17-12: ESC closes sidebar mobile', () => {
     initHeader();
 
     // Sidebar is closed — ESC should be a no-op (no crash, no side effect).
-    expect(() =>
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })),
-    ).not.toThrow();
+    expect(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))).not.toThrow();
     expect(document.getElementById('sidebar')!.classList.contains('open')).toBe(false);
   });
 

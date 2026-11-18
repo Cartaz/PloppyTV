@@ -10,7 +10,17 @@ describe('constants contracts', () => {
   });
 
   it('falls back to API_BASE for malformed or unsupported bases', () => {
-    for (const input of [null, undefined, 123, '', '   ', 'api.tvmaze.com', 'ftp://api.tvmaze.com', 'http://', 'https:///']) {
+    for (const input of [
+      null,
+      undefined,
+      123,
+      '',
+      '   ',
+      'api.tvmaze.com',
+      'ftp://api.tvmaze.com',
+      'http://',
+      'https:///',
+    ]) {
       expect(normalizeApiBase(input)).toBe(API_BASE);
     }
   });

@@ -181,9 +181,7 @@ describe('BUG-A5-02: wrappers coerce non-array JSON to []', () => {
   });
 
   it('searchShows returns [] when TVMaze returns JSON object (not array)', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"error":"internal"}', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"error":"internal"}', 200) as Response);
     const result = await searchShows('foo');
     expect(Array.isArray(result)).toBe(true);
     expect(result).toEqual([]);
@@ -196,9 +194,7 @@ describe('BUG-A5-02: wrappers coerce non-array JSON to []', () => {
   });
 
   it('searchShows returns [] when TVMaze returns JSON string', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('"not an array"', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('"not an array"', 200) as Response);
     const result = await searchShows('foo');
     expect(result).toEqual([]);
   });
@@ -210,9 +206,7 @@ describe('BUG-A5-02: wrappers coerce non-array JSON to []', () => {
   });
 
   it('getShowEpisodes returns [] when TVMaze returns JSON object', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"message":"moved"}', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"message":"moved"}', 200) as Response);
     const result = await getShowEpisodes(1);
     expect(result).toEqual([]);
   });
@@ -231,17 +225,13 @@ describe('BUG-A5-02: wrappers coerce non-array JSON to []', () => {
   });
 
   it('getShowsPage returns [] when TVMaze returns JSON object', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"page":0}', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"page":0}', 200) as Response);
     const result = await getShowsPage(0);
     expect(result).toEqual([]);
   });
 
   it('still returns the array when TVMaze returns a valid JSON array', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('[{"score":0.5,"show":{"id":1}}]', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[{"score":0.5,"show":{"id":1}}]', 200) as Response);
     const result = await searchShows('foo');
     expect(result).toHaveLength(1);
     expect(result[0].show.id).toBe(1);
@@ -250,9 +240,7 @@ describe('BUG-A5-02: wrappers coerce non-array JSON to []', () => {
   it('apiGet (low-level) still returns the raw object — only wrappers coerce', async () => {
     // apiGet is generic <T> and may legitimately return non-arrays for other
     // endpoints. The Array.isArray coercion is ONLY in the wrappers.
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"foo":"bar"}', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"foo":"bar"}', 200) as Response);
     const result = await apiGet<{ foo: string }>('/some/endpoint');
     expect(result).toEqual({ foo: 'bar' });
   });
@@ -264,9 +252,7 @@ describe('apiGet — URL building edge cases', () => {
   });
 
   it('searchShows encodes empty query (q= with no value)', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await searchShows('');
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;
@@ -274,9 +260,7 @@ describe('apiGet — URL building edge cases', () => {
   });
 
   it('searchShows encodes unicode query (café → caf%C3%A9)', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await searchShows('café');
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;
@@ -284,9 +268,7 @@ describe('apiGet — URL building edge cases', () => {
   });
 
   it('searchShows encodes < > # & to prevent URL injection / fragment', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await searchShows('<script>alert(1)</script>#frag&param=1');
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;
@@ -303,45 +285,35 @@ describe('apiGet — URL building edge cases', () => {
   });
 
   it('searchShows encodes spaces as %20 (not +)', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await searchShows('foo bar baz');
     const url = spy.mock.calls[0][0] as string;
     expect(url).toBe(API_BASE + '/search/shows?q=foo%20bar%20baz');
   });
 
   it('getShowEpisodes with showId=0 hits /shows/0/episodes', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowEpisodes(0);
     const url = spy.mock.calls[0][0] as string;
     expect(url).toBe(API_BASE + '/shows/0/episodes');
   });
 
   it('getShowEpisodes with negative showId hits /shows/-1/episodes', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowEpisodes(-1);
     const url = spy.mock.calls[0][0] as string;
     expect(url).toBe(API_BASE + '/shows/-1/episodes');
   });
 
   it('getShowsPage with negative page hits /shows?page=-1', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowsPage(-1);
     const url = spy.mock.calls[0][0] as string;
     expect(url).toBe(API_BASE + '/shows?page=-1');
   });
 
   it('getShowsPage with NaN page hits /shows?page=NaN', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowsPage(NaN);
     const url = spy.mock.calls[0][0] as string;
     expect(url).toBe(API_BASE + '/shows?page=NaN');
@@ -465,9 +437,7 @@ describe('apiGet — HTTP edge cases', () => {
   });
 
   it('HTTP 429 with JSON body → RateLimitError (body ignored)', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"message":"slow down"}', 429) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"message":"slow down"}', 429) as Response);
     await expect(getShowEpisodes(1)).rejects.toMatchObject({
       name: 'RateLimitError',
       status: 429,
@@ -491,9 +461,7 @@ describe('apiGet — HTTP edge cases', () => {
   });
 
   it('HTTP 400 with JSON error body → ApiError with status 400', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('{"error":"bad request"}', 400) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('{"error":"bad request"}', 400) as Response);
     await expect(getShowEpisodes(1)).rejects.toMatchObject({
       name: 'ApiError',
       status: 400,

@@ -46,13 +46,11 @@ type ToBlobBehavior = 'success' | 'null' | 'throw' | 'no-callback';
 let _toBlobBehavior: ToBlobBehavior = 'success';
 let _toBlobCalls = 0;
 
- 
 function setupCanvasMock(ctxOk: boolean): void {
-   
   (HTMLCanvasElement.prototype as any).getContext = function () {
     return ctxOk ? makeFakeCtx() : null;
   };
-   
+
   (HTMLCanvasElement.prototype as any).toBlob = function (callback: (b: Blob | null) => void) {
     _toBlobCalls++;
     if (_toBlobBehavior === 'throw') {
@@ -532,9 +530,7 @@ describe('computeYearStats: happy path', () => {
     // Add season 2 with more watched eps in 2023
     show.seasons[2] = [];
     for (let i = 1; i <= 8; i++) {
-      show.seasons[2].push(
-        makeEpisode({ num: i, id: 2000 + i, watched: true, airdate: '2023-03-01', runtime: 45 }),
-      );
+      show.seasons[2].push(makeEpisode({ num: i, id: 2000 + i, watched: true, airdate: '2023-03-01', runtime: 45 }));
     }
     const stats = computeYearStats([show], 2023);
     expect(stats.longestSeason).not.toBeNull();
@@ -721,7 +717,6 @@ describe('BUG-A14-08: canvas methods not available', () => {
   });
 
   it('shows error toast when toBlob is not a function', () => {
-     
     (HTMLCanvasElement.prototype as any).toBlob = undefined;
     exportYearCard(makeStats());
     expect(toastHasError()).toBe(true);

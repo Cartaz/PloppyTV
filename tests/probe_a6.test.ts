@@ -59,12 +59,7 @@ import { getShowEpisodes } from '../src/lib/api';
 import { saveData } from '../src/lib/storage';
 import { showToast } from '../src/components/toast';
 import { showModal } from '../src/components/modal';
-import {
-  MAX_EPISODE_NOTE_LENGTH,
-  MAX_EPISODE_RATING,
-  MAX_TAG_LENGTH,
-  MAX_TAGS_PER_SHOW,
-} from '../src/lib/constants';
+import { MAX_EPISODE_NOTE_LENGTH, MAX_EPISODE_RATING, MAX_TAG_LENGTH, MAX_TAGS_PER_SHOW } from '../src/lib/constants';
 
 // ===== Helpers =====
 
@@ -100,7 +95,6 @@ function resetState(shows: Show[] = []): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -228,10 +222,7 @@ describe('BUG-A6-04: refreshShowEpisodes does not wipe on empty API response', (
     expect(result).toBe(false);
     expect(show.seasons).toEqual(originalSeasons);
     expect(show.totalEpisodes).toBe(3);
-    expect(showToast).toHaveBeenCalledWith(
-      expect.stringContaining('Nessun episodio ricevuto'),
-      'warning',
-    );
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Nessun episodio ricevuto'), 'warning');
   });
 
   it('allows empty response when show had 0 episodes (new show)', async () => {
@@ -598,10 +589,7 @@ describe('addShowTag edge cases', () => {
       expect(addShowTag(42, 'tag' + i)).toBe(true);
     }
     expect(addShowTag(42, 'overflow')).toBe(false);
-    expect(showToast).toHaveBeenCalledWith(
-      'Massimo ' + MAX_TAGS_PER_SHOW + ' tag per serie',
-      'warning',
-    );
+    expect(showToast).toHaveBeenCalledWith('Massimo ' + MAX_TAGS_PER_SHOW + ' tag per serie', 'warning');
   });
 
   it('rejects non-string tag', () => {

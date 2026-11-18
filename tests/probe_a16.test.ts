@@ -46,9 +46,9 @@ vi.mock('../src/components/toast', () => ({
 
 // Mock storage (for exportImport tests — search tests don't transitively
 // import storage since shows.ts is mocked).
-const saveDataMock = vi.fn((_opts?: { immediate?: boolean }) => true);
+const saveDataMock = vi.fn(() => true);
 vi.mock('../src/lib/storage', () => ({
-  saveData: (opts?: { immediate?: boolean }) => saveDataMock(opts),
+  saveData: () => saveDataMock(),
   isStorageOK: () => true,
 }));
 

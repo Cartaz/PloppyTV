@@ -15,13 +15,7 @@
 // su reopen), toast replacement (timer reset).
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import {
-  showModal,
-  closeModal,
-  closeAllModals,
-  initModal,
-  isModalOpen,
-} from '../src/components/modal';
+import { showModal, closeModal, closeAllModals, initModal, isModalOpen } from '../src/components/modal';
 import { showToast, dismissToast } from '../src/components/toast';
 
 // DOM speculare a index.html (modal + toast) + outside button per focus-restore.
@@ -216,7 +210,7 @@ describe('BUG-A15-02: onClick reentrancy (pop / swap / closeAll gestiti)', () =>
 // BUG-A15-03: focus trap include textarea, select, summary
 // =====================================================================
 describe('BUG-A15-03: focus trap include textarea/select/summary', () => {
-  it('Tab dall\'ultimo focusable (button) wraps al primo (textarea)', () => {
+  it("Tab dall'ultimo focusable (button) wraps al primo (textarea)", () => {
     showModal('Note', '<textarea id="note" class="note-textarea"></textarea>', [{ label: 'Save' }]);
     const ta = document.getElementById('note') as HTMLTextAreaElement;
     const btn = actionButtons()[0];
@@ -227,7 +221,7 @@ describe('BUG-A15-03: focus trap include textarea/select/summary', () => {
     expect(document.activeElement).toBe(ta);
   });
 
-  it('Shift+Tab dal primo focusable (textarea) wraps all\'ultimo (button)', () => {
+  it("Shift+Tab dal primo focusable (textarea) wraps all'ultimo (button)", () => {
     showModal('Note', '<textarea id="note" class="note-textarea"></textarea>', [{ label: 'Save' }]);
     const ta = document.getElementById('note') as HTMLTextAreaElement;
     const btn = actionButtons()[0];
@@ -238,9 +232,7 @@ describe('BUG-A15-03: focus trap include textarea/select/summary', () => {
   });
 
   it('Tab dal button (last) wraps alla select (first) quando body ha una select', () => {
-    showModal('Pick', '<select id="sel"><option>A</option><option>B</option></select>', [
-      { label: 'OK' },
-    ]);
+    showModal('Pick', '<select id="sel"><option>A</option><option>B</option></select>', [{ label: 'OK' }]);
     const sel = document.getElementById('sel') as HTMLSelectElement;
     const btn = actionButtons()[0];
     // focusables: [select, button]. Tab dal button → select.
@@ -291,7 +283,7 @@ describe('BUG-A15-04: focus trap con no focusable / title focused', () => {
     expect(document.activeElement).toBe(link);
   });
 
-  it('Shift+Tab dal titolo (no buttons, body ha link) wraps all\'ultimo focusable', () => {
+  it("Shift+Tab dal titolo (no buttons, body ha link) wraps all'ultimo focusable", () => {
     showModal('About', '<a href="https://x.example" id="link">Link</a>', []);
     const titleEl = document.getElementById('modalTitle')!;
     const link = document.getElementById('link') as HTMLAnchorElement;
@@ -608,7 +600,7 @@ describe('Memory: no duplicate listeners su reopen', () => {
 // Focus restore: stack vuoto → _firstFocusTarget
 // =====================================================================
 describe('Focus restore: stack nested → outsideBtn', () => {
-  it('closeModal finale su stack 3-livelli ripristina focus all\'outsideBtn', () => {
+  it("closeModal finale su stack 3-livelli ripristina focus all'outsideBtn", () => {
     const outside = document.getElementById('outsideBtn') as HTMLButtonElement;
     outside.focus();
     showModal('A', '<p>a</p>', [{ label: 'OK' }]);
@@ -621,7 +613,7 @@ describe('Focus restore: stack nested → outsideBtn', () => {
     expect(document.activeElement).toBe(outside);
   });
 
-  it('closeAllModals su stack 3-livelli ripristina focus all\'outsideBtn', () => {
+  it("closeAllModals su stack 3-livelli ripristina focus all'outsideBtn", () => {
     const outside = document.getElementById('outsideBtn') as HTMLButtonElement;
     outside.focus();
     showModal('A', '<p>a</p>', [{ label: 'OK' }]);

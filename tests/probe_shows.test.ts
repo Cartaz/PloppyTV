@@ -111,7 +111,6 @@ function resetState(shows: Show[] = []): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -137,7 +136,10 @@ describe('addShowToList', () => {
   it('inflight guard rejects second concurrent call for same show', async () => {
     let resolveFirst!: (v: TvmazeEpisode[]) => void;
     vi.mocked(getShowEpisodes).mockImplementationOnce(
-      () => new Promise((res) => { resolveFirst = res; }),
+      () =>
+        new Promise((res) => {
+          resolveFirst = res;
+        }),
     );
     const p1 = addShowToList(makeTvmazeShow(42), 'towatch');
     // p2 starts synchronously while p1 is still awaiting getShowEpisodes
@@ -171,7 +173,9 @@ describe('addShowToList', () => {
   it('rollback DOES emit change (via removeShowFromState) — UI is notified', async () => {
     vi.mocked(saveData).mockReturnValue(false);
     let emitCount = 0;
-    const unsub = subscribe(() => { emitCount++; });
+    const unsub = subscribe(() => {
+      emitCount++;
+    });
     await addShowToList(makeTvmazeShow(42), 'towatch');
     // RAF-coalesced; flush with a macrotask
     await new Promise((r) => setTimeout(r, 50));
@@ -238,7 +242,9 @@ describe('addShowToList', () => {
   it('success does not emit when currentShowId is set (detail view open)', async () => {
     setState({ currentShowId: 999 });
     let emitCount = 0;
-    const unsub = subscribe(() => { emitCount++; });
+    const unsub = subscribe(() => {
+      emitCount++;
+    });
     await addShowToList(makeTvmazeShow(42), 'towatch');
     await new Promise((r) => setTimeout(r, 50));
     // replaceShow still emits (line 47), so emitCount >= 1.
@@ -472,7 +478,9 @@ describe('markSeasonWatched', () => {
 describe('refreshShowEpisodes', () => {
   it('preserves watched state when episode numbers match', async () => {
     const show = makeShow({
-      id: 42, list: 'watching', manualList: false,
+      id: 42,
+      list: 'watching',
+      manualList: false,
       seasons: {
         1: [
           { num: 1, id: 101, watched: true, airdate: '2024-01-01', name: 'Old Pilot', runtime: 60 },
@@ -489,7 +497,9 @@ describe('refreshShowEpisodes', () => {
 
   it('BUG-06-04 FIXED: preserves watched state when TVMaze renumbers (matched by id)', async () => {
     const show = makeShow({
-      id: 42, list: 'watching', manualList: false,
+      id: 42,
+      list: 'watching',
+      manualList: false,
       seasons: {
         1: [
           { num: 1, id: 101, watched: true, airdate: '2024-01-01', name: 'Old Pilot', runtime: 60 },
@@ -513,7 +523,9 @@ describe('refreshShowEpisodes', () => {
 
   it('refresh falls back to num match when the legacy id is unknown', async () => {
     const show = makeShow({
-      id: 42, list: 'watching', manualList: false,
+      id: 42,
+      list: 'watching',
+      manualList: false,
       seasons: {
         1: [{ num: 1, id: 0, watched: true, airdate: null, name: 'Old', runtime: 60 }],
       },
@@ -532,7 +544,9 @@ describe('refreshShowEpisodes', () => {
   it('rollback restores seasons on saveData fail', async () => {
     vi.mocked(saveData).mockReturnValue(false);
     const show = makeShow({
-      id: 42, list: 'watching', manualList: false,
+      id: 42,
+      list: 'watching',
+      manualList: false,
       seasons: {
         1: [{ num: 1, id: 101, watched: true, airdate: '2024-01-01', name: 'Old', runtime: 60 }],
       },
@@ -554,7 +568,10 @@ describe('refreshShowEpisodes', () => {
   it('inflight guard: rejects second concurrent call', async () => {
     let resolveFirst!: (v: TvmazeEpisode[]) => void;
     vi.mocked(getShowEpisodes).mockImplementationOnce(
-      () => new Promise((res) => { resolveFirst = res; }),
+      () =>
+        new Promise((res) => {
+          resolveFirst = res;
+        }),
     );
     setShows([makeShow({ id: 42 })]);
     const p1 = refreshShowEpisodes(42);
@@ -569,7 +586,10 @@ describe('refreshShowEpisodes', () => {
   it('silent option suppresses inflight toast', async () => {
     let resolveFirst!: (v: TvmazeEpisode[]) => void;
     vi.mocked(getShowEpisodes).mockImplementationOnce(
-      () => new Promise((res) => { resolveFirst = res; }),
+      () =>
+        new Promise((res) => {
+          resolveFirst = res;
+        }),
     );
     setShows([makeShow({ id: 42 })]);
     const p1 = refreshShowEpisodes(42, { silent: true });
@@ -629,10 +649,31 @@ describe('refreshShowEpisodes', () => {
 describe('showNeedsEpisodeNames', () => {
   function makeShowWithEps(eps: Array<Partial<Show['seasons'][number][number]>>): Show {
     return {
-      id: 1, name: 'x', image: null, status: '', premiered: null, genres: [], summary: '',
-      network: '', runtime: 45, list: 'towatch', manualList: false,
-      seasons: { 1: eps.map((e, i) => ({ num: i + 1, id: i + 1, watched: false, airdate: null, name: null, runtime: null, ...e })) },
-      totalSeasons: 1, totalEpisodes: eps.length, addedAt: 0,
+      id: 1,
+      name: 'x',
+      image: null,
+      status: '',
+      premiered: null,
+      genres: [],
+      summary: '',
+      network: '',
+      runtime: 45,
+      list: 'towatch',
+      manualList: false,
+      seasons: {
+        1: eps.map((e, i) => ({
+          num: i + 1,
+          id: i + 1,
+          watched: false,
+          airdate: null,
+          name: null,
+          runtime: null,
+          ...e,
+        })),
+      },
+      totalSeasons: 1,
+      totalEpisodes: eps.length,
+      addedAt: 0,
     };
   }
 
@@ -667,13 +708,24 @@ describe('showNeedsEpisodeNames', () => {
 
   it('returns true if ANY episode in ANY season has missing name', () => {
     const show: Show = {
-      id: 1, name: 'x', image: null, status: '', premiered: null, genres: [], summary: '',
-      network: '', runtime: 45, list: 'towatch', manualList: false,
+      id: 1,
+      name: 'x',
+      image: null,
+      status: '',
+      premiered: null,
+      genres: [],
+      summary: '',
+      network: '',
+      runtime: 45,
+      list: 'towatch',
+      manualList: false,
       seasons: {
         1: [{ num: 1, id: 1, watched: false, airdate: null, name: 'Pilot', runtime: null }],
         2: [{ num: 1, id: 2, watched: false, airdate: null, name: null, runtime: null }],
       },
-      totalSeasons: 2, totalEpisodes: 2, addedAt: 0,
+      totalSeasons: 2,
+      totalEpisodes: 2,
+      addedAt: 0,
     };
     expect(showNeedsEpisodeNames(show)).toBe(true);
   });

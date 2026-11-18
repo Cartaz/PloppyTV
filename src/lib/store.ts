@@ -37,12 +37,6 @@ export interface AppState {
   _storageDisabled: boolean;
   _quotaWarned: boolean;
   _discoverTab: 'popular' | 'recent';
-  /**
-   * `true` quando ci sono modifiche locali non ancora persistite.
-   * Usato dal CAS multi-tab in storage.ts per rifiutare eventi `storage`
-   * che sovrascriverebbero modifiche in-flight dell'utente.
-   */
-  _localDirty: boolean;
 }
 
 type Listener = () => void;
@@ -56,7 +50,6 @@ const state: AppState = {
   _storageDisabled: false,
   _quotaWarned: false,
   _discoverTab: 'popular',
-  _localDirty: false,
 };
 
 const listeners = new Set<Listener>();

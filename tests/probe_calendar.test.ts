@@ -43,12 +43,14 @@ function makeCalEp(over: Partial<CalendarEpisode> = {}): CalendarEpisode {
   };
 }
 
-function mockCal(opts: {
-  week?: CalendarEpisode[];
-  afterWeek?: CalendarEpisode[];
-  weekStart?: string;
-  weekEnd?: string;
-} = {}) {
+function mockCal(
+  opts: {
+    week?: CalendarEpisode[];
+    afterWeek?: CalendarEpisode[];
+    weekStart?: string;
+    weekEnd?: string;
+  } = {},
+) {
   vi.mocked(computeCalendarAsync).mockResolvedValue({
     week: opts.week ?? [],
     afterWeek: opts.afterWeek ?? [],
@@ -71,7 +73,6 @@ beforeEach(() => {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
   vi.mocked(computeCalendarAsync).mockReset();
   mockCal();
@@ -352,10 +353,7 @@ describe('Agent-16 calendar: defense-in-depth — null check on parseISODateLoca
     // (where formatDate gracefully returns 'N/D' for bad dates).
     const main = makeMain();
     mockCal({
-      week: [
-        makeCalEp({ showName: 'Good', date: '2024-03-12' }),
-        makeCalEp({ showName: 'Bad', date: 'garbage-date' }),
-      ],
+      week: [makeCalEp({ showName: 'Good', date: '2024-03-12' }), makeCalEp({ showName: 'Bad', date: 'garbage-date' })],
     });
     await renderCalendar(main);
     // FIX: no crash, no "Errore" UI — the malformed-date episode was skipped
@@ -576,7 +574,12 @@ describe('Agent-16 calendar: NaN delta & state pollution (BUG-16-02 FIXED)', () 
 describe('Agent-16 calendar: async render flow', () => {
   it('skeleton shown before computeCalendarAsync resolves', async () => {
     const main = makeMain();
-    let resolveFn!: (v: { week: CalendarEpisode[]; afterWeek: CalendarEpisode[]; weekStart: string; weekEnd: string }) => void;
+    let resolveFn!: (v: {
+      week: CalendarEpisode[];
+      afterWeek: CalendarEpisode[];
+      weekStart: string;
+      weekEnd: string;
+    }) => void;
     vi.mocked(computeCalendarAsync).mockReturnValueOnce(
       new Promise((r) => {
         resolveFn = r as typeof resolveFn;
@@ -601,8 +604,28 @@ describe('Agent-16 calendar: async render flow', () => {
     let r1!: () => void;
     let r2!: () => void;
     vi.mocked(computeCalendarAsync)
-      .mockReturnValueOnce(new Promise((r) => { r1 = () => r({ week: [makeCalEp({ showName: 'First' })], afterWeek: [], weekStart: '2024-03-11', weekEnd: '2024-03-17' }); }))
-      .mockReturnValueOnce(new Promise((r) => { r2 = () => r({ week: [makeCalEp({ showName: 'Second' })], afterWeek: [], weekStart: '2024-03-11', weekEnd: '2024-03-17' }); }));
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          r1 = () =>
+            r({
+              week: [makeCalEp({ showName: 'First' })],
+              afterWeek: [],
+              weekStart: '2024-03-11',
+              weekEnd: '2024-03-17',
+            });
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          r2 = () =>
+            r({
+              week: [makeCalEp({ showName: 'Second' })],
+              afterWeek: [],
+              weekStart: '2024-03-11',
+              weekEnd: '2024-03-17',
+            });
+        }),
+      );
     const p1 = renderCalendar(main);
     const p2 = renderCalendar(main);
     // Resolve r1 FIRST (out-of-order), then r2.
@@ -619,8 +642,28 @@ describe('Agent-16 calendar: async render flow', () => {
     let r1!: () => void;
     let r2!: () => void;
     vi.mocked(computeCalendarAsync)
-      .mockReturnValueOnce(new Promise((r) => { r1 = () => r({ week: [makeCalEp({ showName: 'First' })], afterWeek: [], weekStart: '2024-03-11', weekEnd: '2024-03-17' }); }))
-      .mockReturnValueOnce(new Promise((r) => { r2 = () => r({ week: [makeCalEp({ showName: 'Second' })], afterWeek: [], weekStart: '2024-03-11', weekEnd: '2024-03-17' }); }));
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          r1 = () =>
+            r({
+              week: [makeCalEp({ showName: 'First' })],
+              afterWeek: [],
+              weekStart: '2024-03-11',
+              weekEnd: '2024-03-17',
+            });
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          r2 = () =>
+            r({
+              week: [makeCalEp({ showName: 'Second' })],
+              afterWeek: [],
+              weekStart: '2024-03-11',
+              weekEnd: '2024-03-17',
+            });
+        }),
+      );
     const p1 = renderCalendar(main);
     const p2 = renderCalendar(main);
     // Resolve r2 first, then r1. Before the FIX, r1 would overwrite with 'First'.

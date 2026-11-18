@@ -18,7 +18,7 @@ initModal();
 beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();
-  setState({ shows: [], _storageDisabled: false, _localDirty: false, currentShowId: null, currentView: 'library' });
+  setState({ shows: [], _storageDisabled: false, currentShowId: null, currentView: 'library' });
   loadData();
   _resetLibraryFiltersForTesting();
   document.getElementById('toast')!.innerHTML = '';
@@ -76,7 +76,7 @@ describe('notification preferences tolerate unreadable data', () => {
 });
 
 it('keeps an unsaved note editor open without a success message', () => {
-  expect(saveData({ immediate: true })).toBe(true);
+  expect(saveData()).toBe(true);
   setState({ currentShowId: 1 });
   renderShowDetail(main);
   resetBoundGuard();
@@ -97,7 +97,7 @@ it('keeps an unsaved note editor open without a success message', () => {
 });
 
 it('closes the note editor only after a successful save', () => {
-  expect(saveData({ immediate: true })).toBe(true);
+  expect(saveData()).toBe(true);
   setState({ currentShowId: 1 });
   renderShowDetail(main);
   resetBoundGuard();

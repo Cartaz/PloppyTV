@@ -252,7 +252,9 @@ describe('dashboard — continueWatching filter edge cases', () => {
     const card = main.querySelector('.show-card') as HTMLElement;
     expect(card).not.toBeNull();
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     // Focus the card, then dispatch a keydown Enter.
     card.focus();
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
@@ -268,7 +270,9 @@ describe('dashboard — continueWatching filter edge cases', () => {
     const card = main.querySelector('.continue-card') as HTMLElement;
     expect(card).not.toBeNull();
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -283,7 +287,9 @@ describe('dashboard — continueWatching filter edge cases', () => {
     renderDashboard(main);
     const card = main.querySelector('.show-card') as HTMLElement;
     let clicked = 0;
-    card.addEventListener('click', () => { clicked++; });
+    card.addEventListener('click', () => {
+      clicked++;
+    });
     const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
     Object.defineProperty(ev, 'target', { value: card });
     main.dispatchEvent(ev);
@@ -311,10 +317,7 @@ describe('dashboard — continueWatching filter edge cases', () => {
       list: 'watching',
       totalEpisodes: 5,
       seasons: {
-        1: [
-          makeEpisode({ num: 0, id: 1, watched: false }),
-          makeEpisode({ num: 0, id: 2, watched: false }),
-        ],
+        1: [makeEpisode({ num: 0, id: 1, watched: false }), makeEpisode({ num: 0, id: 2, watched: false })],
       },
     });
     setShows([s]);

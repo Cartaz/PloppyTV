@@ -25,13 +25,7 @@ vi.mock('../src/lib/shows.ts', async (importOriginal) => {
 
 import { renderShowDetail, bindShowDetailEvents, resetBoundGuard } from '../src/views/showDetail';
 import { getState, setState, subscribe } from '../src/lib/store';
-import {
-  toggleEpisode,
-  markSeasonWatched,
-  refreshShowEpisodes,
-  moveShowToList,
-  removeShow,
-} from '../src/lib/shows';
+import { toggleEpisode, markSeasonWatched, refreshShowEpisodes, moveShowToList, removeShow } from '../src/lib/shows';
 
 function getMain(): HTMLElement {
   let m = document.getElementById('mainContent');
@@ -54,7 +48,6 @@ function resetState(): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -93,9 +86,7 @@ describe('renderShowDetail — bigImg URL replace', () => {
     renderShowDetail(getMain());
     const img = document.querySelector('.detail-poster') as HTMLImageElement;
     expect(img).toBeTruthy();
-    expect(img.getAttribute('src')).toBe(
-      'https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg',
-    );
+    expect(img.getAttribute('src')).toBe('https://static.tvmaze.com/uploads/images/original_portrait/100/250000.jpg');
     expect(img.dataset.fallbackSrc).toBe(url);
     expect(img.dataset.fallback).toBe('Immagine non disponibile');
     expect(img.dataset.fallbackCls).toBe('detail-poster-placeholder');
@@ -193,11 +184,7 @@ describe('renderShowDetail — seasons filter+sort', () => {
     setState({ currentShowId: 1, currentSeason: 1, shows: [show] });
     renderShowDetail(getMain());
     const tabs = Array.from(document.querySelectorAll('.season-tab'));
-    expect(tabs.map((t) => t.textContent?.trim())).toEqual([
-      'Stagione 1',
-      'Stagione 2',
-      'Stagione 10',
-    ]);
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Stagione 1', 'Stagione 2', 'Stagione 10']);
   });
 
   it('currentSeason set to first season when not in seasons', () => {
@@ -223,9 +210,7 @@ describe('renderShowDetail — seasons filter+sort', () => {
     expect(getState().currentSeason).toBeNull();
     expect(document.querySelector('.season-tabs')).toBeNull();
     expect(document.querySelector('.empty-state')).toBeTruthy();
-    expect(document.querySelector('.empty-state-title')?.textContent).toBe(
-      'Nessun episodio disponibile',
-    );
+    expect(document.querySelector('.empty-state-title')?.textContent).toBe('Nessun episodio disponibile');
   });
 
   it('pathological non-integer season key "1.5" — REJECTED by filter (FIXED BUG-14-04)', () => {
@@ -353,7 +338,7 @@ describe('renderShowDetail — summary rendering', () => {
     expect(summary?.innerHTML).toContain('<p>line3</p>');
   });
 
-  it('summary with HTML-like content (NOT stripHtml\'d by renderShowDetail) → escapeHtml neutralizes safely', () => {
+  it("summary with HTML-like content (NOT stripHtml'd by renderShowDetail) → escapeHtml neutralizes safely", () => {
     // renderShowDetail does NOT call stripHtml on summary — it relies on normalize.
     // For an un-normalized state with raw <script>, escapeHtml neutralizes tags
     // (no XSS), but the literal text shows through (not stripped).

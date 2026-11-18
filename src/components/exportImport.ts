@@ -3,19 +3,17 @@
 // FIXES applicati:
 //  - BUG-11-01: BOM detection UTF-8/UTF-16 LE/BE via readAsArrayBuffer + TextDecoder.
 //  - BUG-11-02: policy schema condivisa; legacy senza versione ammesso, versioni invalide/future rifiutate.
-//  - BUG-11-03: merge field-level — preserva addedAt/image/name/status/premiered/
-//    genres/summary/network/runtime locali; adotta solo seasons/totalEpisodes/
-//    totalSeasons/list/manualList dal backup.
-//  - BUG-11-04: merge chiama `updateShowListStatus` per riconciliare la list.
+//  - Unione: vedi src/lib/merge.ts (per episodio, nessun dato locale perso).
 //  - BUG-11-07: grammatica italiana singolare/plurale.
 //  - BUG-11-09: export JSON minified (no indent).
 
 import type { ExportedData } from '../types';
 import { SCHEMA_VERSION, MAX_IMPORT_SIZE } from '../lib/constants';
-import { getState, setShows, emitChange, updateShowListStatus } from '../lib/store';
+import { getState, setShows, emitChange } from '../lib/store';
+import { mergeImportedShow } from '../lib/merge';
 import { saveData, isStorageOK } from '../lib/storage';
 import { canonicalizeDataDocument } from '../lib/dataDocument';
-import { getWatchedCount, localISODate } from '../lib/utils';
+import { localISODate } from '../lib/utils';
 import { showToast } from './toast';
 import { showModal, closeAllModals, type ModalAction } from './modal';
 import { updateBadges } from './header';
@@ -188,24 +186,11 @@ export function initExportImport(): void {
               if (!existing) {
                 currentShows.push(s);
                 added++;
-              } else {
-                const existingWatched = getWatchedCount(existing);
-                const newWatched = getWatchedCount(s);
-                if (newWatched > existingWatched) {
-                  // BUG-11-03: merge field-level — preserva i metadati locali,
-                  // adotta solo seasons/totalEpisodes/totalSeasons/list/manualList.
-                  existing.seasons = s.seasons;
-                  existing.totalEpisodes = s.totalEpisodes;
-                  existing.totalSeasons = s.totalSeasons;
-                  existing.list = s.list;
-                  existing.manualList = s.manualList;
-                  // BUG-11-04: riconcilia list in base al nuovo watched count.
-                  updateShowListStatus(existing);
-                  updated++;
-                }
+              } else if (mergeImportedShow(existing, s)) {
+                updated++;
               }
             }
-            if (!saveData({ immediate: true })) {
+            if (!saveData()) {
               // Rollback: ripristina lo snapshot precedente
               setShows(prevShows);
               showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');
@@ -249,7 +234,7 @@ export function initExportImport(): void {
                     // Snapshot per rollback
                     const prev = getState().shows.map((s) => ({ ...s }));
                     setShows(dedupedShows);
-                    if (!saveData({ immediate: true })) {
+                    if (!saveData()) {
                       // Rollback al precedente stato
                       setShows(prev);
                       showToast('Import annullato: storage insufficiente o modifiche in altro tab', 'error');

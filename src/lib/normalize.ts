@@ -129,13 +129,12 @@ export function normalizeShow(raw: unknown): Show | null {
             const r = Math.round(ep.rating);
             if (r >= 1 && r <= MAX_EPISODE_RATING) obj.rating = r;
           }
-          // P2.2 + BUG-A1-08 FIXED: note — stripHtml (XSS defense-in-depth)
-          // + stringa non vuota dopo trim, troncata a MAX_EPISODE_NOTE_LENGTH.
+          // Le note sono testo dell'utente, non HTML: vanno conservate così
+          // come scritte (l'escaping appartiene al renderer). Stessa regola di
+          // setEpisodeNote: troncata e trimmata, vuota = assente.
           if (typeof ep.note === 'string') {
-            const noteStripped = stripHtml(ep.note).slice(0, MAX_EPISODE_NOTE_LENGTH);
-            if (noteStripped.trim().length > 0) {
-              obj.note = noteStripped;
-            }
+            const note = ep.note.slice(0, MAX_EPISODE_NOTE_LENGTH).trim();
+            if (note.length > 0) obj.note = note;
           }
           return obj;
         })
@@ -179,17 +178,17 @@ export function normalizeShow(raw: unknown): Show | null {
   // BUG-02-09: truthy coercion `!!` (1, "yes", true → true; 0, "", null → false).
   const manualList = !!r.manualList;
 
-  // P2.3 + BUG-A1-09 FIXED: tags — stripHtml (XSS defense-in-depth) + array di
-  // stringhe non vuote, dedup case-insensitive, troncate, max MAX_TAGS_PER_SHOW.
+  // Tag: testo dell'utente (niente stripHtml, l'escaping è del renderer).
+  // Stessa regola di addShowTag: trim, troncati, dedup case-insensitive,
+  // max MAX_TAGS_PER_SHOW.
   const tags: string[] = Array.isArray(r.tags)
     ? (() => {
         const seen = new Set<string>();
         const result: string[] = [];
         for (const t of r.tags) {
           if (typeof t !== 'string') continue;
-          const stripped = stripHtml(t).trim();
-          if (stripped.length === 0) continue;
-          const trimmed = stripped.slice(0, MAX_TAG_LENGTH);
+          const trimmed = t.trim().slice(0, MAX_TAG_LENGTH);
+          if (trimmed.length === 0) continue;
           const lower = trimmed.toLowerCase();
           if (seen.has(lower)) continue; // dedup case-insensitive
           seen.add(lower);

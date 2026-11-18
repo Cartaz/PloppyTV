@@ -54,7 +54,7 @@ export async function addShowToList(tvmazeShow: TvmazeShow, list: ListName): Pro
     // così reconcileList/updateShowListStatus non la retrocederanno.
     if (list !== 'towatch') show.manualList = true;
     replaceShow(show);
-    if (!saveData({ immediate: true })) {
+    if (!saveData()) {
       // rollback
       removeShowFromState(show.id);
       showToast('Impossibile salvare (storage pieno o modifiche in altro tab?)', 'error');
@@ -96,7 +96,7 @@ export function removeShow(showId: number, showName: string): void {
         onClick: () => {
           const snapshot = getState().shows.map((s) => ({ ...s }));
           removeShowFromState(showId);
-          if (!saveData({ immediate: true })) {
+          if (!saveData()) {
             // Rollback: ripristina lo snapshot E ri-triggera il render
             setState({ shows: snapshot });
             emitChange();
@@ -130,7 +130,7 @@ export function moveShowToList(showId: number, list: ListName): void {
   // BUG-06-01: towatch NON imposta manualList (permette promozione naturale).
   // watching e completed impostano manualList=true (blocca retrocessione).
   show.manualList = list !== 'towatch';
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     show.list = prevList;
     show.manualList = prevManual;
     showToast('Spostamento non salvato (modifiche in altro tab?)', 'error');
@@ -141,12 +141,7 @@ export function moveShowToList(showId: number, list: ListName): void {
   emitChange();
 }
 
-/**
- * Toggle watched su un episodio. Usa `saveData({ immediate: true })`:
- * il ritorno booleano riflette davvero l'esito del salvataggio (a differenza
- * della versione debounced che ritornava sempre true), permettendo il
- * rollback corretto in caso di fallenza.
- */
+/** Toggle watched su un episodio, con rollback se il salvataggio fallisce. */
 export function toggleEpisode(showId: number, seasonNum: number, epNum: number): void {
   const state = getState();
   const show = state.shows.find((s) => s.id === showId);
@@ -162,8 +157,7 @@ export function toggleEpisode(showId: number, seasonNum: number, epNum: number):
   const prevManual = show.manualList ?? false;
   ep.watched = !ep.watched;
   updateShowListStatus(show);
-  if (!saveData({ immediate: true })) {
-    // Rollback reale (saveData immediate ritorna false su failure)
+  if (!saveData()) {
     ep.watched = prevWatched;
     show.list = prevList;
     show.manualList = prevManual;
@@ -188,7 +182,7 @@ export function markSeasonWatched(showId: number, seasonNum: number, watched: bo
     ep.watched = watched;
   });
   updateShowListStatus(show);
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     show.seasons[seasonNum] = prevEps;
     show.list = prevList;
     show.manualList = prevManual;
@@ -287,7 +281,7 @@ export async function refreshShowEpisodes(showId: number, opts?: { silent?: bool
     show.totalSeasons = refreshed.totalSeasons;
     updateShowListStatus(show);
 
-    if (!saveData({ immediate: true })) {
+    if (!saveData()) {
       // Rollback
       show.seasons = prevSeasons;
       show.totalEpisodes = prevTotalEpisodes;
@@ -358,7 +352,7 @@ export function setEpisodeRating(showId: number, seasonNum: number, epNum: numbe
   const prevRating = ep.rating;
   ep.rating = newRating;
 
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     ep.rating = prevRating;
     showToast('Rating non salvato (storage error o modifiche in altro tab)', 'error');
     return;
@@ -387,7 +381,7 @@ export function setEpisodeNote(showId: number, seasonNum: number, epNum: number,
   const prevNote = ep.note;
   ep.note = newNote;
 
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     ep.note = prevNote;
     showToast('Nota non salvata (storage error o modifiche in altro tab)', 'error');
     return false;
@@ -425,7 +419,7 @@ export function addShowTag(showId: number, tag: string): boolean {
   const prevTags = show.tags;
   show.tags = [...tags, trimmed];
 
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     show.tags = prevTags;
     showToast('Tag non salvato (storage error o modifiche in altro tab)', 'error');
     return false;
@@ -450,7 +444,7 @@ export function removeShowTag(showId: number, tag: string): void {
 
   if (show.tags.length === prevTags.length) return; // nessun cambiamento
 
-  if (!saveData({ immediate: true })) {
+  if (!saveData()) {
     show.tags = prevTags;
     showToast('Rimozione tag non salvata (storage error o modifiche in altro tab)', 'error');
     return;

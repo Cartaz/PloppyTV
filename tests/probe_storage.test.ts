@@ -9,7 +9,6 @@ const _state = {
   shows: [] as unknown[],
   _storageDisabled: false,
   _quotaWarned: false,
-  _localDirty: false,
 };
 
 const setShowsMock = vi.fn((shows: unknown[]) => {
@@ -140,7 +139,6 @@ beforeEach(() => {
   _state.shows = [];
   _state._storageDisabled = false;
   _state._quotaWarned = false;
-  _state._localDirty = false;
   setShowsMock.mockClear();
   setStorageDisabledMock.mockClear();
   setQuotaWarnedMock.mockClear();
@@ -155,42 +153,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-});
-
-// ============================================================
-// BUG-04-01 (FIXED): _localDirty is now consulted in the storage
-// event handler. When _localDirty=true (pending local edits), the
-// handler skips setShows, shows a toast, and leaves _lastSavedAt at
-// its pre-event value so the next CAS mismatches and forces a reload.
-// ============================================================
-describe('BUG-04-01 FIXED: _localDirty now consulted', () => {
-  it('storage event does NOT overwrite this tab shows when _localDirty=true', () => {
-    // Tab A loaded one show, then user made a debounced edit (state._localDirty=true)
-    // but the debounced save hasn't fired yet. Meanwhile tab B writes 3 different
-    // shows to localStorage. Tab A's storage event handler now consults
-    // _localDirty and refuses to overwrite.
-    _state.shows = [{ id: 1, name: 'A-edit' }];
-    _state._localDirty = true;
-    putSavedData(mem, [], 1000); // baseline in localStorage
-    loadData(); // loads nothing → _lastSavedAt = 1000
-    _state.shows = [{ id: 1, name: 'A-edit' }];
-    _state._localDirty = true;
-
-    const tabBShows = [
-      { id: 2, name: 'B1' },
-      { id: 3, name: 'B2' },
-    ];
-    dispatchStorageEvent(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, shows: tabBShows, savedAt: 2000 }));
-
-    // FIXED: _localDirty is consulted → shows preserved, not overwritten.
-    expect(_state.shows).toEqual([{ id: 1, name: 'A-edit' }]);
-    // setShows was NOT called with tabBShows (handler returned early).
-    expect(setShowsMock).not.toHaveBeenCalledWith(tabBShows);
-    // A toast was shown warning about the multi-tab update.
-    expect(showToastMock).toHaveBeenCalledWith('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
-    // The user's edit "A-edit" is preserved in this tab's in-memory shows.
-    expect(_state.shows).toContainEqual({ id: 1, name: 'A-edit' });
-  });
 });
 
 // ============================================================
@@ -220,7 +182,7 @@ describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () 
     // Make ALL STORAGE_KEY writes fail with QuotaExceeded (unrecoverable)
     mem.quotaFailOn = (key) => key === STORAGE_KEY;
 
-    const r1 = saveData({ immediate: true });
+    const r1 = saveData();
     expect(r1).toBe(false); // both writes failed
     // "Spazio esaurito" toast from the inner catch
     expect(showToastMock).toHaveBeenCalledWith('Spazio esaurito. Esporta backup e rimuovi serie vecchie.', 'error');
@@ -232,7 +194,7 @@ describe('BUG-04-02 FIXED: _lastSavedAt advanced only after write succeeds', () 
     // Restore storage write capability (simulate user freed space by exporting)
     mem.quotaFailOn = undefined;
     _state.shows = [{ id: 1, name: 'Y' }];
-    const r2 = saveData({ immediate: true });
+    const r2 = saveData();
     // FIXED: _lastSavedAt was NOT advanced by r1 (still 1000). Storage still
     // has savedAt=1000. CAS matches → save succeeds.
     expect(r2).toBe(true);
@@ -259,14 +221,12 @@ describe('BUG-04-03 FIXED: storage event null newValue preserves local data', ()
       { id: 1, name: 'A' },
       { id: 2, name: 'B' },
     ];
-    _state._localDirty = true;
     putSavedData(mem, _state.shows, 1000);
     loadData();
     _state.shows = [
       { id: 1, name: 'A' },
       { id: 2, name: 'B' },
     ];
-    _state._localDirty = true;
 
     // Simulate another tab removing STORAGE_KEY (e.g., user clears site data)
     mem.store.delete(STORAGE_KEY);
@@ -295,7 +255,7 @@ describe('CAS revision includes key presence', () => {
     mem.store.delete(STORAGE_KEY);
     _state.shows = [{ id: 2, name: 'stale edit' }];
 
-    expect(saveData({ immediate: true })).toBe(false);
+    expect(saveData()).toBe(false);
     expect(mem.store.has(STORAGE_KEY)).toBe(false);
     expect(showToastMock).toHaveBeenCalledWith(
       'Modifiche in un altro tab — ricarica per vedere i dati aggiornati',
@@ -340,10 +300,10 @@ describe('BUG-04-04 FIXED: modal-open storage event does NOT enable stale overwr
     // Toast was shown warning about the multi-tab update.
     expect(showToastMock).toHaveBeenCalledWith('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
 
-    // Now user closes modal and triggers a save (e.g., beforeunload in main.ts,
+    // Now user closes modal and triggers a save (e.g., a later edit,
     // or a toggleEpisode after closing the modal).
     isModalOpenMock.mockReturnValue(false);
-    const r = saveData({ immediate: true });
+    const r = saveData();
 
     // FIXED (H5): _lastSavedAt was NOT advanced (still 1000). Storage has 2000.
     // CAS mismatch → save FAILS → tab B's data is preserved.
@@ -417,7 +377,7 @@ describe('BUG-04-05 FIXED: QuotaExceeded recovery re-checks CAS', () => {
       return false;
     };
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
 
     // Restore getItem
     (globalThis as { localStorage: Storage }).localStorage.getItem = realGetItem;
@@ -469,7 +429,7 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
 
     // Tab A writes
     _state.shows = [{ id: 1, name: 'A' }];
-    const rA = saveData({ immediate: true });
+    const rA = saveData();
     expect(rA).toBe(true);
     expect(readSavedAt(mem)).not.toBe(1000); // advanced
     expect(readShows(mem)).toEqual([{ id: 1, name: 'A' }]);
@@ -489,7 +449,7 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
     // Now tab B writes — its CAS reads savedAt=1001 from storage,
     // _lastSavedAt=1000 → CAS should CATCH the mismatch.
     _state.shows = [{ id: 2, name: 'B' }];
-    const rB = saveData({ immediate: true });
+    const rB = saveData();
     // CAS catches it: storage savedAt=1001, _lastSavedAt=1000 → false
     expect(rB).toBe(false);
     expect(showToastMock).toHaveBeenCalledWith(
@@ -509,7 +469,7 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
     // But since storage.ts reads via _readSavedAtFromStorage() each save, we
     // can simulate by intercepting the read between two saveData calls.
     //
-    // Easier: call saveData({immediate:true}) twice in rapid succession WITH
+    // Easier: call saveData() twice in rapid succession WITH
     // the same _lastSavedAt baseline. But each successful save advances
     // _lastSavedAt, so the second CAS will see the new savedAt in storage
     // matching the new _lastSavedAt → passes legitimately.
@@ -547,7 +507,7 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
 
     // Tab A writes savedAt=1001 with show A
     _state.shows = [{ id: 1, name: 'A' }];
-    const rA = saveData({ immediate: true });
+    const rA = saveData();
     expect(rA).toBe(true);
     // Tab A's _lastSavedAt is now 1001
 
@@ -592,7 +552,7 @@ describe('BUG-04-06: multi-tab CAS TOCTOU (silent last-writer-wins)', () => {
     // tab A's write. We can't perfectly simulate two threads, but the
     // structural gap is real.
     _state.shows = [{ id: 2, name: 'B' }];
-    const rB = saveData({ immediate: true });
+    const rB = saveData();
     expect(rB).toBe(false); // CAS catches it
     // This test documents that CAS works when tab B re-reads storage.
     // The TOCTOU window (between read at line 82 and write at line 119) is
@@ -619,7 +579,7 @@ describe('BUG-04-07 FIXED: size threshold uses UTF-8 bytes', () => {
     loadData();
     _state.shows = [{ id: 1, name: manyMultibyte }];
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     // FIXED: quota warning now fires (UTF-8 byte size > 4500 KB).
     const quotaWarnCalls = showToastMock.mock.calls.filter(
@@ -718,7 +678,7 @@ describe('loadData backup recovery (sanity: this path works)', () => {
     expect(setShowsMock).toHaveBeenCalledWith(backupShows);
     expect(showToastMock).toHaveBeenCalledWith('Dati corrotti. Ripristinato backup precedente.', 'warning');
 
-    // saveData({immediate:true}) should have been called internally — STORAGE_KEY
+    // saveData() should have been called internally — STORAGE_KEY
     // should now contain valid JSON with the restored shows
     const written = readShows(mem);
     expect(written).toEqual(backupShows);
@@ -726,80 +686,6 @@ describe('loadData backup recovery (sanity: this path works)', () => {
     const newSavedAt = readSavedAt(mem);
     expect(typeof newSavedAt).toBe('number');
     expect(newSavedAt).toBeGreaterThan(5000);
-  });
-});
-
-// ============================================================
-// BUG-04-09 (FIXED): debounced saveData now returns void
-// (scheduled, not succeeded). Callers needing success/failure
-// feedback must use { immediate: true } which still returns
-// boolean. All current callers use immediate, so no breakage.
-// ============================================================
-describe('saveData debounce returns void (FIXED)', () => {
-  it('debounced saveData returns void even if scheduled save will fail', () => {
-    vi.useFakeTimers();
-    // Setup: storage has savedAt=2000 but _lastSavedAt=1000 (other tab wrote)
-    putSavedData(mem, [], 2000);
-    loadData(); // _lastSavedAt = 2000
-    // Now roll back _lastSavedAt to 1000 to simulate stale state
-    putSavedData(mem, [], 1000);
-    loadData(); // _lastSavedAt = 1000
-    putSavedData(mem, [], 2000); // storage has 2000 but _lastSavedAt=1000
-
-    _state.shows = [{ id: 1, name: 'X' }];
-    const r = saveData(); // debounced
-    // FIXED: debounced path returns void (not true).
-    expect(r).toBeUndefined();
-    // Now the debounced save fires — CAS will fail
-    vi.advanceTimersByTime(300);
-    // The CAS-fail toast was shown
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Modifiche in un altro tab — ricarica per vedere i dati aggiornati',
-      'warning',
-    );
-    // Storage was NOT updated (CAS rejected)
-    expect(readSavedAt(mem)).toBe(2000);
-  });
-});
-
-// ============================================================
-// Verify beforeunload (main.ts line 148) calls saveData({immediate:true}).
-// If CAS fails (another tab wrote AND storage event fired in this tab),
-// saveData returns false → user's last edits lost on tab close.
-// ============================================================
-describe('beforeunload saveData may fail CAS (informational)', () => {
-  it('saveData immediate=false when CAS mismatch — main.ts beforeunload loses edits', () => {
-    // Setup: tab A loaded savedAt=1000. Tab B wrote savedAt=2000 (storage event
-    // fired in A, _lastSavedAt=2000, shows replaced with B's). Now user makes
-    // an edit in tab A (shows=[A-edited]), then closes tab. beforeunload calls
-    // saveData({immediate:true}). CAS reads 2000, _lastSavedAt=2000 → PASSES.
-    // Wait — that's the BUG-04-04 scenario: A's stale shows overwrite B's.
-    //
-    // The simpler case: tab A loaded savedAt=1000. Tab B writes savedAt=2000
-    // but the storage event in tab A is delayed (browser queue). User edits
-    // in tab A (shows=[A-edited]), then closes tab. beforeunload → saveData
-    // reads savedAt=2000, _lastSavedAt=1000 → CAS FAILS → returns false.
-    // User's edit is lost on tab close (no auto-merge, no force-write).
-    putSavedData(mem, [], 1000);
-    loadData(); // _lastSavedAt = 1000
-
-    // Tab B writes 2000 (storage event NOT yet delivered to tab A)
-    putSavedData(mem, [{ id: 99, name: 'B-only' }], 2000);
-    // _lastSavedAt still 1000 in tab A (no storage event)
-
-    // User edits in tab A
-    _state.shows = [{ id: 1, name: 'A-edit' }];
-
-    // beforeunload fires → saveData({immediate:true})
-    const r = saveData({ immediate: true });
-    expect(r).toBe(false); // CAS failed
-    expect(showToastMock).toHaveBeenCalledWith(
-      'Modifiche in un altro tab — ricarica per vedere i dati aggiornati',
-      'warning',
-    );
-    // Tab A's edit "A-edit" was NOT persisted. User lost their work on close.
-    expect(readShows(mem)).toEqual([{ id: 99, name: 'B-only' }]);
-    // The toast may not even be visible because the tab is closing.
   });
 });
 
@@ -818,7 +704,7 @@ describe('BACKUP_KEY write failure ignored (sanity)', () => {
     // Make BACKUP_KEY writes throw, but STORAGE_KEY writes succeed
     mem.quotaFailOn = (key) => key === BACKUP_KEY;
 
-    const r = saveData({ immediate: true });
+    const r = saveData();
     expect(r).toBe(true);
     expect(readShows(mem)).toEqual([{ id: 1, name: 'new' }]);
     // BACKUP_KEY was NOT written (write threw, error ignored)

@@ -38,9 +38,9 @@ vi.hoisted(() => {
 });
 
 // ===== Mocks =====
-const saveDataMock = vi.fn((_opts?: { immediate?: boolean }) => true);
+const saveDataMock = vi.fn(() => true);
 vi.mock('../src/lib/storage', () => ({
-  saveData: (opts?: { immediate?: boolean }) => saveDataMock(opts),
+  saveData: () => saveDataMock(),
   isStorageOK: () => true,
 }));
 
@@ -519,7 +519,7 @@ describe('merge: basic flows', () => {
         .shows.map((s) => s.id)
         .sort(),
     ).toEqual([1, 2]);
-    expect(saveDataMock).toHaveBeenCalledWith({ immediate: true });
+    expect(saveDataMock).toHaveBeenCalled();
     // BUG-11-06 fix: singular feminine "Importata 1 nuova"
     expect(lastToast()?.msg).toContain('Importata 1 nuova');
   });

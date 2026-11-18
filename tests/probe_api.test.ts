@@ -43,11 +43,7 @@ function installPendingFetch(): {
           reject(makeAbortError());
           return;
         }
-        signal.addEventListener(
-          'abort',
-          () => reject(makeAbortError()),
-          { once: true },
-        );
+        signal.addEventListener('abort', () => reject(makeAbortError()), { once: true });
       }
       // never resolves otherwise
     });
@@ -154,11 +150,7 @@ describe('apiGet — internal timeout', () => {
       captured = init?.signal as AbortSignal | undefined;
       return new Promise<Response>((_resolve, reject) => {
         if (captured) {
-          captured.addEventListener(
-            'abort',
-            () => reject(makeAbortError()),
-            { once: true },
-          );
+          captured.addEventListener('abort', () => reject(makeAbortError()), { once: true });
         }
       });
     }) as typeof fetch;
@@ -188,11 +180,7 @@ describe('apiGet — internal timeout', () => {
             reject(makeAbortError());
             return;
           }
-          signal.addEventListener(
-            'abort',
-            () => reject(makeAbortError()),
-            { once: true },
-          );
+          signal.addEventListener('abort', () => reject(makeAbortError()), { once: true });
         }
       });
     }) as typeof fetch;
@@ -254,8 +242,7 @@ describe('apiGet — empty body contract', () => {
   it('iterating null directly throws TypeError (simulates refreshShowEpisodes loop)', () => {
     // refreshShowEpisodes (shows.ts L215) does `for (const ep of episodes)`.
     expect(() => {
-       
-      for (const _ep of (null as unknown as never[])) {
+      for (const _ep of null as unknown as never[]) {
         // never reached
       }
     }).toThrow(TypeError);
@@ -292,16 +279,12 @@ describe('apiGet — error typing', () => {
   });
 
   it('200 OK with HTML body → ApiError name "ParseError"', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      makeResponse('<html><body>not json</body></html>', 200) as Response,
-    );
+    vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('<html><body>not json</body></html>', 200) as Response);
     await expect(getShowEpisodes(1)).rejects.toMatchObject({ name: 'ParseError' });
   });
 
   it('fetch throws TypeError → ApiError name "NetworkError"', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(
-      Object.assign(new TypeError('Failed to fetch'), {}),
-    );
+    vi.spyOn(global, 'fetch').mockRejectedValue(Object.assign(new TypeError('Failed to fetch'), {}));
     await expect(getShowEpisodes(1)).rejects.toMatchObject({ name: 'NetworkError' });
   });
 
@@ -329,9 +312,7 @@ describe('apiGet — happy path', () => {
   });
 
   it('searchShows encodes query and hits /search/shows', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await searchShows('a & b');
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;
@@ -339,9 +320,7 @@ describe('apiGet — happy path', () => {
   });
 
   it('getShowsPage encodes page number', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowsPage(42);
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;
@@ -349,9 +328,7 @@ describe('apiGet — happy path', () => {
   });
 
   it('getShowEpisodes encodes showId', async () => {
-    const spy = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(makeResponse('[]', 200) as Response);
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(makeResponse('[]', 200) as Response);
     await getShowEpisodes(7);
     expect(spy).toHaveBeenCalledOnce();
     const url = spy.mock.calls[0][0] as string;

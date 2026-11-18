@@ -1,6 +1,6 @@
 // Agent 18 — probe tests for src/main.ts
 // Stress test: init order, hash routing, SW registration + onNeedRefresh,
-// beforeunload, standalone detection, double-init.
+// no save on unload, standalone detection, double-init.
 //
 // Mocks all dependencies (store, storage, components) so we can capture call
 // order, inject failures, and exercise edge cases without touching real
@@ -66,7 +66,7 @@ const mockRender = vi.fn();
 const mockShowToast = vi.fn((_msg: any, _type?: any) => undefined);
 const mockIsStorageOK = vi.fn(() => true as boolean);
 const mockLoadData = vi.fn();
-const mockSaveData = vi.fn((_opts?: any) => true as boolean);
+const mockSaveData = vi.fn(() => true as boolean);
 const mockSubscribe = vi.fn((_fn: any) => vi.fn() as () => void);
 const mockSwitchView = vi.fn((_view: any) => undefined);
 const mockOpenShow = vi.fn((_id: any) => undefined);
@@ -83,7 +83,6 @@ let _state: any = {
   _storageDisabled: false,
   _quotaWarned: false,
   _discoverTab: 'popular' as const,
-  _localDirty: false,
 };
 function __setState(patch: Partial<typeof _state>): void {
   _state = { ..._state, ...patch };
@@ -108,7 +107,7 @@ vi.mock('../src/lib/store', () => ({
 vi.mock('../src/lib/storage', () => ({
   isStorageOK: () => mockIsStorageOK(),
   loadData: () => mockLoadData(),
-  saveData: (opts?: any) => mockSaveData(opts),
+  saveData: () => mockSaveData(),
 }));
 
 vi.mock('../src/components/modal', () => ({
@@ -174,7 +173,6 @@ function resetMocks(): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
   mockGetState.mockImplementation(() => _state);
   // FIX-18-08: init() now guards against double-init via a flag on window.
@@ -285,19 +283,8 @@ describe('main.ts — init order', () => {
     spy.mockRestore();
   });
 
-  it('FIX-18-02 (C3): beforeunload listener is registered INSIDE init() AFTER loadData — if init throws early, beforeunload is NOT registered and saveData is NOT called on tab close', async () => {
-    mockInitRenderer.mockImplementationOnce(() => {
-      throw new Error('boom');
-    });
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    try {
-      await import('../src/main');
-    } catch {
-      // FIX: init no longer throws; expected path is no throw.
-    }
-    spy.mockRestore();
-    // FIX: beforeunload listener is registered AFTER loadData(); since
-    // initRenderer throws before loadData, the listener was never attached.
+  it('closing the tab does not write storage: every mutation is already saved', async () => {
+    await import('../src/main');
     fireBeforeunload();
     expect(mockSaveData).not.toHaveBeenCalled();
   });
@@ -645,50 +632,6 @@ describe('main.ts — SW registration (dev)', () => {
   });
 });
 
-describe('main.ts — beforeunload', () => {
-  beforeEach(() => {
-    resetMocks();
-    vi.useFakeTimers();
-    vi.resetModules();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-    document.documentElement.classList.remove('pwa-standalone');
-  });
-
-  it('beforeunload fires saveData with {immediate:true}', async () => {
-    await import('../src/main');
-    fireBeforeunload();
-    expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });
-  });
-
-  it('FIX-18-05 (H14): beforeunload handler still calls saveData when it returns false (CAS fail) — try/catch wrapper does not suppress the call', async () => {
-    mockSaveData.mockReturnValue(false); // CAS fail / quota fail
-    await import('../src/main');
-    fireBeforeunload();
-    expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });
-    // The return value is still ignored (no preventDefault, no retry), but
-    // the C3 fix ensures the listener only runs after data is loaded, so
-    // the false return no longer risks overwriting valid localStorage with
-    // empty state — the worst case is the user's last edits in THIS tab
-    // are not persisted on close, which is acceptable for a best-effort save.
-  });
-
-  it('FIX-18-06: beforeunload contains save failures instead of leaking them', async () => {
-    const error = new Error('save failed');
-    mockSaveData.mockImplementation(() => {
-      throw error;
-    });
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await import('../src/main');
-
-    expect(() => fireBeforeunload()).not.toThrow();
-    expect(mockSaveData).toHaveBeenCalledWith({ immediate: true });
-    expect(warnSpy).toHaveBeenCalledWith('[PloppyTV] saveData on beforeunload failed:', error);
-  });
-});
-
 describe('main.ts — standalone detection', () => {
   let originalMatchMedia: any;
   let originalStandalone: any;
@@ -764,7 +707,7 @@ describe('main.ts — double init (HMR / re-import)', () => {
     expect(mockInitRenderer).toHaveBeenCalledTimes(1);
   });
 
-  it('FIX-18-08: idempotency guard — with vi.resetModules between imports, init still runs ONCE (no duplicate listeners, no double save on beforeunload)', async () => {
+  it('FIX-18-08: idempotency guard — with vi.resetModules between imports, init still runs ONCE (no duplicate listeners)', async () => {
     await import('../src/main');
     vi.resetModules();
     await import('../src/main');
@@ -774,9 +717,6 @@ describe('main.ts — double init (HMR / re-import)', () => {
     expect(mockInitRenderer).toHaveBeenCalledTimes(1);
     expect(mockLoadData).toHaveBeenCalledTimes(1);
     expect(mockRender).toHaveBeenCalledTimes(1);
-    // beforeunload listener added ONCE → saveData called once on one event
-    fireBeforeunload();
-    expect(mockSaveData).toHaveBeenCalledTimes(1);
   });
 
   it('FIX-18-08: idempotency guard — applyHash fires ONCE on hashchange (single handler even after re-import)', async () => {

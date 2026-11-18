@@ -4,10 +4,7 @@
 //  - BUG-A18-01: registerSW wrappato in try/catch — se la registrazione SW
 //    lancia (navigator.serviceWorker rotto, virtual module buggy), init non
 //    crasha e l'app continua a funzionare senza PWA offline.
-//  - BUG-A18-02: init() body wrappato in try/catch con fallback UI. Il
-//    listener beforeunload è spostato DENTRO init() DOPO loadData: se init
-//    lancia prima di loadData, il listener non viene attaccato, evitando
-//    che saveData sovrascriva localStorage valido con state vuoto.
+//  - BUG-A18-02: init() body wrappato in try/catch con fallback UI.
 //  - BUG-A18-03: onNeedRefresh dedup — multiple chiamate mostrano un solo
 //    bottone "Aggiorna ora". Il flag dedup è resettato dopo l'auto-remove
 //    (30s) così un secondo update può mostrare un nuovo bottone.
@@ -15,7 +12,6 @@
 //    avviene comunque, no unhandled rejection.
 //  - BUG-A18-05: toast message chiaro ("vedi pulsante in basso a destra")
 //    invece del precedente "tocca per aggiornare" (il toast non è cliccabile).
-//  - BUG-A18-06: beforeunload handler wrappa saveData in try/catch.
 //  - BUG-A18-07: idempotency guard via __ploppytvInit flag su window —
 //    sopravvive a vi.resetModules() (HMR / re-import), evitando listener
 //    duplication e double-init.
@@ -24,7 +20,7 @@
 
 import './styles/main.css';
 import { getState, subscribe, switchView, openShow } from './lib/store';
-import { isStorageOK, loadData, saveData } from './lib/storage';
+import { isStorageOK, loadData } from './lib/storage';
 import { initModal, showModal } from './components/modal';
 import { initHeader, updateBadges } from './components/header';
 import { initSearch } from './components/search';
@@ -219,7 +215,7 @@ function detectStandalone(): void {
 function init(): void {
   // BUG-A18-07: idempotency guard. Il flag su window sopravvive a
   // vi.resetModules() (HMR / re-import), così il secondo import non
-  // re-registra listener (hashchange, beforeunload, error, unhandledrejection)
+  // re-registra listener (hashchange, error, unhandledrejection)
   // e non re-runna initX (evitando double-bind, double-save, ecc.).
   const w = window as unknown as { __ploppytvInit?: boolean };
   if (w.__ploppytvInit) return;
@@ -280,20 +276,6 @@ function init(): void {
     registerPWA();
 
     detectStandalone();
-
-    // BUG-A18-02: beforeunload registrato DENTRO init() DOPO loadData.
-    // Se init lancia prima di loadData (es. initRenderer throw), il listener
-    // non viene attaccato → saveData NON viene chiamato su tab close →
-    // evita di sovrascrivere localStorage valido con state vuoto.
-    // BUG-A18-06: saveData avvolto in try/catch — un throw del modulo storage
-    // (es. SecurityError in casi rari) non deve crashare il listener.
-    window.addEventListener('beforeunload', () => {
-      try {
-        saveData({ immediate: true });
-      } catch (e) {
-        console.warn('[PloppyTV] saveData on beforeunload failed:', e);
-      }
-    });
   } catch (e) {
     // BUG-A18-02: init() non deve lanciare. Mostra fallback UI + logga.
     showFatalError(e);

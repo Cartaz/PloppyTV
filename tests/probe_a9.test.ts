@@ -289,7 +289,6 @@ function makeGetterBombShow(): Show {
 }
 
 describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + no leak', () => {
-   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -384,7 +383,6 @@ describe('[client] BUG-A9-05: postMessage throws DataCloneError → fallback + n
 });
 
 describe('[client] BUG-A9-06: fallback compute throws → promise rejects (no hang)', () => {
-   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;

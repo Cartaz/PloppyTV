@@ -32,8 +32,6 @@ export function isStorageOK(): boolean {
   }
 })();
 
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
-
 // Il documento esatto è la revisione: due scritture nello stesso
 // millisecondo (o legacy senza savedAt) restano distinguibili, senza cambiare
 // lo schema persistito. null rappresenta la chiave assente.
@@ -48,27 +46,14 @@ function _readStorageRevision(): { raw: string | null } | null {
 }
 
 /**
- * Salva lo stato corrente su localStorage.
- * - `{ immediate: true }`: scrive sincronamente, ritorna `false` se la
- *   scrittura fallisce (quota, serializzazione, conflitto multi-tab).
- * - senza `immediate`: schedula un debounce di 300ms e ritorna `void`, perché
- *   il risultato della persistenza non è ancora disponibile al chiamante.
+ * Salva subito lo stato corrente su localStorage. Ritorna `false` se la
+ * scrittura fallisce (quota, serializzazione, conflitto multi-tab): i
+ * chiamanti fanno rollback della modifica in memoria.
  *
  * CAS multi-tab: se la revisione corrente (contenuto esatto) differisce
  * da quella caricata dal tab, la scrittura viene rifiutata.
  */
-export function saveData(opts?: { immediate?: boolean }): boolean | void {
-  if (opts && opts.immediate) {
-    if (_saveTimer) clearTimeout(_saveTimer);
-    return _saveDataNow();
-  }
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(_saveDataNow, 300);
-  return;
-}
-
-function _saveDataNow(): boolean {
-  _saveTimer = null;
+export function saveData(): boolean {
   const state = getState();
   if (state._storageDisabled || !_storageOK) return false;
 
@@ -234,7 +219,7 @@ export function loadData(): void {
     if (backupShows) {
       setShows(backupShows);
       showToast('Dati corrotti. Ripristinato backup precedente.', 'warning');
-      saveData({ immediate: true });
+      saveData();
       return;
     }
     setShows([]);
@@ -248,7 +233,7 @@ export function loadData(): void {
     if (unsupported) {
       console.warn('[PloppyTV] Schema version futura:', canonical.version, '— atteso', SCHEMA_VERSION);
       // Una versione futura è valida per una build più recente, non corrotta.
-      // Bloccare le scritture evita che recovery o beforeunload la distruggano.
+      // Bloccare le scritture evita che il recovery la distrugga.
       setStorageDisabled(true);
       setShows([]);
       showToast(
@@ -264,7 +249,7 @@ export function loadData(): void {
     if (backupShows) {
       setShows(backupShows);
       showToast('Dati non validi. Ripristinato backup precedente.', 'warning');
-      saveData({ immediate: true });
+      saveData();
       return;
     }
 
@@ -292,7 +277,7 @@ if (typeof window !== 'undefined') {
       const state = getState();
 
       // BUG-04-03: storage event con newValue=null (altro tab ha cancellato).
-      // Se ci sono shows locali (o _localDirty), NON wipe — mostra toast.
+      // Se ci sono shows locali, NON wipe — mostra toast.
       if (ev.newValue === null) {
         if (state.shows.length > 0) {
           showToast('Dati cancellati in altro tab — ricarica per sincronizzare', 'warning');
@@ -323,14 +308,6 @@ if (typeof window !== 'undefined') {
         console.warn('[PloppyTV] storage event con version passata:', sourceVersion);
       }
       const newShows = canonical.document.shows;
-
-      // BUG-04-01: se _localDirty=true (modifiche locali non salvate), NON
-      // sovrascrivere lo stato. Mostra toast e lascia _lastRevision al valore
-      // pre-event (così il prossimo saveData CAS-fail e forza reload).
-      if (state._localDirty) {
-        showToast('Aggiornamento da altro tab — ricarica per sincronizzare', 'warning');
-        return;
-      }
 
       // H5 / BUG-04-04: se c'è una modale aperta, NON sovrascrivere lo stato.
       // Mostriamo un toast che invita a ricaricare a modale chiusa.

@@ -1443,17 +1443,15 @@ describe('A20 — normalize.ts defense-in-depth (XSS on import)', () => {
     expect(show!.summary).not.toContain('alert');
   });
 
-  it('normalizeShow: tags with XSS → stripped', () => {
+  it('normalizeShow: tags are user text — preserved verbatim (escaped at render)', () => {
     const raw = {
       id: 1,
       name: 'Show',
-      tags: ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>', 'safe-tag'],
+      tags: ['<script>alert(1)</script>', 'R&amp;B', 'safe-tag'],
       seasons: {},
     };
     const show = normalizeMod.normalizeShow(raw);
-    expect(show).toBeTruthy();
-    // The XSS tags are stripped to empty strings → filtered out.
-    expect(show!.tags).toEqual(['safe-tag']);
+    expect(show!.tags).toEqual(['<script>alert(1)</script>', 'R&amp;B', 'safe-tag']);
   });
 
   it('normalizeShow: episode name with XSS → stripped', () => {
@@ -1475,22 +1473,19 @@ describe('A20 — normalize.ts defense-in-depth (XSS on import)', () => {
     expect(show!.seasons[1][2].name).toBe('safe');
   });
 
-  it('normalizeShow: episode note with XSS → stripped', () => {
+  it('normalizeShow: episode notes are user text — preserved verbatim (escaped at render)', () => {
     const raw = {
       id: 1,
       name: 'Show',
       seasons: {
         1: [
-          { num: 1, id: 1, note: '<script>alert(1)</script>safe note' },
-          { num: 2, id: 2, note: '<img src=x onerror=alert(1)>' },
+          { num: 1, id: 1, note: '2 < 3 > 1 &amp; co' },
+          { num: 2, id: 2, note: '   ' },
         ],
       },
     };
     const show = normalizeMod.normalizeShow(raw);
-    expect(show).toBeTruthy();
-    // The script tag is stripped (content removed) → "safe note" survives.
-    expect(show!.seasons[1][0].note).toBe('safe note');
-    // The img tag is stripped (no content) → empty → filtered out (no note).
+    expect(show!.seasons[1][0].note).toBe('2 < 3 > 1 &amp; co');
     expect(show!.seasons[1][1].note).toBeUndefined();
   });
 
@@ -1758,17 +1753,10 @@ describe('A20 — library.ts showAvgRating Infinity/NaN (cross-file BUG-A20-02)'
   });
 });
 
-describe('A20 — shows.ts addShowTag/setEpisodeNote stripHtml inconsistency (cross-file BUG-A20-03)', () => {
-  // BUG-A20-03 [LOW] cross-file (shows.ts, agent A6): addShowTag and
-  // setEpisodeNote store user input RAW (trim + slice only, no stripHtml).
-  // This is inconsistent with normalizeShow which strips HTML from tags
-  // (BUG-A1-09) and notes (BUG-A1-08) on import. The display is safe
-  // (escapeHtml/escapeAttr applied in views), so no XSS. But there's a data
-  // consistency issue: if a user types "<b>important</b>" as a tag, it's
-  // stored raw and displayed as escaped text "<b>important</b>". After
-  // export + re-import, normalize strips the <b> tags → tag becomes
-  // "important". The tag silently changes. Defense-in-depth: addShowTag
-  // and setEpisodeNote should stripHtml to match normalizeShow.
+describe('A20 — notes and tags survive a persistence round-trip unchanged', () => {
+  // Regressione: prima normalizeShow applicava stripHtml a note e tag, quindi
+  // il testo scritto dall'utente ("2 < 3 > 1", "<b>importante</b>") cambiava
+  // al primo ricaricamento o re-import.
   let storeMod: typeof Store;
   let showsMod: typeof Shows;
 
@@ -1780,7 +1768,7 @@ describe('A20 — shows.ts addShowTag/setEpisodeNote stripHtml inconsistency (cr
     storeMod.setShows([]);
   });
 
-  it('addShowTag: stores HTML raw (no stripHtml) — inconsistent with normalizeShow', async () => {
+  it('addShowTag: the stored tag is unchanged by normalizeShow', async () => {
     const show = corruptShow({
       id: 1,
       name: 'Show',
@@ -1791,22 +1779,15 @@ describe('A20 — shows.ts addShowTag/setEpisodeNote stripHtml inconsistency (cr
     });
     storeMod.setShows([show]);
 
-    const htmlTag = '<b>important</b>';
-    const result = showsMod.addShowTag(1, htmlTag);
-    expect(result).toBe(true);
-
-    // BUG-A20-03: the tag is stored RAW (with HTML). normalizeShow would
-    // strip the <b> tags → "important". But addShowTag doesn't strip.
+    const tag = '<b>important</b> & co';
+    expect(showsMod.addShowTag(1, tag)).toBe(true);
     const updated = storeMod.getState().shows[0];
-    expect(updated.tags).toContain(htmlTag); // raw HTML stored
-    // After normalize (simulating re-import), the tag would be stripped:
+    expect(updated.tags).toEqual([tag]);
     const normalizeMod = await import('../src/lib/normalize');
-    const normalized = normalizeMod.normalizeShow(updated);
-    expect(normalized!.tags).toContain('important'); // stripped
-    expect(normalized!.tags).not.toContain(htmlTag); // raw HTML gone
+    expect(normalizeMod.normalizeShow(JSON.parse(JSON.stringify(updated)))!.tags).toEqual([tag]);
   });
 
-  it('setEpisodeNote: stores HTML raw (no stripHtml) — inconsistent with normalizeShow', async () => {
+  it('setEpisodeNote: the stored note is unchanged by normalizeShow', async () => {
     const show = corruptShow({
       id: 1,
       name: 'Show',
@@ -1816,17 +1797,12 @@ describe('A20 — shows.ts addShowTag/setEpisodeNote stripHtml inconsistency (cr
     });
     storeMod.setShows([show]);
 
-    const htmlNote = '<b>spoiler</b> alert';
-    showsMod.setEpisodeNote(1, 1, 1, htmlNote);
-
-    // BUG-A20-03: the note is stored RAW (with HTML). normalizeShow would
-    // strip the <b> tags → "spoiler alert".
+    const note = 'Ricordati: 2 < 3 > 1 &amp; <b>spoiler</b>';
+    showsMod.setEpisodeNote(1, 1, 1, note);
     const updated = storeMod.getState().shows[0];
-    expect(updated.seasons[1][0].note).toBe(htmlNote); // raw HTML stored
-    // After normalize (simulating re-import), the note would be stripped:
+    expect(updated.seasons[1][0].note).toBe(note);
     const normalizeMod = await import('../src/lib/normalize');
-    const normalized = normalizeMod.normalizeShow(updated);
-    expect(normalized!.seasons[1][0].note).toBe('spoiler alert'); // stripped
+    expect(normalizeMod.normalizeShow(JSON.parse(JSON.stringify(updated)))!.seasons[1][0].note).toBe(note);
   });
 });
 

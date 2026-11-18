@@ -375,7 +375,6 @@ describe('[worker] computeCalendar', () => {
 // ============================================================
 
 describe('[client] computeStatsAsync', () => {
-   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;
@@ -634,7 +633,6 @@ describe('[client] computeStatsAsync', () => {
 });
 
 describe('[client] computeCalendarAsync', () => {
-   
   let mockWorker: any;
   let messageHandlers: ((ev: { data: WorkerResponse }) => void)[];
   let originalWorker: typeof Worker;

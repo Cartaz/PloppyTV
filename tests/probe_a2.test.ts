@@ -30,7 +30,6 @@ function resetState(): void {
     _storageDisabled: false,
     _quotaWarned: false,
     _discoverTab: 'popular',
-    _localDirty: false,
   });
 }
 
@@ -78,7 +77,7 @@ describe('BUG-A2-01: setShows validates non-array input', () => {
 describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
   beforeEach(resetState);
 
-  it('setShows non condivide la reference dell\'array con il caller', () => {
+  it("setShows non condivide la reference dell'array con il caller", () => {
     const arr = [makeShow({ id: 1 })];
     setShows(arr);
     expect(getState().shows).not.toBe(arr);
@@ -87,7 +86,7 @@ describe('BUG-A2-02: setShows/setState defensive shallow-copy', () => {
     expect(getState().shows.length).toBe(1);
   });
 
-  it('setState({ shows: arr }) non condivide la reference dell\'array', () => {
+  it("setState({ shows: arr }) non condivide la reference dell'array", () => {
     const arr = [makeShow({ id: 1 })];
     setState({ shows: arr });
     expect(getState().shows).not.toBe(arr);
@@ -312,7 +311,7 @@ describe('BUG-A2-06: setState validates `shows` field if present', () => {
 describe('BUG-A2-07: emitChange listener iteration is reentrancy-safe', () => {
   beforeEach(resetState);
 
-  it('listener iscritto durante l\'emit NON firea nello stesso flush', async () => {
+  it("listener iscritto durante l'emit NON firea nello stesso flush", async () => {
     const late = vi.fn();
     let unsubLate: () => void = () => {};
     const early = vi.fn(() => {
@@ -447,13 +446,16 @@ describe('BUG-A2 edge: combinazioni + immutabilità post-fix', () => {
   beforeEach(resetState);
 
   it('snapshot di show con tutti i campi (tags, genres, seasons) è totalmente isolato', () => {
-    const show = makeShowWithSeasons({ 1: 3 }, {
-      id: 7,
-      tags: ['gold', 'rewatch'],
-      genres: ['Drama', 'Thriller'],
-      list: 'watching',
-      manualList: true,
-    });
+    const show = makeShowWithSeasons(
+      { 1: 3 },
+      {
+        id: 7,
+        tags: ['gold', 'rewatch'],
+        genres: ['Drama', 'Thriller'],
+        list: 'watching',
+        manualList: true,
+      },
+    );
     markWatchedFirst(show, 1, 2);
     setShows([show]);
 
@@ -579,7 +581,7 @@ describe('BUG-A2 regression: existing behaviors preserved', () => {
     expect(getState().shows[0].name).toBe('New');
   });
 
-  it('removeShowFromState rimuove solo l\'id specificato', () => {
+  it("removeShowFromState rimuove solo l'id specificato", () => {
     setShows([makeShow({ id: 1 }), makeShow({ id: 2 }), makeShow({ id: 3 })]);
     removeShowFromState(2);
     expect(getState().shows.map((s) => s.id)).toEqual([1, 3]);
@@ -598,15 +600,18 @@ describe('BUG-A2 regression: existing behaviors preserved', () => {
   });
 
   it('snapshot preserva i valori dei campi scalari', () => {
-    const show = makeShowWithSeasons({ 1: 2 }, {
-      id: 42,
-      name: 'Test',
-      list: 'watching',
-      manualList: true,
-      runtime: 60,
-      totalEpisodes: 2,
-      totalSeasons: 1,
-    });
+    const show = makeShowWithSeasons(
+      { 1: 2 },
+      {
+        id: 42,
+        name: 'Test',
+        list: 'watching',
+        manualList: true,
+        runtime: 60,
+        totalEpisodes: 2,
+        totalSeasons: 1,
+      },
+    );
     markWatchedFirst(show, 1, 1);
     setShows([show]);
 
